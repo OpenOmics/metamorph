@@ -249,9 +249,9 @@ def parsed_arguments(name, description):
         Optional arguments are shown in square brackets above.
 
         {3}{4}Description:{5}
-          To run the ...long pipeline name with your data raw data, please
-        provide a space seperated list of FastQ (globbing is supported) and an output 
-        directory to store results.
+          To run the metagenomics and metatranscriptomics pipeline with your data raw 
+        data, please provide a space seperated list of FastQ (globbing is supported) 
+        and an output directory to store results.
 
         {3}{4}Required arguments:{5}
           --input INPUT [INPUT ...]
