@@ -219,9 +219,6 @@ def setup(sub_args, ifiles, repo_path, output_path):
             v = str(v)
         config['options'][opt] = v
 
-    # Save config to output directory
-    with open(os.path.join(output_path, 'config.json'), 'w') as fh:
-        json.dump(config, fh, indent = 4, sort_keys = True)
 
     return config
 
@@ -313,7 +310,12 @@ def resolve_additional_bind_paths(search_paths):
 
     for index, paths in indexed_paths.items():
         # Find common paths for each path index
-        common_paths.append(os.path.dirname(os.path.commonprefix(paths)))
+        p = os.path.dirname(os.path.commonprefix(paths))
+        if p == os.sep:
+            # Aviods adding / to bind list when
+            # given /tmp or /scratch as input 
+            p = os.path.commonprefix(paths)
+        common_paths.append(p)
 
     return list(set(common_paths))
 
@@ -336,14 +338,15 @@ def bind(sub_args, config):
                 value = os.path.dirname(value)
             if value not in bindpaths:
                 bindpaths.append(value)
-    
-    # Bind input file paths, working 
-    # directory, and other reference 
+
+    # Bind input file paths, working
+    # directory, and other reference
     # genome paths
     rawdata_bind_paths = [os.path.realpath(p) for p in config['project']['datapath'].split(',')]
     working_directory =  os.path.realpath(config['project']['workpath'])
     genome_bind_paths = resolve_additional_bind_paths(bindpaths)
     bindpaths = [working_directory] + rawdata_bind_paths +  genome_bind_paths
+    bindpaths = list(set([p for p in bindpaths if p != os.sep]))
 
     return bindpaths
 
@@ -451,7 +454,7 @@ def add_rawdata_information(sub_args, config, ifiles):
     @return config <dict>:
          Updated config dictionary containing user information (username and home directory)
     """
-    
+
     # Determine whether dataset is paired-end
     # or single-end
     # Updates config['project']['nends'] where
@@ -601,12 +604,15 @@ def dryrun(outdir, config='config.json', snakefile=os.path.join('workflow', 'Sna
         Byte string representation of dryrun command
     """
     try:
+        # Setting cores to dummy high number so
+        # displays the true number of cores a rule
+        # will use, it uses the min(--cores CORES, N)
         dryrun_output = subprocess.check_output([
             'snakemake', '-npr',
             '-s', str(snakefile),
             '--use-singularity',
             '--rerun-incomplete',
-            '--cores', str(1),
+            '--cores', str(256),
             '--configfile={}'.format(config)
         ], cwd = outdir,
         stderr=subprocess.STDOUT)
@@ -621,14 +627,14 @@ def dryrun(outdir, config='config.json', snakefile=os.path.join('workflow', 'Sna
             # Failure caused by unknown cause, raise error
             raise e
     except subprocess.CalledProcessError as e:
-        print(e, e.output)
+        print(e, e.output.decode("utf-8"))
         raise(e)
 
     return dryrun_output
 
 
 def runner(mode, outdir, alt_cache, logger, additional_bind_paths = None, 
-    threads=2,  jobname='pl:master', submission_script='runner',
+    threads=2,  jobname='pl:master', submission_script='run.sh',
     tmp_dir = '/lscratch/$SLURM_JOBID/'):
     """Runs the pipeline via selected executor: local or slurm.
     If 'local' is selected, the pipeline is executed locally on a compute node/instance.
@@ -660,7 +666,16 @@ def runner(mode, outdir, alt_cache, logger, additional_bind_paths = None,
     # Add any default PATHs to bind to 
     # the container's filesystem, like 
     # tmp directories, /lscratch
-    bindpaths = "{},{}".format(outdir, os.path.dirname(tmp_dir.rstrip('/')))
+    addpaths = []
+    temp = os.path.dirname(tmp_dir.rstrip('/'))
+    if temp == os.sep:
+        temp = tmp_dir.rstrip('/')
+    if outdir not in additional_bind_paths:
+        addpaths.append(outdir)
+    if temp not in additional_bind_paths:
+        addpaths.append(temp)
+    bindpaths = ','.join(addpaths)
+
     # Set ENV variable 'SINGULARITY_CACHEDIR' 
     # to output directory
     my_env = {}; my_env.update(os.environ)
@@ -673,13 +688,15 @@ def runner(mode, outdir, alt_cache, logger, additional_bind_paths = None,
         cache = alt_cache
 
     if additional_bind_paths:
-        # Add Bind PATHs for rawdata directories
-        bindpaths = "{},{}".format(additional_bind_paths,bindpaths)
+        # Add Bind PATHs for outdir and tmp dir
+        if bindpaths:
+            bindpaths = ",{}".format(bindpaths)
+        bindpaths = "{}{}".format(additional_bind_paths,bindpaths)
 
     if not exists(os.path.join(outdir, 'logfiles')):
         # Create directory for logfiles
         os.makedirs(os.path.join(outdir, 'logfiles'))
-    
+
     # Create .singularity directory for 
     # installations of snakemake without
     # setuid which creates a sandbox in
@@ -722,7 +739,7 @@ def runner(mode, outdir, alt_cache, logger, additional_bind_paths = None,
         #   --rerun-incomplete --stats "$3"/logfiles/runtime_statistics.json \
         #   --keep-remote --local-cores 30 2>&1 | tee -a "$3"/logfiles/master.log
         masterjob = subprocess.Popen([
-                str(os.path.join(outdir, 'resources', str(submission_script))), mode,
+                str(submission_script), mode,
                 '-j', jobname, '-b', str(bindpaths),
                 '-o', str(outdir), '-c', str(cache),
                 '-t', "'{}'".format(tmp_dir)

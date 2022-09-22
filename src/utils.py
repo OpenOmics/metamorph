@@ -170,9 +170,11 @@ def require(cmds, suggestions, path=None):
     for i in range(len(cmds)):
         available = which(cmds[i])
         if not available:
+            c = Colors
             error = True
-            err("""\x1b[6;37;41m\n\tFatal: {} is not in $PATH and is required during runtime!
-            └── Solution: please 'module load {}' and run again!\x1b[0m""".format(cmds[i], suggestions[i])
+            err("""\n{}{}Fatal: {} is not in $PATH and is required during runtime!{}
+            └── Possible solution: please 'module load {}' and run again!""".format(
+                c.bg_red, c.white, cmds[i], c.end, suggestions[i])
             )
 
     if error: fatal()
@@ -206,11 +208,16 @@ def git_commit_hash(repo_path):
     @return githash <str>:
         Latest git commit hash
     """
-    githash = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd = repo_path).strip().decode('utf-8')
-    # Typecast to fix python3 TypeError (Object of type bytes is not JSON serializable)
-    # subprocess.check_output() returns a byte string
-    githash = str(githash)
-
+    try:
+        githash = subprocess.check_output(['git', 'rev-parse', 'HEAD'], stderr=subprocess.STDOUT, cwd = repo_path).strip().decode('utf-8')
+        # Typecast to fix python3 TypeError (Object of type bytes is not JSON serializable)
+        # subprocess.check_output() returns a byte string
+        githash = str(githash)
+    except Exception as e:
+        # Github releases are missing the .git directory,
+        # meaning you cannot get a commit hash, set the 
+        # commit hash to indicate its from a GH release
+        githash = 'github_release'
     return githash
 
 
@@ -286,6 +293,69 @@ def unpacked(nested_dict):
             # If value is not dict type then
             # yield the value
             yield value
+
+
+class Colors():
+    """Class encoding for ANSI escape sequeces for styling terminal text.
+    Any string that is formatting with these styles must be terminated with
+    the escape sequence, i.e. `Colors.end`.
+    """
+    # Escape sequence
+    end = '\33[0m'
+    # Formatting options
+    bold   = '\33[1m'
+    italic = '\33[3m'
+    url    = '\33[4m'
+    blink  = '\33[5m'
+    higlighted = '\33[7m'
+    # Text Colors
+    black  = '\33[30m'
+    red    = '\33[31m'
+    green  = '\33[32m'
+    yellow = '\33[33m'
+    blue   = '\33[34m'
+    pink  = '\33[35m'
+    cyan  = '\33[96m'
+    white = '\33[37m'
+    # Background fill colors
+    bg_black  = '\33[40m'
+    bg_red    = '\33[41m'
+    bg_green  = '\33[42m'
+    bg_yellow = '\33[43m'
+    bg_blue   = '\33[44m'
+    bg_pink  = '\33[45m'
+    bg_cyan  = '\33[46m'
+    bg_white = '\33[47m'
+
+
+def hashed(l):
+    """Returns an MD5 checksum for a list of strings. The list is sorted to
+    ensure deterministic results prior to generating the MD5 checksum. This 
+    function can be used to generate a batch id from a list of input files.
+    It is worth noting that path should be removed prior to calculating the 
+    checksum/hash.
+    @Input:
+        l list[<str>]: List of strings to hash
+    @Output:
+        h <str>: MD5 checksum of the sorted list of strings
+    Example:
+        $ echo -e '1\n2\n3' > tmp
+        $ md5sum tmp
+        # c0710d6b4f15dfa88f600b0e6b624077  tmp
+        hashed([1,2,3])   # returns c0710d6b4f15dfa88f600b0e6b624077
+    """
+    # Sort list to ensure deterministic results
+    l = sorted(l)
+    # Convert everything to strings
+    l = [str(s) for s in l]
+    # Calculate an MD5 checksum of results
+    h = hashlib.md5()
+    # encode method ensure cross-compatiability 
+    # across python2 and python3 
+    h.update("{}\n".format("\n".join(l)).encode())
+    h = h.hexdigest()
+
+    return h
 
 
 if __name__ == '__main__':
