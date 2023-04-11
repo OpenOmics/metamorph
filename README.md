@@ -2,7 +2,8 @@
    
   <h1>metamorph 🔬</h1>
   
-  **_An awesome metagenomics and metatranscriptomics pipeline_**
+  ** Metagenome and Metatranscriptome sequencing analysis workflow for
+quantification, taxonomic classification, and functional profiling of assembled metagenomes **
 
   [![tests](https://github.com/OpenOmics/metamorph/workflows/tests/badge.svg)](https://github.com/OpenOmics/metamorph/actions/workflows/main.yaml) [![docs](https://github.com/OpenOmics/metamorph/workflows/docs/badge.svg)](https://github.com/OpenOmics/metamorph/actions/workflows/docs.yml) [![GitHub issues](https://img.shields.io/github/issues/OpenOmics/metamorph?color=brightgreen)](https://github.com/OpenOmics/metamorph/issues)  [![GitHub license](https://img.shields.io/github/license/OpenOmics/metamorph)](https://github.com/OpenOmics/metamorph/blob/main/LICENSE) 
   
