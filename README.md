@@ -3,12 +3,12 @@
   <h1>metamorph 🔬</h1>
   
   ** Metagenome and Metatranscriptome sequencing analysis workflow for
-quantification, taxonomic classification, and functional profiling of assembled metagenomes **
+quantification, taxonomic classification, and functional profiling of assembled metagenomes (bacteria and archaea) **
 
   [![tests](https://github.com/OpenOmics/metamorph/workflows/tests/badge.svg)](https://github.com/OpenOmics/metamorph/actions/workflows/main.yaml) [![docs](https://github.com/OpenOmics/metamorph/workflows/docs/badge.svg)](https://github.com/OpenOmics/metamorph/actions/workflows/docs.yml) [![GitHub issues](https://img.shields.io/github/issues/OpenOmics/metamorph?color=brightgreen)](https://github.com/OpenOmics/metamorph/issues)  [![GitHub license](https://img.shields.io/github/license/OpenOmics/metamorph)](https://github.com/OpenOmics/metamorph/blob/main/LICENSE) 
   
   <i>
-    This is the home of the pipeline, metamorph. Its long-term goals: to accurately ...insert goal, to infer ..insert goal, and to boldly ..insert goal like no pipeline before!
+    This is the home of the pipeline, metamorph. Its long-term goals is to accurately characterize metagenomes like no pipeline before!
   </i>
 </div>
 
@@ -21,7 +21,7 @@ The **`./metamorph`** pipeline is composed several inter-related sub commands to
  * [<code>metamorph <b>unlock</b></code>](https://openomics.github.io/metamorph/usage/unlock/): Unlocks a previous runs output directory.
  * [<code>metamorph <b>cache</b></code>](https://openomics.github.io/metamorph/usage/cache/): Cache remote resources locally, coming soon!
 
-**metamorph** is a comprehensive ...insert long description. It relies on technologies like [Singularity<sup>1</sup>](https://singularity.lbl.gov/) to maintain the highest-level of reproducibility. The pipeline consists of a series of data processing and quality-control steps orchestrated by [Snakemake<sup>2</sup>](https://snakemake.readthedocs.io/en/stable/), a flexible and scalable workflow management system, to submit jobs to a cluster.
+**metamorph** is a comprehensive workflow that starts off with assembly of short read DNA sequencing data (metagenome) to build contigs for each individual sample, followed by contig binning. Good quality genomic bins from all samples are futher combined and dereplicated to generate representative metagenome-assembled genomes or MAGs. These MAGs are further classified, quantified, and used to predict functional profiles. The short read DNA sequencing data (metatranscriptome) mapping to MAGs is used for functional profiling. It relies on technologies like [Singularity<sup>1</sup>](https://singularity.lbl.gov/) to maintain the highest-level of reproducibility. The pipeline consists of a series of data processing and quality-control steps orchestrated by [Snakemake<sup>2</sup>](https://snakemake.readthedocs.io/en/stable/), a flexible and scalable workflow management system, to submit jobs to a cluster.
 
 The pipeline is compatible with data generated from Illumina short-read sequencing technologies. As input, it accepts a set of FastQ files and can be run locally on a compute instance or on-premise using a cluster. A user can define the method or mode of execution. The pipeline can submit jobs to a cluster using a job scheduler like SLURM (more coming soon!). A hybrid approach ensures the pipeline is accessible to all users.
 
