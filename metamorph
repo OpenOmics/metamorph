@@ -54,8 +54,8 @@ from src.utils import (
 
 # Pipeline Metadata
 __version__ = version
-__authors__ = 'Skyler Kuhn, Neelam Redekar'
-__email__ = 'skyler.kuhn@nih.gov, neelam.redekar@nih.gov'
+__authors__ = 'Neelam Redekar, Skyler Kuhn'
+__email__ = 'neelam.redekar <AT> nih.gov, skyler.kuhn <AT> nih.gov'
 __home__  =  os.path.dirname(os.path.abspath(__file__))
 _name = os.path.basename(sys.argv[0])
 _description = 'An awesome metagenomics and metatranscriptomics pipeline'

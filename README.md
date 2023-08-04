@@ -2,13 +2,12 @@
    
   <h1>metamorph 🔬</h1>
   
-  ** Metagenome and Metatranscriptome sequencing analysis workflow for
-quantification, taxonomic classification, and functional profiling of assembled metagenomes (bacteria and archaea) **
+  **_An awesome metagenomic and metatranscriptomics pipeline_**
 
   [![tests](https://github.com/OpenOmics/metamorph/workflows/tests/badge.svg)](https://github.com/OpenOmics/metamorph/actions/workflows/main.yaml) [![docs](https://github.com/OpenOmics/metamorph/workflows/docs/badge.svg)](https://github.com/OpenOmics/metamorph/actions/workflows/docs.yml) [![GitHub issues](https://img.shields.io/github/issues/OpenOmics/metamorph?color=brightgreen)](https://github.com/OpenOmics/metamorph/issues)  [![GitHub license](https://img.shields.io/github/license/OpenOmics/metamorph)](https://github.com/OpenOmics/metamorph/blob/main/LICENSE) 
   
   <i>
-    This is the home of the pipeline, metamorph. Its long-term goals is to accurately characterize metagenomes like no pipeline before!
+    This is the home of the pipeline, metamorph. Its long-term goals: to provide accurate quantification, taxonomic classification, and functional profiling functional profiling of assembled (bacteria and archaea) metagenomes!
   </i>
 </div>
 
@@ -19,6 +18,7 @@ The **`./metamorph`** pipeline is composed several inter-related sub commands to
 
  * [<code>metamorph <b>run</b></code>](https://openomics.github.io/metamorph/usage/run/): Run the metamorph pipeline with your input files.
  * [<code>metamorph <b>unlock</b></code>](https://openomics.github.io/metamorph/usage/unlock/): Unlocks a previous runs output directory.
+ * [<code>metamorph <b>install</b></code>](https://openomics.github.io/metamorph/usage/install/): Download reference files locally.
  * [<code>metamorph <b>cache</b></code>](https://openomics.github.io/metamorph/usage/cache/): Cache remote resources locally, coming soon!
 
 **metamorph** is a comprehensive workflow that starts off with assembly of short read DNA sequencing data (metagenome) to build contigs for each individual sample, followed by contig binning. Good quality genomic bins from all samples are futher combined and dereplicated to generate representative metagenome-assembled genomes or MAGs. These MAGs are further classified, quantified, and used to predict functional profiles. The short read DNA sequencing data (metatranscriptome) mapping to MAGs is used for functional profiling. It relies on technologies like [Singularity<sup>1</sup>](https://singularity.lbl.gov/) to maintain the highest-level of reproducibility. The pipeline consists of a series of data processing and quality-control steps orchestrated by [Snakemake<sup>2</sup>](https://snakemake.readthedocs.io/en/stable/), a flexible and scalable workflow management system, to submit jobs to a cluster.
@@ -50,6 +50,30 @@ module load snakemake singularity
 
 ## Contribute 
 This site is a living document, created for and by members like you. metamorph is maintained by the members of OpenOmics and is improved by continous feedback! We encourage you to contribute new content and make improvements to existing content via pull request to our [GitHub repository](https://github.com/OpenOmics/metamorph).
+
+
+## Cite
+
+If you use this software, please cite it as below:  
+
+<details>
+  <summary><b><i>@BibText</i></b></summary>
+ 
+```text
+Citation coming soon!
+```
+
+</details>
+
+<details>
+  <summary><b><i>@APA</i></b></summary>
+
+```text
+Citation coming soon!
+```
+
+</details>
+
 
 ## References
 <sup>**1.**  Kurtzer GM, Sochat V, Bauer MW (2017). Singularity: Scientific containers for mobility of compute. PLoS ONE 12(5): e0177459.</sup>  
