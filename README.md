@@ -7,7 +7,7 @@
   [![tests](https://github.com/OpenOmics/metamorph/workflows/tests/badge.svg)](https://github.com/OpenOmics/metamorph/actions/workflows/main.yaml) [![docs](https://github.com/OpenOmics/metamorph/workflows/docs/badge.svg)](https://github.com/OpenOmics/metamorph/actions/workflows/docs.yml) [![GitHub issues](https://img.shields.io/github/issues/OpenOmics/metamorph?color=brightgreen)](https://github.com/OpenOmics/metamorph/issues)  [![GitHub license](https://img.shields.io/github/license/OpenOmics/metamorph)](https://github.com/OpenOmics/metamorph/blob/main/LICENSE) 
   
   <i>
-    This is the home of the pipeline, metamorph. Its long-term goals: to provide accurate quantification, taxonomic classification, and functional profiling functional profiling of assembled (bacteria and archaea) metagenomes!
+    This is the home of the pipeline, metamorph. Its long-term goals: to provide accurate quantification, taxonomic classification, and functional profiling of assembled (bacteria and archaea) metagenomes!
   </i>
 </div>
 

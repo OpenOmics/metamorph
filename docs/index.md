@@ -17,7 +17,7 @@
   </a>
 
   <p>
-    This is the home of the pipeline, metamorph. Its long-term goals: to provide accurate quantification, taxonomic classification, and functional profiling functional profiling of assembled (bacteria and archaea) metagenomes!
+    This is the home of the pipeline, metamorph. Its long-term goals: to provide accurate quantification, taxonomic classification, and functional profiling of assembled (bacteria and archaea) metagenomes!
   </p>
 
 </div>  
