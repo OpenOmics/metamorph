@@ -24,3 +24,4 @@ rule all:
 
 # Import rules 
 include: join("rules", "common.smk")
+include: join("rules", "hooks.smk")

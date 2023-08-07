@@ -2,7 +2,7 @@
 site_name: metamorph
 site_author: Skyler Kuhn
 site_description: >-
-  An awesome OpenOmics metagenomic and metatranscriptomics pipeline
+  An awesome metagenomics and metatranscriptomics pipeline
 
 # Repository
 repo_name: OpenOmics/metamorph
@@ -14,7 +14,7 @@ extra_css:
   - css/extra.css
 
 # Copyright
-copyright: Copyright &copy; 2022 OpenOmics
+copyright: Copyright &copy; 2023 OpenOmics
 
 # Configuration
 theme:
@@ -27,12 +27,12 @@ theme:
     # Palette toggle for light mode 
     - scheme: default
       toggle:
-        icon: material/toggle-switch-off-outline
+        icon: material/lightbulb-on
         name: Switch to dark mode
     # Palette toggle for dark mode
     - scheme: slate
       toggle:
-        icon: material/toggle-switch
+        icon: material/weather-night
         name: Switch to light mode
   logo: assets/icons/doc-book.svg
   favicon: assets/favicon/favicon.ico
@@ -58,6 +58,7 @@ extra:
 
 # Extensions
 markdown_extensions:
+  - markdown.extensions.md_in_html
   - markdown.extensions.admonition
   - markdown.extensions.attr_list
   - markdown.extensions.def_list
@@ -87,7 +88,8 @@ markdown_extensions:
   - pymdownx.snippets:
       check_paths: true
   - pymdownx.superfences
-  - pymdownx.tabbed
+  - pymdownx.tabbed:
+      alternate_style: true
   - pymdownx.tasklist:
       custom_checkbox: true
   - pymdownx.tilde
@@ -98,6 +100,7 @@ nav:
   - Commands: 
     - metamorph run: usage/run.md
     - metamorph unlock: usage/unlock.md
+    - metamorph install: usage/install.md
     - metamorph cache: usage/cache.md
   - FAQ:
     - General Questions: faq/questions.md
