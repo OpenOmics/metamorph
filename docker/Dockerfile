@@ -10,10 +10,8 @@ RUN usermod -a -G sudo $MAMBA_USER
 # back to mamba user
 USER $MAMBA_USER
 
-# update chanels
-RUN micromamba update -y -n base -c conda-forge; micromamba update -y -n base -c bioconda; micromamba update -y -n base -c defaults
-
 # setup up metagenome environment
-COPY env.yaml /env.yaml
-RUN micromamba create -f /env.yaml
+COPY assets /assets
+RUN micromamba create -f /assets/base.yaml
+RUN micromamba create -f /assets/metawrap.yaml
 ENV ENV_NAME=metagenome

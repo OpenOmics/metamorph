@@ -1,0 +1,16 @@
+name: metawrap_env
+channels:
+  - defaults
+  - bioconda
+  - ursky
+  - conda-forge
+  - mkl
+dependencies:
+  - python=2.7
+  - blas==2.5 
+  - blast==2.6.0 
+  - kraken==1.1 
+  - kraken2
+  - krona==2.7 
+  - samtools==1.9
+  - concoct==1.0.0
