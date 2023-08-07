@@ -135,8 +135,12 @@ dmypy.json
 **/.DS_Store
 **/._*
 
+# SM
 .snakemake*
 **/.snakemake*
+
+# venv
+.env-*
 .venv
 .venv/*
 
