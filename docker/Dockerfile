@@ -1,3 +1,4 @@
+ARG ENV_CONTEXT=metagenome
 FROM mambaorg/micromamba 
 # $MAMBA_USER from inherited image
 
@@ -14,4 +15,4 @@ USER $MAMBA_USER
 COPY assets /assets
 RUN micromamba create -f /assets/base.yaml
 RUN micromamba create -f /assets/metawrap.yaml
-ENV ENV_NAME=metagenome
+ENV ENV_NAME=$ENV_CONTEXT

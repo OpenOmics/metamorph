@@ -1,5 +1,18 @@
-## Steps for Building Docker Images
+# Metagenome and metatranscriptome sequencing analyses docker
 
+## Dockerfile configuration
+The docker image for this workflow is based on the (micromamba docker)[https://github.com/mamba-org/micromamba-docker]. Two micromamba environments exist on this image one containing metawrap 1.2 (the `metawrap_env` environment) and its dependencies, and another (the `metagenome` environment) containing everything else. See the conda enviroment specification files in the asset directory for more detail.
+
+## Execution context switching of the docker image
+Micromamba makes use of the environmental variable `ENV_NAME` to determine which environment to activate on entry to the docker container. The default of this variable points to the `metagenome` environment, if you specified the environmental variable `ENV_NAME` as `metawrap_env` you would get the metawrap execution context. 
+
+Alternatively, micromamba can be invoked with context directly, i.e.:
+<pre>
+micromamba run -n metagenome drep <i>args</i>
+micromamba run -n metawrap_env metawrap <i>args</i>
+</pre>
+
+## Steps for Building Docker Images
 Directly below are instructions for building an image using the provided Dockerfile:
 
 ```bash
