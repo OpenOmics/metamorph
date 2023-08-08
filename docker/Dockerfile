@@ -1,4 +1,3 @@
-ARG ENV_CONTEXT=metagenome
 FROM mambaorg/micromamba 
 # $MAMBA_USER from inherited image
 
@@ -13,6 +12,7 @@ USER $MAMBA_USER
 
 # setup up metagenome environment
 COPY assets /assets
-RUN micromamba create -f /assets/base.yaml
+ENV ENV_NAME=metagenome
+#RUN micromamba create -f /assets/base.yaml
 RUN micromamba create -f /assets/metawrap.yaml
-ENV ENV_NAME=$ENV_CONTEXT
+#RUN micromamba run -n metawrap_env -c ursky -c bioconda metawrap-mg=1.2.1
