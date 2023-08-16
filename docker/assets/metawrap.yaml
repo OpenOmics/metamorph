@@ -22,4 +22,6 @@ dependencies:
   - bioconda::checkm-genome==1.0.12
   - concoct==1.0.0.*
   - r-base==3.5.1
+  - bioconda::quast==5.0.2
+  - seaborn==0.9.0.*
   - salmon==0.13.1.*
