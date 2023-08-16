@@ -1,3 +1,7 @@
+from snakemake.io import expand, join
+from functools import partial
+
+
 # Common helper functions shared across the entire workflow
 def provided(samplelist, condition):
     """
@@ -81,7 +85,7 @@ def abstract_location(file_address, *args, **kwargs):
 
     # Check if user provided any input
     if not file_address or file_address is None:
-        raise IOError("Failed to provide any input files! Input(s) are required to resolve required files.".format(file_address))
+        raise IOError("Failed to provide any input files! Input(s) are required to resolve required files.".format(file_address),
 
     # If given file path to one file, convert it a list[<str>]
     file_list = [file_address] if isinstance(file_address, str) else file_address
@@ -105,7 +109,7 @@ def abstract_location(file_address, *args, **kwargs):
                 # s3 bucket are configured correctly.
                 # If a file in provieded as input to a Snakemake rule, only read
                 # access is needed to access the remote S3 object.
-                remote_provider = snakemake.remote.S3.RemoteProvider(config=botocore.client.Config(signature_version=botocore.UNSIGNED))
+                remote_provider = snakemake.remote.S3.RemoteProvider(config=botocore.client.Config(signature_version=botocore.UNSIGNED),
             file_list[i] = remote_provider.remote(uri, *args, **kwargs)
 
         elif uri.lower().startswith('gs://'):
@@ -188,7 +192,7 @@ def str_bool(s):
     else:
         # Provided value could not be
         # type casted into a boolean
-        raise TypeError('Fatal: cannot type cast {} into a boolean'.format(val))
+        raise TypeError('Fatal: cannot type cast {} into a boolean'.format(val),
 
 
 def joint_option(prefix, valueslist):
@@ -201,4 +205,55 @@ def joint_option(prefix, valueslist):
     for v in valueslist:
         s += "{} {} ".format(prefix, v)
     s = s.rstrip()
-    return s
+    return s    
+
+
+def output_from_modes(pwd, samples, mode, run):
+    outputsbymode = {
+        'coassembly': {
+            'kwargs': {
+                0: {'rn': run},
+                1: {'rn': run},
+            },
+            'paths': [
+                # Concatenate clean pure reads
+                join(pwd, "concatreads_dna/All_pure_reads_{rn}.fastq"),
+                join(pwd, "QC_dna/All_pure_reads_{rn}.R{rn}_fastqc.zip"),
+                # MetaWRAP assembly with metaspades and megahit
+                join(pwd, "coassembly_dna/final_assembly.fasta"),
+                join(pwd, "coassembly_dna/assembly_report.html"),
+                # Binning assembly contigs with MetaBAT2, MaxBin2, CONCOCT (together) 
+                join(pwd, "coassembly_dna/Binning/metabat2_bins"),
+                join(pwd, "coassembly_dna/Binning/maxbin2_bins"),
+                join(pwd, "coassembly_dna/Binning/concoct_bins"),
+                join(pwd, "coassembly_dna/Binning/complete.txt"),
+            ],
+        'assembly': {
+            'kwargs': {n: {'samples': samples} for n in range(12)} # all twelve assembly outputs
+            'paths': [
+                # MetaWRAP assembly with metaspades and megahit
+                join(pwd, "assembly_dna/{samples}_asm/final_assembly.fasta"),
+                join(pwd, "assembly_dna/{samples}_asm/assembly_report.html"),
+                # Binning assembly contigs with MetaBAT2, MaxBin2, CONCOCT (separately)
+                join(pwd, "metabat2Bins/{samples}/metabat2_bins"),
+                join(pwd, "maxbin2Bins/{samples}/maxbin2_bins"),
+                join(pwd, "concoctBins/{samples}/concoct_bins"),
+                join(pwd, "metabat2Bins/{samples}/complete.txt"),
+                join(pwd, "maxbin2Bins/{samples}/complete.txt"),
+                join(pwd, "concoctBins/{samples}/complete.txt"),
+                # Binning assembly contigs with MetaBAT2, MaxBin2, CONCOCT (together) 
+                join(pwd, "binning_dna/{samples}/metabat2_bins"),
+                join(pwd, "binning_dna/{samples}/maxbin2_bins"),
+                join(pwd, "binning_dna/{samples}/concoct_bins"),
+                join(pwd, "binning_dna/{samples}/complete.txt")
+            ]
+        }
+    }
+
+    outputs = []
+
+    for i, path in enumerate(outputsbymode[mode]['paths']):
+        kwargs = outsputsbymode[mode]['kwargs'].get(i, None)
+        outputs.append(expand(path, **kwargs) if kwargs else expand(path))
+
+    return(outputs)

@@ -1,27 +1,376 @@
-# Python standard library
+
+##########################################################################################
+# metamorph - Metagenome and metatranscriptome sequencing analyses workflow 
+# 
+# Steps: Assembly, quantification, taxonomic classification, and pathway annotation 
+#
+# Creator: Neelam Redekar, neelam.redekar@nih.gov
+# Created: June 7, 2023
+# Version 1.0
+# Last modified: Jul 24, 2023
+##########################################################################################
+
 from os.path import join
-from os import listdir
-import os, sys
-
-# 3rd party imports from pypi
-from snakemake.workflow import workflow as wf_api
+from snakemake.io import expand, glob_wildcards
 from snakemake.utils import R
-
-# Local imports
-from scripts.common import (
-    allocated,
-    provided, 
-    references,
-    str_bool
-)
+from os import listdir
+from scripts.common import output_from_modes
 
 
-# Final ouput files of the pipeline
-rule all:
+# Global configuration options
+configfile: 'config.json'
+dna_reads   = config["dna_reads"]
+rawdata_dir = config["rawdata_dir"]
+working_dir = config["result_dir"]
+genome      = config["genome"]
+mode        = config["Mode"]
+DNASAMPLES  = glob_wildcards(join(dna_reads, '{samples}_R1.fastq.gz'))
+RN          = ['1', '2']
+
+
+rule All:
     input:
-        []
+        # Creating data links:
+        expand(join(working_dir, "raw_dna/{samples}_{rn}.fastq"), samples=DNASAMPLES, rn=RN),
+        # ReadQC with metawrap (trimming, Fastqc before and after trimming, host read removal)
+        expand(join(working_dir, "QC_dna/{samples}/final_pure_reads_1.fastq"), samples=DNASAMPLES),
+        expand(join(working_dir, "QC_dna/{samples}/final_pure_reads_2.fastq"), samples=DNASAMPLES),
+        output_from_modes(working_dir, DNASAMPLES, mode, RN)
+
+    output:
+       #join(working_dir, "multiqc_report.html")
+
+    shell:
+        """
+        cd working_dir
+        mutliqc --interactive ./
+        """
+
+rule decompress_dna:
+    """
+    @Input:
+        Raw FastQ file compressed
+    @Output:
+        Raw FastQ file uncompressed
+    """
+    input:
+        FQin1 = join(dna_reads, "{samples}_R1.fastq.gz"),
+        FQin2 = join(dna_reads, "{samples}_R2.fastq.gz")
+    output:
+        FQ1 = join(working_dir, "raw_dna/{samples}_1.fastq"),
+        FQ2 = join(working_dir, "raw_dna/{samples}_2.fastq")
+    params:
+        rname="decompress_dna",
+        dir=directory(join(working_dir, "raw_dna")),
+    shell:
+        """
+        mkdir -p {params.dir}
+        gunzip -c {input.FQin1} > {output.FQ1}
+        gunzip -c {input.FQin2} > {output.FQ2}
+        """
+
+rule readQC_dna:
+    """
+    Quality-control step to assess sequencing quality of the raw data prior to assembly 
+    and alignment. The raw reads are trimmed based on adapted content and PHRED scored 
+    with the default setting of Trim-galore, ensuring that only high-quality sequences 
+    are left. Then reads are then aligned to the host genome (e.g. human) with bmtagger, 
+    and any host reads are removed from the metagenomic data to remove host contamination.
+    
+    Read pairs where only one read was aligned to the host genome are also removed. 
+    Finally, FASTQC is used to generate quality reports of the raw and final read sets 
+    in order to assess read quality improvement. 
+    @Input:
+        Raw FastQ file uncompressed
+    @Output:
+        Processed FastQ files (uncompressed) - adapters trimmed, QC, contaminant reads removed.
+        post-QC_report
+		pre-QC_report
+    """
+    input:
+        FQin1 = join(working_dir, "raw_dna/{samples}_1.fastq"),
+        FQin2 = join(working_dir, "raw_dna/{samples}_2.fastq"),
+    output:
+        FQ1 = join(working_dir, "QC_dna/{samples}/final_pure_reads_1.fastq"),
+        FQ2 = join(working_dir, "QC_dna/{samples}/final_pure_reads_2.fastq")
+    params:
+        rname="readQC_dna",
+        dir=directory(join(working_dir, "QC_dna/{samples}")),
+        batch='--cpus-per-task=32 --mem=110g --time=48:00:00',
+        prefix=genome, 
+    threads: 8
+    shell:
+        """
+        mkdir -p {params.dir}
+        source /data/NCBR/apps/genome-assembly/conda/etc/profile.d/conda.sh
+        set +u
+        conda activate metawrap-env
+        #source ~/.bash_profile
+        metawrap read_qc -1 {input.FQin1} -2 {input.FQin2} -x {params.prefix} -t {threads} -o {params.dir}
+        conda deactivate
+        """
+
+    
+rule concatenate_dna:
+    """ 
+    @Input:
+        Processed FastQ files (uncompressed) - adapters trimmed, QC, contaminant reads removed.
+    @Output:
+        Processed FastQ files concatenated from all samples
+    """
+    input:
+        FQin1 = expand(join(working_dir, "QC_dna/{samples}/final_pure_reads_1.fastq"),samples=DNASAMPLES),
+        FQin2 = expand(join(working_dir, "QC_dna/{samples}/final_pure_reads_2.fastq"),samples=DNASAMPLES),
+    output:     
+    	FQ1 = join(working_dir, "concatreads_dna/All_pure_reads_1.fastq"),
+        FQ2 = join(working_dir, "concatreads_dna/All_pure_reads_2.fastq"),
+        QC1 = join(working_dir, "QC_dna/All_pure_reads_1.R1_fastqc.zip"),
+        QC2 = join(working_dir, "QC_dna/All_pure_reads_2.R2_fastqc.zip"),
+    params:
+        rname="concatenate_dna",
+        dir=directory(join(working_dir, "concatreads_dna")),
+        batch='--cpus-per-task=32 --mem=110g --time=48:00:00',
+        fastqc_dir=directory(join(working_dir, "QC_dna")),
+    threads: 8
+    shell:
+        """
+        mkdir -p {params.dir}
+        cat {input.FQin1} > {output.FQ1}
+        cat {input.FQin2} > {output.FQ2}
+        fastqc {output.FQ1} {output.FQ2} -f fastq -t {threads} -o {params.fastqc_dir}
+        """
+        
+	
+
+rule coassembly_dna:
+    """
+    The metaWRAP::Assembly module allows the user to assemble a set of metagenomic reads 
+    with either metaSPAdes or MegaHit (default). While metaSPAdes results in a superior 
+    assembly in most samples, MegaHit is much more memory efficient, faster, and scales 
+    well with large datasets. In addition to simplifying parameter selection for the 
+    user, this module also sorts and formats the MegaHit assembly in a way that makes 
+    it easier to inspect. The contigs are sorted by length and their naming is changed 
+    to resemble that of SPAdes, including the contig ID, length, and coverage. Finally, 
+    short scaffolds are discarded (<1000bp), and an assembly report is generated with 
+    QUAST.
+    @Input:
+        Concatenated FastQ files (uncompressed) - adapters trimmed, QC, contaminant reads 
+        removed.
+    @Output:
+	Assembly.fasta
+        QUAST report
+    """
+    input:    
+    	FQin1 = join(working_dir, "concatreads_dna/All_pure_reads_1.fastq"),
+        FQin2 = join(working_dir, "concatreads_dna/All_pure_reads_2.fastq"),
+    output:
+        asm = join(working_dir, "coassembly_dna/final_assembly.fasta"),
+        asmQC = join(working_dir, "coassembly_dna/assembly_report.html")
+    params:
+        rname="coassembly_dna",
+        dir=directory(join(working_dir, "coassembly_dna")),
+        asmdir="coassembly_dna",
+        batch='--cpus-per-task=96 --mem=999g --time=48:00:00',
+        minlen=1000,
+        threads=96
+    shell:
+        """
+        mkdir -p {params.dir}
+        cd working_dir
+        source /data/NCBR/apps/genome-assembly/conda/etc/profile.d/conda.sh
+        set +u
+        conda activate metawrap-env
+        metawrap assembly -1 {input.FQin1} -2 {input.FQin2} -m 999 -t {params.threads} --metaspades --megahit -l {params.minlen} -o {params.asmdir}
+        conda deactivate
+        """
 
 
-# Import rules 
-include: join("rules", "common.smk")
-include: join("rules", "hooks.smk")
+rule assembly_dna:
+    """
+        The metaWRAP::Assembly module allows the user to assemble a set of metagenomic reads 
+        with either metaSPAdes or MegaHit (default). While metaSPAdes results in a superior 
+        assembly in most samples, MegaHit is much more memory efficient, faster, and scales 
+        well with large datasets. In addition to simplifying parameter selection for the 
+        user, this module also sorts and formats the MegaHit assembly in a way that makes 
+        it easier to inspect. The contigs are sorted by length and their naming is changed 
+        to resemble that of SPAdes, including the contig ID, length, and coverage. Finally, 
+        short scaffolds are discarded (<1000bp), and an assembly report is generated with 
+        QUAST.
+
+        @Input:
+            Concatenated FastQ files (uncompressed) - adapters trimmed, QC, contaminant reads 
+            removed.
+        
+        @Output:
+            Assembly.fasta
+            QUAST report
+    """
+    input:    
+        FQin1 = join(working_dir, "QC_dna/{samples}/final_pure_reads_1.fastq"),
+        FQin2 = join(working_dir, "QC_dna/{samples}/final_pure_reads_2.fastq"),
+    output:
+        asm = join(working_dir, "assembly_dna/{samples}_asm/final_assembly.fasta"),
+        asmQC = join(working_dir, "assembly_dna/{samples}_asm/assembly_report.html"),
+    params:
+        rname="assembly_dna",
+        dir=directory(join(working_dir, "assembly_dna/{samples}_asm")),
+        batch='--cpus-per-task=16 --mem=200g --time=48:00:00',
+        minlen=1000,
+    	threads=16
+    shell:
+        """
+        mkdir -p {params.dir}
+        cd {params.dir}; cd ../
+        source /data/NCBR/apps/genome-assembly/conda/etc/profile.d/conda.sh
+        set +u
+        conda activate metawrap-env
+        metawrap assembly -1 {input.FQin1} -2 {input.FQin2} -m 200 -t {params.threads} --metaspades --megahit -l {params.minlen} -o {params.dir}
+        conda deactivate
+        """
+
+rule metabat2Bins:
+    input:    
+        FQin1 = join(working_dir, "QC_dna/{samples}/final_pure_reads_1.fastq"), 
+        FQin2 = join(working_dir, "QC_dna/{samples}/final_pure_reads_2.fastq"), 
+        asm = join(working_dir, "assembly_dna/{samples}_asm/final_assembly.fasta"),
+    output:
+        bin = directory(join(working_dir, "metabat2Bins/{samples}/metabat2_bins")),
+        complete = join(working_dir, "metabat2Bins/{samples}/complete.txt"),
+    params:
+        rname="metabat2Bins",
+        asm=join(working_dir, "assembly_dna/{samples}_asm/final_assembly_renamed.fasta"),
+        dir=directory(join(working_dir, "metabat2Bins/{samples}")),
+        batch='--cpus-per-task=16 --mem=200g --time=48:00:00',
+        log=join(working_dir, "metabat2Bins/{samples}/binning_log.txt"),
+        minlen=1000,
+        tag="{samples}",
+        threads=16
+    shell:
+        """
+        mkdir -p {params.dir}
+        cd {params.dir}
+        perl -p -e "s/^>/>{params.tag}-/g" {input.asm} > {params.asm}
+        source /data/NCBR/apps/genome-assembly/conda/etc/profile.d/conda.sh
+        set +u
+        conda activate metawrap-env
+        metaWRAP binning --metabat2 --run-checkm -m 200 -t 16 -a {params.asm} -o {params.dir} {input.FQin1} {input.FQin2} > {params.log} && touch {output.complete}
+        conda deactivate
+        """
+
+rule maxbin2Bins:
+    input:   
+        FQin1 = join(working_dir, "QC_dna/{samples}/final_pure_reads_1.fastq"), 
+        FQin2 = join(working_dir, "QC_dna/{samples}/final_pure_reads_2.fastq"), 
+        asm = join(working_dir, "assembly_dna/{samples}_asm/final_assembly.fasta"),
+    output:
+        bin = directory(join(working_dir, "maxbin2Bins/{samples}/maxbin2_bins")),
+        complete = join(working_dir, "maxbin2Bins/{samples}/complete.txt"),
+    params:
+        rname="maxbin2Bins",
+        asm=join(working_dir, "assembly_dna/{samples}_asm/final_assembly_renamed.fasta"),
+        dir=directory(join(working_dir, "maxbin2Bins/{samples}")),
+        batch='--cpus-per-task=16 --mem=200g --time=48:00:00',
+        log=join(working_dir, "maxbin2Bins/{samples}/binning_log.txt"),
+        minlen=1000,
+        tag="{samples}",
+        threads=16
+    shell:
+        """
+        mkdir -p {params.dir}
+        cd {params.dir}
+        perl -p -e "s/^>/>{params.tag}-/g" {input.asm} > {params.asm}
+        source /data/NCBR/apps/genome-assembly/conda/etc/profile.d/conda.sh
+        set +u
+        conda activate metawrap-env
+        metaWRAP binning --maxbin2 --run-checkm -m 200 -t 16 -a {params.asm} -o {params.dir} {input.FQin1} {input.FQin2} > {params.log} && touch {output.complete}
+        conda deactivate
+        """
+
+rule concoctBins:
+    input:   
+        FQin1 = join(working_dir, "QC_dna/{samples}/final_pure_reads_1.fastq"), 
+        FQin2 = join(working_dir, "QC_dna/{samples}/final_pure_reads_2.fastq"), 
+        asm = join(working_dir, "assembly_dna/{samples}_asm/final_assembly.fasta"),
+    output:
+        bin = directory(join(working_dir, "concoctBins/{samples}/concoct_bins")),
+        complete = join(working_dir, "concoctBins/{samples}/complete.txt"),
+    params:
+        rname="concoctBins",
+        asm=join(working_dir, "assembly_dna/{samples}_asm/final_assembly_renamed.fasta"),
+        dir=directory(join(working_dir, "concoctBins/{samples}")),
+        batch='--cpus-per-task=16 --mem=200g --time=48:00:00',
+        log=join(working_dir, "concoctBins/{samples}/binning_log.txt"),
+        minlen=1000,
+        tag="{samples}",
+        threads=16
+    shell:
+        """
+        mkdir -p {params.dir}
+        cd {params.dir}
+        perl -p -e "s/^>/>{params.tag}-/g" {input.asm} > {params.asm}
+        source /data/NCBR/apps/genome-assembly/conda/etc/profile.d/conda.sh
+        set +u
+        conda activate metawrap-env
+        metaWRAP binning --concoct --run-checkm -m 200 -t 16 -a {params.asm} -o {params.dir} {input.FQin1} {input.FQin2} > {params.log} && touch {output.complete}
+        conda deactivate
+        """
+
+
+rule coassemblyBins:
+    input:
+        FQin1 = join(working_dir, "concatreads_dna/All_pure_reads_1.fastq"),
+        FQin2 = join(working_dir, "concatreads_dna/All_pure_reads_2.fastq"),
+        asm = join(working_dir, "coassembly_dna/final_assembly.fasta"),
+    output:
+        bin1 = directory(join(working_dir, "coassembly_dna/Binning/metabat2_bins")),
+        bin2 = directory(join(working_dir, "coassembly_dna/Binning/maxbin2_bins")),
+        bin3 = directory(join(working_dir, "coassembly_dna/Binning/concoct_bins")),
+        complete = join(working_dir, "coassembly_dna/Binning/complete.txt"),
+    params:
+        rname="coassemblyBins",
+        dir=directory(join(working_dir, "coassembly_dna/Binning")),
+        batch='--cpus-per-task=32 --mem=999g --time=10-00:00:00',
+        log=join(working_dir, "coassembly_dna/Binning/binning_log.txt"),
+        minlen=1000,
+        threads=32
+    shell:
+        """
+        mkdir -p {params.dir}
+        cd {params.dir}
+        source /data/NCBR/apps/genome-assembly/conda/etc/profile.d/conda.sh
+        set +u
+        conda activate metawrap-env
+        metaWRAP binning --metabat2 --maxbin2 --concoct --run-checkm -m 999 -t 32 -a {input.asm} -o {params.dir} {input.FQin1} {input.FQin2} > {params.log} && touch {output.complete}
+        conda deactivate
+        """
+
+rule assemblyBins:
+    input:   
+        FQin1 = join(working_dir, "QC_dna/{samples}/final_pure_reads_1.fastq"), 
+        FQin2 = join(working_dir, "QC_dna/{samples}/final_pure_reads_2.fastq"), 
+        asm = join(working_dir, "assembly_dna/{samples}_asm/final_assembly.fasta"),
+    output:
+        bin1 = directory(join(working_dir, "binning_dna/{samples}/metabat2_bins")),
+        bin2 = directory(join(working_dir, "binning_dna/{samples}/maxbin2_bins")),
+        bin3 = directory(join(working_dir, "binning_dna/{samples}/concoct_bins")),
+        complete = join(working_dir, "binning_dna/{samples}/complete.txt"),
+    params:
+        rname="assemblyBins",
+        asm=join(working_dir, "assembly_dna/{samples}_asm/final_assembly_renamed.fasta"),
+        dir=directory(join(working_dir, "binning_dna/{samples}")),
+        batch='--cpus-per-task=32 --mem=200g --time=48:00:00',
+        log=join(working_dir, "binning_dna/{samples}/binning_log.txt"),
+        minlen=1000,
+        tag="{samples}",
+        threads=16
+    shell:
+        """
+        mkdir -p {params.dir}
+        cd {params.dir}
+        source /data/NCBR/apps/genome-assembly/conda/etc/profile.d/conda.sh
+        set +u
+        conda activate metawrap-env
+        metaWRAP binning --metabat2 --maxbin2 --concoct --run-checkm -m 200 -t 32 -a {input.asm} -o {params.dir} {input.FQin1} {input.FQin2} > {params.log} && touch {output.complete}
+        conda deactivate
+        """
+
