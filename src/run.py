@@ -183,7 +183,7 @@ def setup(sub_args, ifiles, repo_path, output_path):
         # Base configuration file
         "base": os.path.join(output_path,'config','config.json'),
         # Template for project-level information
-        "project": os.path.join(output_path,'config','containers.json'),
+        "project": os.path.join(output_path,'config','images.json'),
         # Template for genomic reference files
         # User provided argument --genome is used to select the template
         "genome": genome_config,
@@ -387,6 +387,7 @@ def mixed_inputs(ifiles):
             """.format(" ".join(fq_files), " ".join(bam_files), sys.argv[0])
         )
 
+
 def add_user_information(config):
     """Adds username and user's home directory to config.
     @params config <dict>:
@@ -487,7 +488,7 @@ def image_cache(sub_args, config, repo_path):
     @return config <dict>:
          Updated config dictionary containing user information (username and home directory)
     """
-    images = os.path.join(repo_path, 'config','containers.json')
+    images = os.path.join(repo_path, 'config','images.json')
 
     # Read in config for docker image uris 
     with open(images, 'r') as fh:

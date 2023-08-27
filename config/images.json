@@ -1,0 +1,6 @@
+{
+    "images": {
+        "metawrap": "docker://rroutsong/metawrap-mg",
+        "metagenome": ""
+    }
+}
