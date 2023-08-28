@@ -1,5 +1,18 @@
+#!/usr/bin/env snakemake -s
+# ~~~~~~~~~~
+# Metawrap metagenome assembly and analysis rules
+# ~~~~~~~~~~
+from scripts.common import (
+    allocated,
+    provided, 
+    references,
+    str_bool
+)
+
 rule metawrap_read_qc:
     """
+        Metawrap read quality control rule for producing high quality reads for assembly.
+
         Quality-control step accomplishes three tasks:
             - Trims adapter sequences from input read pairs (.fastq.gz)
             - Quality filters from input read pairs
@@ -13,29 +26,31 @@ rule metawrap_read_qc:
                 - [Cutadapt](https://github.com/marcelm/cutadapt)
 
         @Input:
-            Trimmed FastQ file (scatter)
-        @Output:
+            Raw fastq.gz reads (R1 & R2 per-sample) from the instrument
+            
+        @Outputs:
+            Trimmed, quality filtered reads (R1 & R2)
             FastQC html report and zip file on trimmed data
         
         requires minimum of ~16gb memory for loading bmtagger index in memory (8gb)
     """
     input:
-        R1 = join(workpath, '{name}.R1.fastq.gz'),
-        R2 = join(workpath, '{name}.R2.fastq.gz'),
+        R1 = join(workpath, "{name}.R1.fastq.gz"),
+        R2 = join(workpath, "{name}.R2.fastq.gz"),
     output:
-        R1_bmtagger_report  = join(workpath, 'metawrap_readqc', '{name}', '{name}.R1_bmtagger_report.html'),
-        R2_bmtagger_report  = join(workpath, 'metawrap_readqc', '{name}', '{name}.R2_bmtagger_report.html'),
-        R1_fastqc_report    = join(workpath, 'metawrap_readqc', '{name}', '{name}.R1_fastqc_report.html'),
-        R2_fastqc_report    = join(workpath, 'metawrap_readqc', '{name}', '{name}.R2_fastqc_report.html'),
-        R1_qc_reads         = join(workpath, '{name}.R1_readqc.fastq.gz'),
-        R2_qc_reads         = join(workpath, '{name}.R2_readqc.fastq.gz'),
+        R1_bmtagger_report  = join(workpath, "metawrap_readqc", "{name}", "{name}.R1_bmtagger_report.html"),
+        R2_bmtagger_report  = join(workpath, "metawrap_readqc", "{name}", "{name}.R2_bmtagger_report.html"),
+        R1_fastqc_report    = join(workpath, "metawrap_readqc", "{name}", "{name}.R1_fastqc_report.html"),
+        R2_fastqc_report    = join(workpath, "metawrap_readqc", "{name}", "{name}.R2_fastqc_report.html"),
+        R1_qc_reads         = join(workpath, "{name}.R1_readqc.fastq.gz"),
+        R2_qc_reads         = join(workpath, "{name}.R2_readqc.fastq.gz"),
     params:
-        readqc_dir          = join(workpath, 'metawrap_readqc', "{name}"),
-        R1_mw_named         = join(workpath, '{name}_1.fastq'),
-        R2_mw_named         = join(workpath, '{name}_2.fastq'),
-        intermediate_qc_R1  = join(workpath, '{name}.R1_readqc.fastq'),
-        intermediate_qc_R2  = join(workpath, '{name}.R2_readqc.fastq'),
-    container: config['images']['metawrap'],
+        readqc_dir          = join(workpath, "metawrap_readqc", "{name}"),
+        R1_mw_named         = join(workpath, "{name}_1.fastq"),
+        R2_mw_named         = join(workpath, "{name}_2.fastq"),
+        intermediate_qc_R1  = join(workpath, "{name}.R1_readqc.fastq"),
+        intermediate_qc_R2  = join(workpath, "{name}.R2_readqc.fastq"),
+    container: config["images"]["metawrap"],
     threads: int(allocated("threads", "metawrap_read_qc", cluster)),
     shell: 
         """
@@ -66,4 +81,47 @@ rule metawrap_read_qc:
         rm -f {params.R2_mw_named}
         cp {params.readqc_dir}/post-QC_report/final_pure_reads_2_fastqc.html {output.R2_bmtagger_report}
         cp {params.readqc_dir}/pre-QC_report/{params.R2_mw_named}_fastqc.html {output.R2_fastqc_report}
+        """
+
+
+rule metawrap_genome_assembly:
+    """
+        @Input:
+            Clean trimmed fastq.gz reads (R1 & R2 per sample)
+        @Output:
+            
+    """
+    input:
+        R1                          = join(workpath, "{name}.R1_readqc.fastq.gz"),
+        R2                          = join(workpath, "{name}.R2_readqc.fastq.gz"),
+    output:
+        assembly_dir                = join(workpath, "metawrap_assembly", "{name}"),
+        # megahit outputs
+        megahit_dir                 = join(assembly_dir, "{name}", "megahit"),
+        megahit_assembly            = join(megahit_dir, "final.contigs.fa"),
+        megahit_longcontigs         = join(megahit_dir, "long.contigs.fa"),
+        megahit_log                 = join(megahit_dir, "log"),
+        # metaspades outsputs
+        metaspades_dir              = join(workpath, "metawrap_assembly", "{name}", "metaspades"),
+        metaspades_assembly         = join(metaspades_dir, "contigs.fasta"),
+        metaspades_graph            = join(metaspades_dir, "assembly_graph.fastg"),
+        metaspades_longscaffolds    = join(metaspades_dir, "long_scaffolds.fasta"),
+        metaspades_scaffolds        = join(metaspades_dir, "scaffolds.fasta"),
+        metaspades_cor_readsr1      = join(metaspades_dir, "{name}_1.fastq.00.0_0.cor.fastq.gz"),
+        metaspades_cor_readsr2      = join(metaspades_dir, "corrected", "{name}_2.fastq.00.0_0.cor.fastq.gz"),
+        # ensemble outputs
+        final_assembly          = join(assembly_dir, "{name}", "final_assembly.fasta"),
+        final_assembly_report   = join(assembly_dir, "{name}", "assembly_report.html"),
+    container: config["images"]["metawrap"],
+    params:
+        memlimit                = allocated("mem", "metawrap_genome_assembly", cluster)
+        contig_min_len          = "1000"
+        assembly_R1             = join(workpath, "{name}_1.fastq.gz"),
+        assembly_R2             = join(workpath, "{name}_2.fastq.gz"),
+    threads: int(allocated("threads", "metawrap_genome_assembly", cluster)),
+    shell:
+        """
+            ln {input.R1} {params.assembly_R1}
+            ln {input.R2} {params.assembly_R2}
+            metawrap assembly --megahit --metaspades -m {params.memlimit} -t {threads} -l {params.contig_min_len} -1 {params.assembly_R1} -2 {params.assembly_R2} -o {output.assembly_dir}
         """

@@ -1,5 +1,4 @@
-samples = config['samples']
-ns      = list(range(config['project']['nends']))
+#!/usr/bin/env snakemake -s
 
 rule concatenate_reads:
     input:
