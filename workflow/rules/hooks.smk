@@ -1,8 +1,8 @@
-# Adding handlers for displaying status of the 
-# pipeline and for getting job information for 
+# Adding handlers for displaying status of the
+# pipeline and for getting job information for
 # previously submitted jobs using `jobby`:
 # https://github.com/OpenOmics/scribble/blob/main/scripts/jobby/jobby
-if config['options']['mode'] == 'slurm':
+if config["options"]["mode"] == "slurm":
     onstart:
         shell(
             """
@@ -23,7 +23,6 @@ if config['options']['mode'] == 'slurm':
             done
             """
         )
-
     onsuccess:
         shell(
             """

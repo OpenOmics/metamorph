@@ -1,4 +1,3 @@
-#!/usr/bin/env snakemake -s
 # Python standard library
 from os.path import join
 from os import listdir
@@ -6,19 +5,16 @@ import os, sys
 
 
 # Local imports
-from scripts.common import (
-    allocated,
-    provided, 
-    references,
-    str_bool
-)
+from scripts.common import allocated, provided, references, str_bool
 
 
 # Global workflow variables
-configfile: "config.json"                      # Generated from user input and config/*.json
-workpath = config["project"]["workpath"]       # Pipeline"s output directory
-tmpdir   = config["options"]["tmp_dir"]        # Temporary directory
-samples  = config["samples"]                   # List containing basename of samples
+configfile: "config.json"  # Generated from user input and config/*.json
+
+
+workpath = config["project"]["workpath"]  # Pipeline"s output directory
+tmpdir = config["options"]["tmp_dir"]  # Temporary directory
+samples = config["samples"]  # List containing basename of samples
 
 
 # Read in resource information, containing information about threads, mem, walltimes, etc.
@@ -31,31 +27,29 @@ with open(join(workpath, "config", "cluster.json")) as fh:
 rule all:
     input:
         expand(
-            join(workpath, "metawrap_readqc", "{name}", "{name}.R1_bmtagger_report.html"), 
-            name=samples
+            join(
+                workpath, "metawrap_readqc", "{name}", "{name}.R1_bmtagger_report.html"
+            ),
+            name=samples,
         ),
         expand(
-            join(workpath, "metawrap_readqc", "{name}", "{name}.R2_bmtagger_report.html"), 
-            name=samples
+            join(
+                workpath, "metawrap_readqc", "{name}", "{name}.R2_bmtagger_report.html"
+            ),
+            name=samples,
         ),
-        expand(
-            join(workpath, "{name}.R1_readqc.fastq.gz"), 
-            name=samples
-        ),
-        expand(
-            join(workpath, "{name}.R2_readqc.fastq.gz"),
-            name=samples
-        ),
+        expand(join(workpath, "{name}.R1_readqc.fastq.gz"), name=samples),
+        expand(join(workpath, "{name}.R2_readqc.fastq.gz"), name=samples),
         expand(
             join(workpath, "metawrap_assembly", "{name}", "final_assembly.fasta"),
-            name=samples
+            name=samples,
         ),
         expand(
             join(workpath, "metawrap_assembly", "{name}", "assembly_report.html"),
-            name=samples
+            name=samples,
         ),
 
 
-# Import rules 
+# Import rules
 include: join("rules", "common.smk")
 include: join("rules", "metawrap.smk")

@@ -2,13 +2,11 @@
 # ~~~~~~~~~~
 # Common utility functions used throughout the workflow
 # ~~~~~~~~~~
-
 def provided(samplelist, condition):
     """
-    Determines if optional rules should run. If an empty list is provided to rule all,
-    snakemake will not try to generate that set of target files. If a given condition
-    is not met (i.e. False) then it will not try to run that rule.
-
+        Determines if optional rules should run. If an empty list is provided to rule all,
+        snakemake will not try to generate that set of target files. If a given condition
+        is not met (i.e. False) then it will not try to run that rule.
     """
     if not condition:
         # If condition is False, 
@@ -22,14 +20,13 @@ def provided(samplelist, condition):
 
 def references(config, reflist):
     """
-    Checks if a set of required reference files were provided. Some rules depend
-    on a set of required reference files that may only exist for specific reference
-    genomes. An example of this would be blasklists arriba. The blacklist are manually
-    curated and only exist for a few reference genomes (mm10, hg38, hg19).
-    If one of the required reference files does not exist, then it will return
-    an empty list.
+        Checks if a set of required reference files were provided. Some rules depend
+        on a set of required reference files that may only exist for specific reference
+        genomes. An example of this would be blasklists arriba. The blacklist are manually
+        curated and only exist for a few reference genomes (mm10, hg38, hg19).
+        If one of the required reference files does not exist, then it will return
+        an empty list.
     """
-
     _all = True
     for ref in reflist:
         try: tmp = config['references'][ref]
@@ -39,7 +36,6 @@ def references(config, reflist):
             break
         # Check if ref is empty key string
         if not tmp: _all = False
-
     return _all
 
 
