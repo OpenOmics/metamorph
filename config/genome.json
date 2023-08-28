@@ -1,4 +1,8 @@
 {
     "references": {
+        "KRAKEN_DB": "/fdb/kraken/20171019_minikraken_8GB",
+        "BMTAGGER_INDEX": "/data/NCBR/apps/genome-assembly/metaWRAP/BMTAGGER_INDEX",
+        "GTDBTK_DB": "/data/NHLBI_IDSS/database/GTDBtk/release207_v2",
+        "GUNC_DB": "/data/NHLBI_IDSS/database/gunc_1.0.5db"
     }
 }

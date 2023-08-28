@@ -1,0 +1,1 @@
+FROM quay.io/biocontainers/metawrap-mg:1.3.0--hdfd78af_1

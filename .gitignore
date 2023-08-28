@@ -173,3 +173,4 @@ site/
 test.sh
 test_*/
 tmp_*/
+.*vscode
