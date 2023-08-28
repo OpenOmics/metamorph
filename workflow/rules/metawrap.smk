@@ -1,8 +1,11 @@
 # ~~~~~~~~~~
 # Metawrap metagenome assembly and analysis rules
 # ~~~~~~~~~~
+from os.path import join
 default_threads            = cluster["__default__"]['threads']
-default_memory             = cluster["__defualt__"]['mem']
+default_memory             = cluster["__default__"]['mem']
+top_readqc_dir             = join(workpath, "metawrap_readqc")
+top_assembly_dir           = join(workpath, "metawrap_assembly")
 metawrap_container         = config["images"]["metawrap"]
 
 
@@ -36,18 +39,18 @@ rule metawrap_read_qc:
         R1                  = join(workpath, "{name}.R1.fastq.gz"),
         R2                  = join(workpath, "{name}.R2.fastq.gz"),
     output:
-        R1_bmtagger_report  = join(workpath, "metawrap_readqc", "{name}", "{name}.R1_bmtagger_report.html"),
-        R2_bmtagger_report  = join(workpath, "metawrap_readqc", "{name}", "{name}.R2_bmtagger_report.html"),
-        R1_fastqc_report    = join(workpath, "metawrap_readqc", "{name}", "{name}.R1_fastqc_report.html"),
-        R2_fastqc_report    = join(workpath, "metawrap_readqc", "{name}", "{name}.R2_fastqc_report.html"),
+        R1_bmtagger_report  = join(top_readqc_dir, "{name}", "{name}.R1_bmtagger_report.html"),
+        R2_bmtagger_report  = join(top_readqc_dir, "{name}", "{name}.R2_bmtagger_report.html"),
+        R1_fastqc_report    = join(top_readqc_dir, "{name}", "{name}.R1_fastqc_report.html"),
+        R2_fastqc_report    = join(top_readqc_dir, "{name}", "{name}.R2_fastqc_report.html"),
         R1_qc_reads         = join(workpath, "{name}.R1_readqc.fastq.gz"),
         R2_qc_reads         = join(workpath, "{name}.R2_readqc.fastq.gz"),
     params:
-        readqc_dir          = join(workpath, "metawrap_readqc", "{name}"),
-        R1_mw_named         = join(workpath, "{name}_1.fastq"),
-        R2_mw_named         = join(workpath, "{name}_2.fastq"),
-        intermediate_qc_R1  = join(workpath, "{name}.R1_readqc.fastq"),
-        intermediate_qc_R2  = join(workpath, "{name}.R2_readqc.fastq"),
+        readqc_dir          = join(top_readqc_dir, "{name}"),
+        R1_mw_named         = join(top_readqc_dir, "{name}", "{name}_1.fastq"),
+        R2_mw_named         = join(top_readqc_dir, "{name}", "{name}_2.fastq"),
+        intermediate_qc_R1  = join(top_readqc_dir, "{name}", "{name}.R1_readqc.fastq"),
+        intermediate_qc_R2  = join(top_readqc_dir, "{name}", "{name}.R2_readqc.fastq"),
     container: metawrap_container,
     threads: int(cluster["metawrap_genome_assembly"].get('threads', default_threads)),
     shell: 
@@ -91,33 +94,34 @@ rule metawrap_genome_assembly:
         R1                          = join(workpath, "{name}.R1_readqc.fastq.gz"),
         R2                          = join(workpath, "{name}.R2_readqc.fastq.gz"),
     output:
-        assembly_dir                = join(workpath, "metawrap_assembly", "{name}"),
         # megahit outputs
-        megahit_dir                 = join(assembly_dir, "{name}", "megahit"),
-        megahit_assembly            = join(megahit_dir, "final.contigs.fa"),
-        megahit_longcontigs         = join(megahit_dir, "long.contigs.fa"),
-        megahit_log                 = join(megahit_dir, "log"),
+        megahit_assembly            = join(top_assembly_dir, "{name}", "megahit", "final.contigs.fa"),
+        megahit_longcontigs         = join(top_assembly_dir, "{name}", "megahit", "long.contigs.fa"),
+        megahit_log                 = join(top_assembly_dir, "{name}", "megahit", "log"),
         # metaspades outsputs
-        metaspades_dir              = join(workpath, "metawrap_assembly", "{name}", "metaspades"),
-        metaspades_assembly         = join(metaspades_dir, "contigs.fasta"),
-        metaspades_graph            = join(metaspades_dir, "assembly_graph.fastg"),
-        metaspades_longscaffolds    = join(metaspades_dir, "long_scaffolds.fasta"),
-        metaspades_scaffolds        = join(metaspades_dir, "scaffolds.fasta"),
-        metaspades_cor_readsr1      = join(metaspades_dir, "{name}_1.fastq.00.0_0.cor.fastq.gz"),
-        metaspades_cor_readsr2      = join(metaspades_dir, "corrected", "{name}_2.fastq.00.0_0.cor.fastq.gz"),
+        metaspades_assembly         = join(top_assembly_dir, "{name}", "metaspades", "contigs.fasta"),
+        metaspades_graph            = join(top_assembly_dir, "{name}", "metaspades", "assembly_graph.fastg"),
+        metaspades_longscaffolds    = join(top_assembly_dir, "{name}", "metaspades", "long_scaffolds.fasta"),
+        metaspades_scaffolds        = join(top_assembly_dir, "{name}", "metaspades", "scaffolds.fasta"),
+        metaspades_cor_readsr1      = join(top_assembly_dir, "{name}", "metaspades", "{name}_1.fastq.00.0_0.cor.fastq.gz"),
+        metaspades_cor_readsr2      = join(top_assembly_dir, "{name}", "metaspades", "corrected", "{name}_2.fastq.00.0_0.cor.fastq.gz"),
         # ensemble outputs
-        final_assembly              = join(assembly_dir, "{name}", "final_assembly.fasta"),
-        final_assembly_report       = join(assembly_dir, "{name}", "assembly_report.html"),
+        final_assembly              = join(top_assembly_dir, "{name}", "final_assembly.fasta"),
+        final_assembly_report       = join(top_assembly_dir, "{name}", "assembly_report.html"),
     container: metawrap_container,
     params:
-        memlimit                = cluster["metawrap_genome_assembly"].get('memory', default_memory),
-        contig_min_len          = "1000",
-        assembly_R1             = join(workpath, "{name}_1.fastq.gz"),
-        assembly_R2             = join(workpath, "{name}_2.fastq.gz"),
+        assembly_dir                = join(top_assembly_dir, "{name}"),
+        memlimit                    = cluster["metawrap_genome_assembly"].get('memory', default_memory),
+        contig_min_len              = "1000",
+        assembly_R1                 = join(workpath, "{name}_1.fastq.gz"),
+        assembly_R2                 = join(workpath, "{name}_2.fastq.gz"),
     threads: int(cluster["metawrap_genome_assembly"].get('threads', default_threads)),
     shell:
         """
+            # link to the file names metawrap expects
             ln {input.R1} {params.assembly_R1}
             ln {input.R2} {params.assembly_R2}
-            metawrap assembly --megahit --metaspades -m {params.memlimit} -t {threads} -l {params.contig_min_len} -1 {params.assembly_R1} -2 {params.assembly_R2} -o {output.assembly_dir}
+
+            # run genome assembler
+            metawrap assembly --megahit --metaspades -m {params.memlimit} -t {threads} -l {params.contig_min_len} -1 {params.assembly_R1} -2 {params.assembly_R2} -o {params.assembly_dir}
         """
