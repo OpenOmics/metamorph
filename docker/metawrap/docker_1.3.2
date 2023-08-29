@@ -1,0 +1,9 @@
+FROM condaforge/miniforge3:latest
+RUN mamba create -y -n metawrap-env
+RUN conda config --add channels defaults; conda config --add channels conda-forge; \
+    conda config --add channels bioconda;conda config --add channels ursky
+RUN echo "export PATH=\"$PATH:/home/metaWRAP/bin\"" >> /etc/bash.bashrc
+# RUN mamba install -y -n metawrap-env biopython blas=2.5 blast=2.6.0 bmtagger bowtie2 bwa checkm-genome \
+#    fastqc kraken=1.1 kraken=2.0 krona=2.7 matplotlib maxbin2 megahit metabat2 pandas \
+#    prokka quast r-ggplot2 r-recommended salmon samtools=1.9 seaborn spades trim-galore
+RUN mamba install --only-deps -c ursky metawrap-mg==1.3.2
