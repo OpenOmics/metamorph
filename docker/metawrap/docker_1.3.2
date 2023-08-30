@@ -7,3 +7,5 @@ RUN echo "export PATH=\"$PATH:/home/metaWRAP/bin\"" >> /etc/bash.bashrc
 #    fastqc kraken=1.1 kraken=2.0 krona=2.7 matplotlib maxbin2 megahit metabat2 pandas \
 #    prokka quast r-ggplot2 r-recommended salmon samtools=1.9 seaborn spades trim-galore
 RUN mamba install -y --only-deps -c ursky -n metawrap-env metawrap-mg==1.3.2
+RUN cd /home; git clone https://github.com/bxlab/metaWRAP.git; chmod -R 777 metaWRAP
+ENV PATH="/home/metawrap/bin:$PATH"
