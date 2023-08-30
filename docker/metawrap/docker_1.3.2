@@ -9,3 +9,4 @@ RUN echo "export PATH=\"$PATH:/home/metaWRAP/bin\"" >> /etc/bash.bashrc
 RUN mamba install -y --only-deps -c ursky -n metawrap-env metawrap-mg==1.3.2
 RUN cd /home; git clone https://github.com/bxlab/metaWRAP.git; chmod -R 777 metaWRAP
 ENV PATH="/home/metawrap/bin:$PATH"
+COPY docker/metawrap/config-metawrap_1.3.2 /home/metaWRAP/bin/config-metawrap
