@@ -1,0 +1,20 @@
+{
+    "binds": [
+        {
+            "name": "KRAKEN_DB2",
+            "to": "~/KRAKEN_DB2",
+            "from": "/data/OpenOmics/references/metamorph/kraken2/20230605_pluspf_kraken2",
+            "mode": "ro"
+        }, {
+            "name": "KRAKEN_DB",
+            "to": "~/KRAKEN_DB",
+            "from": "/data/OpenOmics/references/metamorph/kraken/20171019_minikraken_8GB",
+            "mode": "ro"
+        }, {
+            "name": "BMTAGGER_INDEX",
+            "to": "~/BMTAGGER_DB",
+            "from": "/data/NCBR/apps/genome-assembly/metaWRAP/BMTAGGER_INDEX",
+            "mode": "ro"
+        }
+    ]
+}
