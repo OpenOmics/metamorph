@@ -16,5 +16,17 @@
         "mem": "64g",
         "partition": "norm",
         "time": "2-00:00:00"
+    },
+    "metawrap_tax_classification": {
+        "threads": "12",
+        "mem": "32g",
+        "partition": "quick",
+        "time": "0-04:00:00"
+    },
+    "metawrap_assembly_binning": {
+        "threads": "16",
+        "mem": "128g",
+        "partition": "norm",
+        "time": "2-00:00:00"
     }
 }
