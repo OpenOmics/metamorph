@@ -1,16 +1,8 @@
-# Python standard library
-from os.path import join
-from os import listdir
 import json
 import os, sys
-
-
-# Local imports
+from os.path import join
+from os import listdir
 from scripts.common import allocated, provided, references, str_bool
-
-
-# Global workflow variables
-configfile: "config.json"  # Generated from user input and config/*.json
 
 
 workpath = config["project"]["workpath"]  # Pipeline"s output directory
@@ -22,6 +14,10 @@ samples = config["samples"]  # List containing basename of samples
 # TODO: Add handler for when the mode is set to local.
 with open(join(workpath, "config", "cluster.json")) as fh:
     cluster = json.load(fh)
+
+
+# Global workflow variables
+configfile: "config.json"  # Generated from user input and config/*.json
 
 
 # Final ouput files of the pipeline
