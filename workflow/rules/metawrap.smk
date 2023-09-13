@@ -140,11 +140,11 @@ rule metawrap_tax_classification:
         final_assembly              = join(top_assembly_dir, "{name}", "final_assembly.fasta"),
         R1                          = expand(join(workpath, "{name}.R1_readqc.fastq.gz")),
         R2                          = expand(join(workpath, "{name}.R2_readqc.fastq.gz")),
-        reads                       = list(chain(*zip(R1, R2)))
+        reads                       = list(chain(*zip(R1, R2))),
     params:
         tax_subsample               = str(int(1e6)),
         tax_dir                     = join(top_tax_dir, "{name}"),
-    singularity: metawrap_container
+    singularity: metawrap_container,
     threads: cluster["metawrap_tax_classification"].get("threads", default_threads),
     shell:
         """
@@ -163,9 +163,10 @@ rule metawrap_binning_rename:
     input:
         R1_from_qc                          = join(workpath, "{name}.R{pair}_readqc.fastq"),
         R2_from_qc                          = join(workpath, "{name}.R{pair}_readqc.fastq"),
+    singularity: metawrap_container,
     output:
-        R1_bin_name                         = join(workpath, "{name}_R{pair}.fastq")
-        R2_bin_name                         = join(workpath, "{name}_R{pair}.fastq")
+        R1_bin_name                         = join(workpath, "{name}_R{pair}.fastq"),
+        R2_bin_name                         = join(workpath, "{name}_R{pair}.fastq"),
     shell:
         """
             ln -s {input.R1_from_qc} {input.R1_bin_name}
@@ -183,7 +184,7 @@ rule metawrap_assembly_binning:
     params:
         bin_mem                     = int(cluster.get("metawrap_assembly_binning", default_memory)),
         bin_dir                     = join(workpath, "metawrap_binning", "{name}"),
-    singularity: metawrap_container
+    singularity: metawrap_container,
     threads: cluster["metawrap_tax_classification"].get("threads", default_threads),
     shell:
         """
