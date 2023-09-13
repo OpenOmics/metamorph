@@ -35,8 +35,8 @@ rule all:
             ),
             name=samples,
         ),
-        expand(join(workpath, "{name}.R1_readqc.fastq.gz"), name=samples),
-        expand(join(workpath, "{name}.R2_readqc.fastq.gz"), name=samples),
+        expand(join(workpath, "{name}", "{name}.R1_readqc.fastq"), name=samples),
+        expand(join(workpath, "{name}", "{name}.R2_readqc.fastq"), name=samples),
         expand(
             join(workpath, "metawrap_assembly", "{name}", "final_assembly.fasta"),
             name=samples,

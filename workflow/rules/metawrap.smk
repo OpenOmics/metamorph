@@ -79,10 +79,10 @@ rule metawrap_read_qc:
             cp {output.readqc_dir}/pre-QC_report/{params.R1_mw_named}_fastqc.html {output.R1_fastqc_report}
 
             # Rename R2 output files from metawrap
-            mv {params.readqc_dir}/final_pure_reads_2.fastq {output.R2_qc_reads}
+            mv {output.readqc_dir}/final_pure_reads_2.fastq {output.R2_qc_reads}
             rm -f {params.R2_mw_named}
-            cp {params.readqc_dir}/post-QC_report/final_pure_reads_2_fastqc.html {output.R2_bmtagger_report}
-            cp {params.readqc_dir}/pre-QC_report/{params.R2_mw_named}_fastqc.html {output.R2_fastqc_report}
+            cp {output.readqc_dir}/post-QC_report/final_pure_reads_2_fastqc.html {output.R2_bmtagger_report}
+            cp {output.readqc_dir}/pre-QC_report/{params.R2_mw_named}_fastqc.html {output.R2_fastqc_report}
         """
 
 
@@ -97,8 +97,8 @@ rule metawrap_genome_assembly:
             Ensemble assembled contigs and reports
     """
     input:
-        R1                          = expand(join(workpath, "{name}.R1_readqc.fastq"), name=samples),
-        R2                          = expand(join(workpath, "{name}.R2_readqc.fastq"), name=samples),
+        R1                          = expand(join(workpath, "{name}", "{name}.R1_readqc.fastq"), name=samples),
+        R2                          = expand(join(workpath, "{name}", "{name}.R2_readqc.fastq"), name=samples),
     output:
         # megahit outputs
         megahit_assembly            = expand(join(top_assembly_dir, "{name}", "megahit", "final.contigs.fa"), name=samples),
@@ -132,26 +132,12 @@ rule metawrap_genome_assembly:
         """
 
 
-rule metawrap_setup_binning:
-    input:
-        R1_from_qc                  = expand(join(workpath, "{name}.R1_readqc.fastq"), name=samples),
-        R2_from_qc                  = expand(join(workpath, "{name}.R2_readqc.fastq"), name=samples),
-    output:
-        R1_bin_name                 = expand(join(workpath, "{name}_{pair}.fastq"), name=samples, pair=['1']),
-        R2_bin_name                 = expand(join(workpath, "{name}_{pair}.fastq"), name=samples, pair=['2']),
-    shell:
-        """
-            ln -s {input.R1_from_qc} {output.R1_bin_name}
-            ln -s {input.R2_from_qc} {output.R2_bin_name}
-        """
-        
-
 rule metawrap_tax_classification:
     """
         TODO: docstring
     """
     input:
-        reads                          = expand(join(workpath, "{name}.R{pair}_readqc.fastq"), name=samples, pair=['1', '2']),
+        reads                       = expand(join(workpath, "{name}.R{pair}_readqc.fastq"), name=samples, pair=['1', '2']),
         final_assembly              = expand(join(top_assembly_dir, "{name}", "final_assembly.fasta"), name=samples),
     output:
         krak2_asm                   = expand(join(top_tax_dir, "{name}", "final_assembly.krak2"), name=samples),
@@ -168,6 +154,20 @@ rule metawrap_tax_classification:
             metawrap kraken2 -t {threads} -s {params.tax_subsample} -o {output.tax_dir} {output.final_assembly} {output.reads}
         """
 
+
+rule metawrap_setup_binning:
+    input:
+        R1_from_qc                  = expand(join(workpath, "{name}.R1_readqc.fastq"), name=samples),
+        R2_from_qc                  = expand(join(workpath, "{name}.R2_readqc.fastq"), name=samples),
+    output:
+        R1_bin_name                 = expand(join(workpath, "{name}_{pair}.fastq"), name=samples, pair=['1']),
+        R2_bin_name                 = expand(join(workpath, "{name}_{pair}.fastq"), name=samples, pair=['2']),
+    shell:
+        """
+            ln -s {input.R1_from_qc} {output.R1_bin_name}
+            ln -s {input.R2_from_qc} {output.R2_bin_name}
+        """
+        
 
 rule metawrap_assembly_binning:
     """
