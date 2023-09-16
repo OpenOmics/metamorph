@@ -170,9 +170,6 @@ def setup(sub_args, ifiles, repo_path, output_path):
     # of FastQ and BAM files 
     mixed_inputs(ifiles)
 
-   
-
-
     required = {
         # Base configuration file
         "base": os.path.join(output_path,'config','config.json'),

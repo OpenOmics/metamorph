@@ -1,18 +1,30 @@
 {
     "__default__": {
-        "threads": "4",
+        "threads": 4,
         "mem": "8g",
         "partition": "norm",
         "time": "0-04:00:00"
     },
     "metawrap_read_qc": {
-        "threads": "8",
+        "threads": 8,
         "mem": "16g",
         "partition": "norm",
         "time": "0-04:00:00"
     },
     "metawrap_genome_assembly": {
-        "threads": "24",
+        "threads": 24,
+        "mem": "128g",
+        "partition": "norm",
+        "time": "2-00:00:00"
+    },
+    "metawrap_tax_classification": {
+        "threads": 12,
+        "mem": "32g",
+        "partition": "quick",
+        "time": "0-04:00:00"
+    },
+    "metawrap_assembly_binning": {
+        "threads": 16,
         "mem": "64g",
         "partition": "norm",
         "time": "2-00:00:00"

@@ -1,15 +1,8 @@
-# Python standard library
+import json
+import os, sys
 from os.path import join
 from os import listdir
-import os, sys
-
-
-# Local imports
 from scripts.common import allocated, provided, references, str_bool
-
-
-# Global workflow variables
-configfile: "config.json"  # Generated from user input and config/*.json
 
 
 workpath = config["project"]["workpath"]  # Pipeline"s output directory
@@ -23,9 +16,15 @@ with open(join(workpath, "config", "cluster.json")) as fh:
     cluster = json.load(fh)
 
 
+# Global workflow variables
+configfile: "config.json"  # Generated from user input and config/*.json
+
+
 # Final ouput files of the pipeline
 rule all:
     input:
+        # read qc and filtering
+        # ~~~~~~~~~~~~~~~~~~~~~
         expand(
             join(
                 workpath, "metawrap_readqc", "{name}", "{name}.R1_bmtagger_report.html"
@@ -38,8 +37,10 @@ rule all:
             ),
             name=samples,
         ),
-        expand(join(workpath, "{name}.R1_readqc.fastq.gz"), name=samples),
-        expand(join(workpath, "{name}.R2_readqc.fastq.gz"), name=samples),
+        expand(join(workpath, "{name}", "{name}.R1_readqc.fastq"), name=samples),
+        expand(join(workpath, "{name}", "{name}.R2_readqc.fastq"), name=samples),
+        # genome assembly
+        # ~~~~~~~~~~~~~~~
         expand(
             join(workpath, "metawrap_assembly", "{name}", "final_assembly.fasta"),
             name=samples,
@@ -48,6 +49,16 @@ rule all:
             join(workpath, "metawrap_assembly", "{name}", "assembly_report.html"),
             name=samples,
         ),
+        # taxonomic classification
+        # ~~~~~~~~~~~~~~~~~~~~~~~~
+        expand(join(workpath, "metawrap_taxonomy", "{name}", "final_assembly.krona"), name=samples),
+        expand(join(workpath, "metawrap_taxonomy", "{name}", "kronagram.html"), name=samples),
+        expand(join(workpath, "metawrap_taxonomy", "{name}", "final_assembly.krak2"), name=samples),
+        expand(join(workpath, "metawrap_taxonomy", "{name}", "final_assembly.kraken2"), name=samples),
+        # assembly binning and refinement
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        expand(join(workpath, "metawrap_binning", "{name}"), name=samples),
+        expand(join(workpath, "metawrap_refine_bins", "{name}"),  name=samples),
 
 
 # Import rules
