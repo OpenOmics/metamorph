@@ -137,7 +137,7 @@ rule metawrap_tax_classification:
         TODO: docstring
     """
     input:
-        reads                       = expand(join(workpath, "{name}.R{pair}_readqc.fastq"), name=samples, pair=['1', '2']),
+        reads                       = expand(join(workpath, "{name}", "{name}.R{pair}_readqc.fastq"), name=samples, pair=['1', '2']),
         final_assembly              = expand(join(top_assembly_dir, "{name}", "final_assembly.fasta"), name=samples),
     output:
         krak2_asm                   = expand(join(top_tax_dir, "{name}", "final_assembly.krak2"), name=samples),
@@ -151,17 +151,17 @@ rule metawrap_tax_classification:
     threads: cluster["metawrap_tax_classification"].get("threads", default_threads),
     shell:
         """
-            metawrap kraken2 -t {threads} -s {params.tax_subsample} -o {output.tax_dir} {output.final_assembly} {output.reads}
+            metawrap kraken2 -t {threads} -s {params.tax_subsample} -o {output.tax_dir} {input.final_assembly} {input.reads}
         """
 
 
 rule metawrap_setup_binning:
     input:
-        R1_from_qc                  = expand(join(workpath, "{name}.R1_readqc.fastq"), name=samples),
-        R2_from_qc                  = expand(join(workpath, "{name}.R2_readqc.fastq"), name=samples),
+        R1_from_qc                  = expand(join(workpath, "{name}", "{name}.R1_readqc.fastq"), name=samples),
+        R2_from_qc                  = expand(join(workpath, "{name}", "{name}.R2_readqc.fastq"), name=samples),
     output:
-        R1_bin_name                 = expand(join(workpath, "{name}_{pair}.fastq"), name=samples, pair=['1']),
-        R2_bin_name                 = expand(join(workpath, "{name}_{pair}.fastq"), name=samples, pair=['2']),
+        R1_bin_name                 = expand(join(workpath, "{name}", "{name}_{pair}.fastq"), name=samples, pair=['1']),
+        R2_bin_name                 = expand(join(workpath, "{name}", "{name}_{pair}.fastq"), name=samples, pair=['2']),
     shell:
         """
             ln -s {input.R1_from_qc} {output.R1_bin_name}
@@ -174,7 +174,7 @@ rule metawrap_assembly_binning:
         TODO: docstring
     """
     input:
-        paired_reads                = expand(join(workpath, "{name}_{pair}.fastq"), name=samples, pair=['1', '2']),
+        paired_reads                = expand(join(workpath, "{name}", "{name}_{pair}.fastq"), name=samples, pair=['1', '2']),
         assembly                    = expand(join(top_assembly_dir, "{name}", "final_assembly.fasta"), name=samples),
     output:
         bin_dir                     = expand(join(top_binning_dir, "{name}"), name=samples),
@@ -190,5 +190,5 @@ rule metawrap_assembly_binning:
     shell:
         """
             metawrap binning --metabat2 --maxbin2 --concoct --interleaved -m {params.bin_mem} -t {threads} -a {input.assembly} -o {output.bin_dir} {input.paired_reads}
-            metawrap bin_refinement -o {output.refine_dir} -t {threads} -A {output.bin_dir}/metabat2_bins -B {output.bin_dir}/maxbin2_bins -c {params.min_perc_complete} -x {params.max_perc_contam}'
+            metawrap bin_refinement -o {output.refine_dir} -t {threads} -A {output.bin_dir}/metabat2_bins -B {output.bin_dir}/maxbin2_bins -c {params.min_perc_complete} -x {params.max_perc_contam}
         """
