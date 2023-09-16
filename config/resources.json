@@ -2,19 +2,39 @@
     "binds": [
         {
             "name": "KRAKEN_DB2",
-            "to": "~/KRAKEN_DB2",
-            "from": "/data/OpenOmics/references/metamorph/kraken2/20230605_pluspf_kraken2",
+            "to": "$HOME/KRAKEN_DB2",
+            "from": "/data/OpenOmics/references/metamorph/kraken2/k2_pluspfp_08gb_20230605",
             "mode": "ro"
         }, {
             "name": "KRAKEN_DB",
-            "to": "~/KRAKEN_DB",
+            "to": "$HOME/KRAKEN_DB",
             "from": "/data/OpenOmics/references/metamorph/kraken/20171019_minikraken_8GB",
             "mode": "ro"
         }, {
             "name": "BMTAGGER_INDEX",
-            "to": "~/BMTAGGER_DB",
-            "from": "/data/NCBR/apps/genome-assembly/metaWRAP/BMTAGGER_INDEX",
+            "to": "$HOME/BMTAGGER_DB",
+            "from": "/data/OpenOmics/references/metamorph/BMTAGGER/BMTAGGER_INDEX",
             "mode": "ro"
+        }, {
+            "name": "BMTAGGER_INDEX",
+            "to": "$HOME/GTDBTK_DB",
+            "from": "/data/OpenOmics/references/metamorph/GTDBtk/release207_v2",
+            "mode": "ro"
+        }, {
+            "name": "GUNC_DB",
+            "to": "$HOME/GUNC_DB",
+            "from": "/data/OpenOmics/references/metamorph/GUNC/gunc_1.0.5db",
+            "mode": "ro"
+        }, {
+            "name": "CHECKM_DB",
+            "to": "$HOME/checkm",
+            "from": "/data/OpenOmics/references/metamorph/checkm",
+            "mode": "rw"
+        }, {
+            "name": "CHECKM_CONFIG",
+            "to": "/opt/conda/envs/metawrap-env/lib/python2.7/site-packages/checkm/DATA_CONFIG",
+            "from": "/data/OpenOmics/references/metamorph/checkm/DATA_CONFIG",
+            "mode": "rw"
         }
     ]
 }
