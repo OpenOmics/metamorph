@@ -620,9 +620,140 @@ def dryrun(outdir, config='config.json', snakefile=os.path.join('workflow', 'Sna
     return dryrun_output
 
 
-def runner(mode, outdir, alt_cache, logger, additional_bind_paths = None, 
-    threads=2,  jobname='pl:master', submission_script='run.sh',
-    tmp_dir = '/lscratch/$SLURM_JOBID/'):
+def run_coa_pipeline(mode, outdir, alt_cache, logger, tmp_dir, additional_bind_paths):
+    # gzip compression speed: ~10.5 MB/s 
+    # see: https://tukaani.org/lzma/benchmarks.html
+    # large fastq ~20GB
+    # 96 samples x 2 (R1 + R2) = 192 fastqs
+    # total size (high estimate): 192 fastqs * 20GB/fastq = 3,840 GB = 3,840,000 MB
+    # total compression time: 3,840,000 MB / (10.5 MB/s) = 365714 s = ~ 4 days
+    # pigz ~6.5 times faster than gzip
+    # https://github.com/neurolabusc/pigz-bench
+    # 3,840,000 MB / (10.5 MB/s * 6.5) = ~ 15.6 hours
+    # ~~~~~~~~~~~~~~    
+    
+    # Add additional singularity bind PATHs
+    # to mount the local filesystem to the 
+    # containers filesystem, NOTE: these 
+    # PATHs must be an absolute PATHs
+    outdir = os.path.abspath(outdir).strip()
+    # Add any default PATHs to bind to 
+    # the container's filesystem, like 
+    # tmp directories, /lscratch
+    addpaths = []
+    temp = os.path.dirname(tmp_dir.rstrip('/'))
+    if temp == os.sep:
+        temp = tmp_dir.rstrip('/')
+    if outdir not in additional_bind_paths.split(','):
+        addpaths.append(outdir)
+    if temp not in additional_bind_paths.split(','):
+        addpaths.append(temp)
+    bindpaths = ','.join(addpaths)
+
+    # Set ENV variable 'SINGULARITY_CACHEDIR' 
+    # to output directory
+    my_env = {}; my_env.update(os.environ)
+    cache = os.path.join(outdir, ".singularity")
+    my_env['SINGULARITY_CACHEDIR'] = cache
+    if alt_cache:
+        # Override the pipeline's default 
+        # cache location
+        my_env['SINGULARITY_CACHEDIR'] = alt_cache
+        cache = alt_cache
+
+    if additional_bind_paths:
+        # Add Bind PATHs for outdir and tmp dir
+        if bindpaths:
+            bindpaths = ",{}".format(bindpaths)
+        bindpaths = "{}{}".format(additional_bind_paths,bindpaths)
+
+    if not exists(os.path.join(outdir, 'logfiles')):
+        # Create directory for logfiles
+        os.makedirs(os.path.join(outdir, 'logfiles'))
+
+    # Create .singularity directory for 
+    # installations of snakemake without
+    # setuid which creates a sandbox in
+    # the SINGULARITY_CACHEDIR
+    if not exists(cache):
+        # Create directory for sandbox 
+        # and image layers
+        os.makedirs(cache, mode=0o755)
+
+    snakefile = os.path.abspath(os.path.join(__file__, '..', 'workflow', 'coa', 'Snakefile'))
+    slurm_dir = os.path.abspath(os.path.join(outdir, 'slurm'))
+    if not os.path.exists(slurm_dir):
+        os.mkdir(slurm_dir, mode=0o755)
+
+    CLUSTER_OPTS = "sbatch --gres {cluster.gres}" + \
+                   " --cpus-per-task {cluster.threads}" + \
+                   " -p {cluster.partition}" + \
+                   " -t {cluster.time}" + \
+                   " --mem {cluster.mem}" + \
+                   " --job-name={params.rname}" + \
+                   " -e $SLURM_DIR/slurm-%j_{params.rname}.out" + \
+                   " -o $SLURM_DIR/slurm-%j_{params.rname}.out" 
+    
+    sbatch_params = [
+        "#SBATCH --cpus-per-task=28",
+        "#SBATCH --mem=64g",
+        "#SBATCH --time=10-00:00:00",
+        "#SBATCH -p norm",
+        "#SBATCH --parsable",
+        "#SBATCH -J \"metagenome_coa\"",
+        "#SBATCH --mail-type=BEGIN,END,FAIL",
+        "#SBATCH --output \"" + outdir + "/logfiles/snakemake.log\"",
+        "#SBATCH --error \"" + outdir + "/logfiles/snakemake.log\"",
+    ]
+        
+    jobscript = [
+        "#!/usr/bin/env bash",
+        "module load snakemake singularity",
+        "snakemake \\",
+        "--latency-wait 120 \\",
+        "-s " + snakefile + " \\",
+        "-d \"{outdir}\" \\",
+        "--use-singularity \\",
+        "--singularity-args \"'-B " + bindpaths + "'\"  \\",
+        "--configfile=\"" + outdir + "/config.json\" \\",
+        "--printshellcmds \\",
+        "--cluster-config \"" + outdir + "/resources/cluster.json\" \\",
+        "--cluster \"" + CLUSTER_OPTS + "\" \\",
+        "--keep-going \\",
+        "--restart-times 3 \\",
+        "-j 500 \\",
+        "--rerun-incomplete --stats \"" + outdir + "/logfiles/runtime_statistics.json\" \\",
+        "--keep-remote \\",
+        "--local-cores 28 2>&1 | tee -a \"" + outdir + "/logfiles/master.log\"",
+    ]
+
+    exec_sh = 'bash'
+    if mode == 'slurm':
+        exec_sh = 'sbatch'
+        jobscript = [jobscript[0], *sbatch_params, *jobscript[1:]]
+    
+    coa_jobscript = os.path.join(slurm_dir, 'jobscript.sh')
+    with open(coa_jobscript, 'w') as fo:
+        fo.write("\n".join(jobscript))
+
+    coajob = subprocess.Popen([
+                exec_sh, str(coa_jobscript)
+            ], cwd = outdir, stderr=subprocess.STDOUT, stdout=logger, env=my_env)
+
+    coajob.wait()
+    return coajob.returncode
+
+def runner(
+        mode, 
+        outdir, 
+        alt_cache, 
+        logger, 
+        additional_bind_paths = None, 
+        threads=2,  
+        jobname='metagenome_' + os.getlogin() + ':master', 
+        submission_script='run.sh',
+        tmp_dir = '/lscratch/$SLURM_JOBID/'
+    ):
     """Runs the pipeline via selected executor: local or slurm.
     If 'local' is selected, the pipeline is executed locally on a compute node/instance.
     If 'slurm' is selected, jobs will be submited to the cluster using SLURM job scheduler.

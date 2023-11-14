@@ -169,7 +169,7 @@ rule metawrap_setup_binning:
         """
         
 
-rule metawrap_assembly_binning:
+rule metawrap_binning:
     """
         TODO: docstring
     """
