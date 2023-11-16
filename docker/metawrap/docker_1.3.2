@@ -14,6 +14,5 @@ RUN echo ". ${CONDA_DIR}/etc/profile.d/conda.sh && conda activate metawrap-env" 
 ENV PATH="/home/metawrap/bin:$PATH"
 COPY docker/metawrap/config-metawrap_1.3.2 /home/metaWRAP/bin/config-metawrap
 RUN chmod u+x /home/metaWRAP/bin/config-metawrap
-COPY docker/metawrap/ep.sh /ep.sh
-RUN chmod u+x /ep.sh
-ENTRYPOINT ["/ep.sh"]
+RUN mamba run -n metawrap-env pip3 install drep
+ENTRYPOINT ["tini", "--", "/bin/bash", "--rcfile", "/etc/skel/.bashrc"]
