@@ -10,12 +10,24 @@ from itertools import chain
 # ~~~~~~~~~~
 default_threads            = cluster["__default__"]['threads']
 default_memory             = cluster["__default__"]['mem']
-top_readqc_dir             = join(workpath, "metawrap_readqc")
-top_assembly_dir           = join(workpath, "metawrap_assembly")
-top_tax_dir                = join(workpath, "metawrap_taxonomy")
-top_binning_dir            = join(workpath, "metawrap_binning")
-top_refine_dir             = join(workpath, "metawrap_refine_bins")
+top_readqc_dir             = join(workpath, config['project'], "metawrap_readqc")
+top_assembly_dir           = join(workpath, config['project'], "metawrap_assembly")
+top_tax_dir                = join(workpath, config['project'], "metawrap_taxonomy")
+top_binning_dir            = join(workpath, config['project'], "metawrap_binning")
+top_refine_dir             = join(workpath, config['project'], "metawrap_refine_bins")
 metawrap_container         = config["images"]["metawrap"]
+
+
+"""
+    1. read qc
+    2. assembly
+    3. binnging
+    4. bin refinement
+    5. depreplicate bins
+    6. annotate bins
+    7. index depreplicated genomes
+    8. align DNA to assembly
+""" 
 
 
 rule metawrap_read_qc:
@@ -128,7 +140,15 @@ rule metawrap_genome_assembly:
             ln -s {input.R1} {output.assembly_R1}
             ln -s {input.R2} {output.assembly_R2}
             # run genome assembler
-            metawrap assembly --megahit --metaspades -m {params.memlimit} -t {threads} -l {params.contig_min_len} -1 {output.assembly_R1} -2 {output.assembly_R2} -o {output.assembly_dir}
+            metawrap assembly \
+            --megahit \
+            --metaspades \
+            -m {params.memlimit} \
+            -t {threads} \
+            -l {params.contig_min_len} \
+            -1 {output.assembly_R1} \
+            -2 {output.assembly_R2} \
+            -o {output.assembly_dir}
         """
 
 
@@ -151,35 +171,50 @@ rule metawrap_tax_classification:
     threads: cluster["metawrap_tax_classification"].get("threads", default_threads),
     shell:
         """
-            metawrap kraken2 -t {threads} -s {params.tax_subsample} -o {output.tax_dir} {input.final_assembly} {input.reads}
+            metawrap kraken2 \
+            -t {threads} \
+            -s {params.tax_subsample} \
+            -o {output.tax_dir} \
+            {input.final_assembly} \
+            {input.reads}
         """
 
 
 rule metawrap_setup_binning:
     input:
-        R1_from_qc                  = expand(join(workpath, "{name}", "{name}.R1_readqc.fastq"), name=samples),
-        R2_from_qc                  = expand(join(workpath, "{name}", "{name}.R2_readqc.fastq"), name=samples),
+        R1_from_qc                  = join(workpath, "{name}", "{name}.R1_readqc.fastq"),
+        R2_from_qc                  = join(workpath, "{name}", "{name}.R2_readqc.fastq"),
     output:
-        R1_bin_name                 = expand(join(workpath, "{name}", "{name}_{pair}.fastq"), name=samples, pair=['1']),
-        R2_bin_name                 = expand(join(workpath, "{name}", "{name}_{pair}.fastq"), name=samples, pair=['2']),
+        R1_bin_name                 = join(workpath, "{name}", "{name}_{pair}.fastq"),
+        R2_bin_name                 = join(workpath, "{name}", "{name}_{pair}.fastq"),
     shell:
         """
-            ln -s {input.R1_from_qc} {output.R1_bin_name}
-            ln -s {input.R2_from_qc} {output.R2_bin_name}
+        ln -s {input.R1_from_qc} {output.R1_bin_name}
+        ln -s {input.R2_from_qc} {output.R2_bin_name}
         """
         
 
 rule metawrap_binning:
-    """
-        TODO: docstring
-    """
     input:
-        paired_reads                = expand(join(workpath, "{name}", "{name}_{pair}.fastq"), name=samples, pair=['1', '2']),
-        assembly                    = expand(join(top_assembly_dir, "{name}", "final_assembly.fasta"), name=samples),
+        r1_read                     = join(workpath, "{name}", "{name}_1.fastq"),
+        r2_read                     = join(workpath, "{name}", "{name}_2.fastq"),
+        assembly                    = join(top_assembly_dir, "{name}", "final_assembly.fasta"),
     output:
-        bin_dir                     = expand(join(top_binning_dir, "{name}"), name=samples),
-        refine_dir                  = expand(join(top_refine_dir, "{name}"),  name=samples),
+        # binning
+        maxbin_bins                 = directory(join(top_binning_dir, "{name}", "maxbin2_bins")),
+        metabat2_bins               = directory(join(top_binning_dir, "{name}", "metabat2_bins")),
+        metawrap_bins               = directory(join(top_binning_dir, "{name}", "metawrap_50_5_bins")),
+        # bin refinement
+        maxbin_contigs              = join(top_refine_dir, "{name}", "maxbin2_bins.contigs"),
+        maxbin_stats                = join(top_refine_dir, "{name}", "maxbin2_bins.stats"),
+        metabat2_contigs            = join(top_refine_dir, "{name}", "metabat2_bins.contigs"),
+        metabat2_stats              = join(top_refine_dir, "{name}", "metabat2_bins.stats"),
+        metawrap_contigs            = join(top_refine_dir, "{name}", "metawrap_50_5_bins.contigs"),
+        metawrap_stats              = join(top_refine_dir, "{name}", "metawrap_50_5_bins.stats"),
+        bin_figure                  = join(top_refine_dir, "{name}", "figures", "binning_results.png"),
     params:
+        bin_dir                     = join(top_binning_dir, "{name}"),
+        refine_dir                  = join(top_refine_dir, "{name}"),
         bin_mem                     = cluster.get("metawrap_assembly_binning", default_memory),
         # minimum percentage completions of bins
         min_perc_complete           = "50",
@@ -189,6 +224,69 @@ rule metawrap_binning:
     threads: cluster["metawrap_tax_classification"].get("threads", default_threads),
     shell:
         """
-            metawrap binning --metabat2 --maxbin2 --concoct --interleaved -m {params.bin_mem} -t {threads} -a {input.assembly} -o {output.bin_dir} {input.paired_reads}
-            metawrap bin_refinement -o {output.refine_dir} -t {threads} -A {output.bin_dir}/metabat2_bins -B {output.bin_dir}/maxbin2_bins -c {params.min_perc_complete} -x {params.max_perc_contam}
+            # metawrap binning
+            metawrap binning \
+            --metabat2 --maxbin2 --concoct \
+            -m {params.bin_mem} \
+            -t {threads} \
+            -a {input.assembly} \
+            -o {params.bin_dir} \
+            {input.r1_read} {input.r2_read}
+            # metawrap bin refinement
+            metawrap bin_refinement \
+            -o {params.refine_dir} \
+            -t {threads} \
+            -A {params.bin_dir}/metabat2_bins \
+            -B {params.bin_dir}/maxbin2_bins \
+            -c {params.min_perc_complete} \
+            -x {params.max_perc_contam}
+        """
+
+
+rule derep_bins:
+    """
+        TODO: docstring
+    """
+    input:
+        maxbin_bins                 = directory(join(top_binning_dir, "{name}", "maxbin2_bins")),
+        metabat2_bins               = directory(join(top_binning_dir, "{name}", "metabat2_bins")),
+        metawrap_bins               = directory(join(top_binning_dir, "{name}", "metawrap_50_5_bins")),
+        maxbin_contigs              = join(top_refine_dir, "{name}", "maxbin2_bins.contigs"),
+        maxbin_stats                = join(top_refine_dir, "{name}", "maxbin2_bins.stats"),
+        metabat2_contigs            = join(top_refine_dir, "{name}", "metabat2_bins.contigs"),
+        metabat2_stats              = join(top_refine_dir, "{name}", "metabat2_bins.stats"),
+        metawrap_contigs            = join(top_refine_dir, "{name}", "metawrap_50_5_bins.contigs"),
+        metawrap_stats              = join(top_refine_dir, "{name}", "metawrap_50_5_bins.stats"),
+    output:
+        dereplicated_bins           = directory(join(top_binning_dir, "{name}", "dereplicated_bins")),
+        search_rep_bc               = join(top_binning_dir, "{name}", "maxbin2_bins"),
+    singularity: metawrap_container,
+    threads: 32
+    params:
+        sid                         = "{name}",
+        # -l LENGTH: Minimum genome length (default: 50000)
+        minimum_genome_length = "1000",
+        # -pa[--P_ani] P_ANI: ANI threshold to form primary (MASH) clusters (default: 0.9)
+        ani_primary_threshold = "0.9",
+        # -sa[--S_ani] S_ANI: ANI threshold to form secondary clusters (default: 0.95)
+        ani_secondary_threshold = "0.95",
+        # -nc[--cov_thresh] COV_THRESH: Minmum level of overlap between genomes when doing secondary comparisons (default: 0.1)
+        min_overlap = "0.1",
+        # -cm[--coverage_method] {total,larger}  {total,larger}: Method to calculate coverage of an alignment
+        coverage_method = 'larger',
+    shell:
+        """
+		sed -i 's/^bin./{name}_bin./g' {input.maxbin_stats} && \
+		sed -i 's/^bin./{name}_bin./g' {input.metabat2_stats} && \
+		sed -i 's/^bin./{name}_bin./g' {input.metawrap_stats} && \
+        touch {output.search_rep_bc}
+        dRep dereplicate \
+        -p {threads} \
+        -l {params.minimum_genome_length} \
+        -pa {params.ani_primary_threshold} \
+        -sa {params.ani_secondary_threshold} \
+        -nc {params.min_overlap} \
+        -cm {params.coverage_method} \
+        -g {input.metawrap_bins}/* \
+        {output.dereplicated_bins}
         """
