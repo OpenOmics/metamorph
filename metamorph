@@ -46,16 +46,15 @@ import argparse  # potential python3 3rd party package, added in python/3.5
 # Local imports
 from src import version 
 from src.run import init, setup, bind, dryrun, runner, run_coa_pipeline
-from src.shells import bash 
 from src.utils import (
     Colors,
     err,
     exists,
     fatal,
-    hashed,
     permissions,
     check_cache,
-    require)
+    require
+)
 
 
 # Pipeline Metadata

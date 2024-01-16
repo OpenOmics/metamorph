@@ -8,20 +8,23 @@ from itertools import chain
 # ~~~~~~~~~~
 # Constants and paths
 # ~~~~~~~~~~
+workpath                   = config["project"]["workpath"]
+datapath                   = config["project"]["datapath"]
 default_threads            = cluster["__default__"]['threads']
 default_memory             = cluster["__default__"]['mem']
-top_readqc_dir             = join(workpath, config['project'], "metawrap_readqc")
-top_assembly_dir           = join(workpath, config['project'], "metawrap_assembly")
-top_tax_dir                = join(workpath, config['project'], "metawrap_taxonomy")
-top_binning_dir            = join(workpath, config['project'], "metawrap_binning")
-top_refine_dir             = join(workpath, config['project'], "metawrap_refine_bins")
-metawrap_container         = config["images"]["metawrap"]
+top_log_dir                = join(workpath, config['project']['id'], "logs")
+top_readqc_dir             = join(workpath, config['project']['id'], "metawrap_qc")
+top_assembly_dir           = join(workpath, config['project']['id'], "metawrap_assembly")
+top_tax_dir                = join(workpath, config['project']['id'], "metawrap_kmer")
+top_binning_dir            = join(workpath, config['project']['id'], "metawrap_binning")
+top_refine_dir             = join(workpath, config['project']['id'], "metawrap_bin_refine")
+metawrap_container         = config["containers"]["metawrap"]
 
 
 """
     1. read qc
     2. assembly
-    3. binnging
+    3. binning
     4. bin refinement
     5. depreplicate bins
     6. annotate bins
@@ -57,44 +60,36 @@ rule metawrap_read_qc:
             - FastQC html report and zip file on trimmed data
     """
     input:
-        R1                  = expand(join(workpath, "{name}.R1.fastq.gz"), name=samples),
-        R2                  = expand(join(workpath, "{name}.R2.fastq.gz"), name=samples),
+        R1                  = join(datapath, "{name}_R1.fastq.gz"),
+        R2                  = join(datapath, "{name}_R2.fastq.gz"),
     output:
-        R1_bmtagger_report  = expand(join(top_readqc_dir, "{name}", "{name}.R1_bmtagger_report.html"), name=samples),
-        R2_bmtagger_report  = expand(join(top_readqc_dir, "{name}", "{name}.R2_bmtagger_report.html"), name=samples),
-        R1_fastqc_report    = expand(join(top_readqc_dir, "{name}", "{name}.R1_fastqc_report.html"), name=samples),
-        R2_fastqc_report    = expand(join(top_readqc_dir, "{name}", "{name}.R2_fastqc_report.html"), name=samples),
-        R1_qc_reads         = expand(join(workpath, "{name}", "{name}.R1_readqc.fastq"), name=samples),
-        R2_qc_reads         = expand(join(workpath, "{name}", "{name}.R2_readqc.fastq"), name=samples),
-        readqc_dir          = expand(join(top_readqc_dir, "{name}"), name=samples),
+        R1_bmtagger_report  = join(top_readqc_dir, "{name}", "{name}.R1_bmtagger_report.html"),
+        R2_bmtagger_report  = join(top_readqc_dir, "{name}", "{name}.R2_bmtagger_report.html"),
+        R1_fastqc_report    = join(top_readqc_dir, "{name}", "{name}.R1_fastqc_report.html"),
+        R2_fastqc_report    = join(top_readqc_dir, "{name}", "{name}.R2_fastqc_report.html"),
+        R1_qc_reads         = join(workpath, "{name}", "{name}.R1_readqc.fastq"),
+        R2_qc_reads         = join(workpath, "{name}", "{name}.R2_readqc.fastq"),
     params:
-        R1_mw_named         = expand(join(top_readqc_dir, "{name}", "{name}_1.fastq"), name=samples),
-        R2_mw_named         = expand(join(top_readqc_dir, "{name}", "{name}_2.fastq"), name=samples),
-    singularity: metawrap_container,
+        rname               = "metawrap_read_qc",
+        this_qc_dir         = join(top_readqc_dir, "{name}"),
+        R1_mw_named         = join(top_readqc_dir, "{name}", "{name}_1.fastq"),
+        R2_mw_named         = join(top_readqc_dir, "{name}", "{name}_2.fastq"),
+    containerized: metawrap_container,
+    log: join(top_log_dir, "read_qc", "{name}")
     threads: int(cluster["metawrap_genome_assembly"].get('threads', default_threads)),
     shell: 
         """
-            # Setting up inputs to metawrap,
-            # needs uncompressed files as input,
-            # input files also need to end with
-            # the following ext: _[1,2].fastq
-            gunzip -c {input.R1} > {params.R1_mw_named}
-            gunzip -c {input.R2} > {params.R2_mw_named}
-            
-            # Running metawraps read_qc module
-            metawrap read_qc -1 {params.R1_mw_named} -2 {params.R2_mw_named} -t {threads} -o {output.readqc_dir}
-            
-            # Rename R1 output files from metawrap
-            mv {output.readqc_dir}/final_pure_reads_1.fastq {output.R1_qc_reads}
-            rm -f {params.R1_mw_named}
-            cp {output.readqc_dir}/post-QC_report/final_pure_reads_1_fastqc.html {output.R1_bmtagger_report}
-            cp {output.readqc_dir}/pre-QC_report/{params.R1_mw_named}_fastqc.html {output.R1_fastqc_report}
-
-            # Rename R2 output files from metawrap
-            mv {output.readqc_dir}/final_pure_reads_2.fastq {output.R2_qc_reads}
-            rm -f {params.R2_mw_named}
-            cp {output.readqc_dir}/post-QC_report/final_pure_reads_2_fastqc.html {output.R2_bmtagger_report}
-            cp {output.readqc_dir}/pre-QC_report/{params.R2_mw_named}_fastqc.html {output.R2_fastqc_report}
+        gunzip -c {input.R1} > {params.R1_mw_named}
+        gunzip -c {input.R2} > {params.R2_mw_named}
+        metawrap read_qc -1 {params.R1_mw_named} -2 {params.R2_mw_named} -t {threads} -o {params.this_qc_dir}
+        mv {params.this_qc_dir}/final_pure_reads_1.fastq {output.R1_qc_reads}
+        rm -f {params.R1_mw_named}
+        cp {params.this_qc_dir}/post-QC_report/final_pure_reads_1_fastqc.html {output.R1_bmtagger_report}
+        cp {params.this_qc_dir}/pre-QC_report/{params.R1_mw_named}_fastqc.html {output.R1_fastqc_report}
+        mv {params.this_qc_dir}/final_pure_reads_2.fastq {output.R2_qc_reads}
+        rm -f {params.R2_mw_named}
+        cp {params.this_qc_dir}/post-QC_report/final_pure_reads_2_fastqc.html {output.R2_bmtagger_report}
+        cp {params.this_qc_dir}/pre-QC_report/{params.R2_mw_named}_fastqc.html {output.R2_fastqc_report}
         """
 
 
@@ -131,6 +126,7 @@ rule metawrap_genome_assembly:
         assembly_dir                = expand(join(top_assembly_dir, "{name}"), name=samples),
     singularity: metawrap_container,
     params:
+        rname                       = "metawrap_genome_assembly",
         memlimit                    = cluster["metawrap_genome_assembly"].get('mem', default_memory),
         contig_min_len              = "1000",
     threads: int(cluster["metawrap_genome_assembly"].get('threads', default_threads)),
@@ -166,6 +162,7 @@ rule metawrap_tax_classification:
         kronagram                   = expand(join(top_tax_dir, "{name}", "kronagram.html"), name=samples),
         tax_dir                     = expand(join(top_tax_dir, "{name}"), name=samples),
     params:
+        rname                       = "metawrap_tax_classification",
         tax_subsample               = str(int(1e6)),
     singularity: metawrap_container,
     threads: cluster["metawrap_tax_classification"].get("threads", default_threads),
@@ -185,14 +182,16 @@ rule metawrap_setup_binning:
         R1_from_qc                  = join(workpath, "{name}", "{name}.R1_readqc.fastq"),
         R2_from_qc                  = join(workpath, "{name}", "{name}.R2_readqc.fastq"),
     output:
-        R1_bin_name                 = join(workpath, "{name}", "{name}_{pair}.fastq"),
-        R2_bin_name                 = join(workpath, "{name}", "{name}_{pair}.fastq"),
+        R1_bin_name                 = join(workpath, "{name}", "{name}_1.fastq"),
+        R2_bin_name                 = join(workpath, "{name}", "{name}_2.fastq"),
+    params:
+        rname                       = "metawrap_setup_binning",
     shell:
         """
         ln -s {input.R1_from_qc} {output.R1_bin_name}
         ln -s {input.R2_from_qc} {output.R2_bin_name}
         """
-        
+
 
 rule metawrap_binning:
     input:
@@ -200,70 +199,65 @@ rule metawrap_binning:
         r2_read                     = join(workpath, "{name}", "{name}_2.fastq"),
         assembly                    = join(top_assembly_dir, "{name}", "final_assembly.fasta"),
     output:
-        # binning
         maxbin_bins                 = directory(join(top_binning_dir, "{name}", "maxbin2_bins")),
         metabat2_bins               = directory(join(top_binning_dir, "{name}", "metabat2_bins")),
         metawrap_bins               = directory(join(top_binning_dir, "{name}", "metawrap_50_5_bins")),
-        # bin refinement
-        maxbin_contigs              = join(top_refine_dir, "{name}", "maxbin2_bins.contigs"),
-        maxbin_stats                = join(top_refine_dir, "{name}", "maxbin2_bins.stats"),
-        metabat2_contigs            = join(top_refine_dir, "{name}", "metabat2_bins.contigs"),
-        metabat2_stats              = join(top_refine_dir, "{name}", "metabat2_bins.stats"),
-        metawrap_contigs            = join(top_refine_dir, "{name}", "metawrap_50_5_bins.contigs"),
-        metawrap_stats              = join(top_refine_dir, "{name}", "metawrap_50_5_bins.stats"),
-        bin_figure                  = join(top_refine_dir, "{name}", "figures", "binning_results.png"),
+        maxbin_contigs              = join(top_binning_dir, "{name}", "maxbin2_bins.contigs"),
+        maxbin_stats                = join(top_binning_dir, "{name}", "maxbin2_bins.stats"),
+        metabat2_contigs            = join(top_binning_dir, "{name}", "metabat2_bins.contigs"),
+        metabat2_stats              = join(top_binning_dir, "{name}", "metabat2_bins.stats"),
+        metawrap_contigs            = join(top_binning_dir, "{name}", "metawrap_50_5_bins.contigs"),
+        metawrap_stats              = join(top_binning_dir, "{name}", "metawrap_50_5_bins.stats"),
+        bin_figure                  = join(top_binning_dir, "{name}", "figures", "binning_results.png"),
     params:
+        rname                       = "metawrap_binning",
         bin_dir                     = join(top_binning_dir, "{name}"),
         refine_dir                  = join(top_refine_dir, "{name}"),
         bin_mem                     = cluster.get("metawrap_assembly_binning", default_memory),
-        # minimum percentage completions of bins
         min_perc_complete           = "50",
-        # maximum percentage of contamination
         max_perc_contam             = "5",
     singularity: metawrap_container,
     threads: cluster["metawrap_tax_classification"].get("threads", default_threads),
     shell:
         """
-            # metawrap binning
-            metawrap binning \
-            --metabat2 --maxbin2 --concoct \
-            -m {params.bin_mem} \
-            -t {threads} \
-            -a {input.assembly} \
-            -o {params.bin_dir} \
-            {input.r1_read} {input.r2_read}
-            # metawrap bin refinement
-            metawrap bin_refinement \
-            -o {params.refine_dir} \
-            -t {threads} \
-            -A {params.bin_dir}/metabat2_bins \
-            -B {params.bin_dir}/maxbin2_bins \
-            -c {params.min_perc_complete} \
-            -x {params.max_perc_contam}
+        # metawrap binning
+        metawrap binning \
+        --metabat2 --maxbin2 --concoct \
+        -m {params.bin_mem} \
+        -t {threads} \
+        -a {input.assembly} \
+        -o {params.bin_dir} \
+        {input.r1_read} {input.r2_read}
+        # metawrap bin refinement
+        metawrap bin_refinement \
+        -o {params.refine_dir} \
+        -t {threads} \
+        -A {params.bin_dir}/metabat2_bins \
+        -B {params.bin_dir}/maxbin2_bins \
+        -c {params.min_perc_complete} \
+        -x {params.max_perc_contam}
         """
 
 
 rule derep_bins:
-    """
-        TODO: docstring
-    """
     input:
-        maxbin_bins                 = directory(join(top_binning_dir, "{name}", "maxbin2_bins")),
-        metabat2_bins               = directory(join(top_binning_dir, "{name}", "metabat2_bins")),
-        metawrap_bins               = directory(join(top_binning_dir, "{name}", "metawrap_50_5_bins")),
-        maxbin_contigs              = join(top_refine_dir, "{name}", "maxbin2_bins.contigs"),
-        maxbin_stats                = join(top_refine_dir, "{name}", "maxbin2_bins.stats"),
-        metabat2_contigs            = join(top_refine_dir, "{name}", "metabat2_bins.contigs"),
-        metabat2_stats              = join(top_refine_dir, "{name}", "metabat2_bins.stats"),
-        metawrap_contigs            = join(top_refine_dir, "{name}", "metawrap_50_5_bins.contigs"),
-        metawrap_stats              = join(top_refine_dir, "{name}", "metawrap_50_5_bins.stats"),
+        maxbin_contigs              = join(top_binning_dir, "{name}", "maxbin2_bins.contigs"),
+        maxbin_stats                = join(top_binning_dir, "{name}", "maxbin2_bins.stats"),
+        metabat2_contigs            = join(top_binning_dir, "{name}", "metabat2_bins.contigs"),
+        metabat2_stats              = join(top_binning_dir, "{name}", "metabat2_bins.stats"),
+        metawrap_contigs            = join(top_binning_dir, "{name}", "metawrap_50_5_bins.contigs"),
+        metawrap_stats              = join(top_binning_dir, "{name}", "metawrap_50_5_bins.stats"),
     output:
-        dereplicated_bins           = directory(join(top_binning_dir, "{name}", "dereplicated_bins")),
+        dereplicated_bins           = directory(join(top_refine_dir, "{name}", "dereplicated_bins")),
         search_rep_bc               = join(top_binning_dir, "{name}", "maxbin2_bins"),
     singularity: metawrap_container,
     threads: 32
     params:
+        rname                       = "derep_bins",
         sid                         = "{name}",
+        maxbin_bins                 = join(top_binning_dir, "{name}", "maxbin2_bins"),
+        metabat2_bins               = join(top_binning_dir, "{name}", "metabat2_bins"),
+        metawrap_bins               = join(top_binning_dir, "{name}", "metawrap_50_5_bins"),
         # -l LENGTH: Minimum genome length (default: 50000)
         minimum_genome_length = "1000",
         # -pa[--P_ani] P_ANI: ANI threshold to form primary (MASH) clusters (default: 0.9)
@@ -287,6 +281,6 @@ rule derep_bins:
         -sa {params.ani_secondary_threshold} \
         -nc {params.min_overlap} \
         -cm {params.coverage_method} \
-        -g {input.metawrap_bins}/* \
+        -g {params.metawrap_bins}/* \
         {output.dereplicated_bins}
         """

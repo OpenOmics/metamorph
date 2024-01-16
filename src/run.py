@@ -4,6 +4,8 @@
 # Python standard library
 from __future__ import print_function
 from shutil import copytree
+from uuid import uuid4
+from datetime import datetime
 import os, re, json, sys, subprocess
 
 # Local imports
@@ -329,10 +331,8 @@ def bind(sub_args, config):
             if value not in bindpaths:
                 bindpaths.append(value)
 
-    rawdata_bind_paths = [os.path.realpath(p) for p in config['project']['datapath'].split(',')]
+    rawdata_bind_paths = [os.path.abspath(p) for p in config['project']['datapath'].split(',')]
     working_directory =  os.path.realpath(config['project']['workpath'])
-
-
 
     return bindpaths
 
@@ -393,6 +393,8 @@ def add_user_information(config):
     # username
     config['project']['userhome'] = home
     config['project']['username'] = username
+    dt = datetime.now().strftime("%m/%d/%Y")
+    config['project']['id'] = f"{uuid4()}_{dt}_metagenome"
 
     return config
 
