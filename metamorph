@@ -103,10 +103,16 @@ def run(sub_args):
     # copy over required resources to run 
     # the pipeline
     git_repo = __home__
+  
+    fastq_inputs = [sub_args.input]
+    
+    if sub_args.rna:
+        fastq_inputs.append(sub_args.rna)
+
     input_files = init(
         repo_path = git_repo,
         output_path = sub_args.output,
-        links = sub_args.input
+        links = fastq_inputs
     )
 
     # Step 2. Setup pipeline for execution, 
@@ -191,6 +197,7 @@ def run(sub_args):
 
 
 def cache(sub_args):
+
     """Caches remote resources or reference files stored on DockerHub and S3.
     Local SIFs will be created from images defined in 'config/containers/images.json'.
     @TODO: add option to cache other shared S3 resources (i.e. kraken db and fqscreen indices)
@@ -393,6 +400,16 @@ def parsed_arguments(name, description):
         nargs = '+',
         help = argparse.SUPPRESS
     )
+
+    subparser_run.add_argument(
+        '--rna',
+        # Check if the file exists and if it is readable
+        type = lambda file: permissions(parser, file, os.R_OK),
+        required = False,
+        nargs = '+',
+        help = argparse.SUPPRESS
+    )
+
 
     # Output Directory, i.e 
     # working directory

@@ -4,6 +4,9 @@
 # Python standard library
 from __future__ import print_function
 from shutil import copytree
+from uuid import uuid4
+from datetime import datetime
+from itertools import chain
 import os, re, json, sys, subprocess
 
 # Local imports
@@ -50,7 +53,17 @@ def init(repo_path, output_path, links=[], required=['workflow', 'resources', 'c
 
     # Create renamed symlinks for each rawdata 
     # file provided as input to the pipeline
-    inputs = sym_safe(input_data = links, target = output_path)
+    try:
+        os.mkdir(os.path.join(output_path, 'dna'))
+    except FileExistsError:
+        pass
+    inputs = dict(dna=sym_safe(input_data = links[0], target = os.path.join(output_path, 'dna')))
+    if len(links) == 2 and links[1]:
+        try:
+            os.mkdir(os.path.join(output_path, 'rna'))
+        except FileExistsError:
+            pass 
+        inputs['rna'] = sym_safe(input_data = links[1], target = os.path.join(output_path, 'rna'))
 
     return inputs
 
@@ -446,14 +459,22 @@ def add_rawdata_information(sub_args, config, ifiles):
     # or single-end
     # Updates config['project']['nends'] where
     # 1 = single-end, 2 = paired-end, -1 = bams
+
     convert = {1: 'single-end', 2: 'paired-end', -1: 'bam'}
-    nends = get_nends(ifiles)  # Checks PE data for both mates (R1 and R2)
+    import ipdb; ipdb.set_trace()
+
+    nends = get_nends(ifiles['dna'])  # Checks PE data for both mates (R1 and R2)
     config['project']['nends'] = nends
     config['project']['filetype'] = convert[nends]
 
     # Finds the set of rawdata directories to bind
     rawdata_paths = get_rawdata_bind_paths(input_files = sub_args.input)
     config['project']['datapath'] = ','.join(rawdata_paths)
+
+    if 'rna' in ifiles and ifiles['rna']:
+        config['project']['rnapath'] = ifiles['rna']
+
+    import ipdb; ipdb.set_trace()
 
     # Add each sample's basename
     config = add_sample_metadata(input_files = ifiles, config = config)
