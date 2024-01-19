@@ -592,7 +592,6 @@ def dryrun(outdir, config='config.json', snakefile=os.path.join('workflow', 'Sna
     @return dryrun_output <str>:
         Byte string representation of dryrun command
     """
-    import ipdb; ipdb.set_trace()
     try:
         # Setting cores to dummy high number so
         # displays the true number of cores a rule
@@ -748,7 +747,7 @@ def run_coa_pipeline(mode, outdir, alt_cache, logger, tmp_dir, additional_bind_p
 
 
 try:
-    __job_name__ = 'metagenome_' + os.getlogin() + ':master'
+    __job_name__ = 'metamorph_' + os.getlogin() + ':master'
 except OSError:
     __job_name__ = 'metamorph:master'
 
