@@ -1,0 +1,40 @@
+# ~~~~~~~~~~
+# Metagenome read concatenation
+# ~~~~~~~~~~
+ruleorder:
+    cat_reads < decompress_reads 
+
+
+rule all:
+    input:
+        expand(join(workpath, "{name}.R{rnum}.fastq.gz", name=samples)),
+
+
+
+rule decompress_reads:
+    input:
+        all_reads                   = join(workpath, "{name}.R{rnum}.fastq.gz")
+    output:
+        all_uncompressed_read       = join(workpath, "{name}.R{rnum}.fastq.gz")
+    shell: 
+        "gunzip {input.all_reads}"
+
+
+rule cat_reads_and_compress:
+    input:
+        all_r1_reads                = expand(join(workpath, "{name}.R1.fastq"))
+        all_r2_reads                = expand(join(workpath, "{name}.R2.fastq"))
+    output:
+        big_read_r1                 = join(workpath, "coa.R1.fastq.gz")
+        big_read_r2                 = join(workpath, "coa.R1.fastq.gz")
+    params:
+        uncompressed_r1             = lambda wc, thisout: Path(thisout.big_read_r1).name[:-3]
+        uncompressed_r2             = lambda wc, thisout: Path(thisout.big_read_r2).name[:-3]
+    threads: 28
+    shell: 
+        """
+        cat {input.all_r1_reads} > {params.uncompressed_r1}
+        cat {input.all_r2_reads} > {params.uncompressed_r2}
+        pigz -9 {params.uncompressed_r1}
+        pigz -9 {params.uncompressed_r2}
+        """

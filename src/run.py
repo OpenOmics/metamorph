@@ -6,7 +6,6 @@ from __future__ import print_function
 from shutil import copytree
 from uuid import uuid4
 from datetime import datetime
-from itertools import chain
 import os, re, json, sys, subprocess
 
 # Local imports
@@ -342,10 +341,8 @@ def bind(sub_args, config):
             if value not in bindpaths:
                 bindpaths.append(value)
 
-    rawdata_bind_paths = [os.path.realpath(p) for p in config['project']['datapath'].split(',')]
+    rawdata_bind_paths = [os.path.abspath(p) for p in config['project']['datapath'].split(',')]
     working_directory =  os.path.realpath(config['project']['workpath'])
-
-
 
     return bindpaths
 
@@ -406,36 +403,18 @@ def add_user_information(config):
     # username
     config['project']['userhome'] = home
     config['project']['username'] = username
+    dt = datetime.now().strftime("%m/%d/%Y")
+    config['project']['id'] = f"{uuid4()}_{dt}_metagenome"
 
     return config
 
 
-def add_sample_metadata(input_files, config, group=None):
-    """Adds sample metadata such as sample basename, label, and group information.
-    If sample sheet is provided, it will default to using information in that file.
-    If no sample sheet is provided, it will only add sample basenames and labels.
-    @params input_files list[<str>]:
-        List containing pipeline input fastq files
-    @params config <dict>:
-        Config dictionary containing metadata to run pipeline
-    @params group <str>:
-        Sample sheet containing basename, group, and label for each sample
-    @return config <dict>:
-        Updated config with basenames, labels, and groups (if provided)
+def add_sample_metadata(input_files, config, rna_files=None, group=None):
     """
-    import re
-
-    # TODO: Add functionality for basecase 
-    # when user has samplesheet
+    """
     added = []
     config['samples'] = []
-    for file in input_files:
-        # Split sample name on file extension
-        sample = re.split('\.R[12]\.fastq\.gz', os.path.basename(file))[0]
-        if sample not in added:
-            # Only add PE sample information once
-            added.append(sample)
-            config['samples'].append(sample)
+    
 
     return config
 
@@ -461,23 +440,21 @@ def add_rawdata_information(sub_args, config, ifiles):
     # 1 = single-end, 2 = paired-end, -1 = bams
 
     convert = {1: 'single-end', 2: 'paired-end', -1: 'bam'}
-    import ipdb; ipdb.set_trace()
 
     nends = get_nends(ifiles['dna'])  # Checks PE data for both mates (R1 and R2)
     config['project']['nends'] = nends
     config['project']['filetype'] = convert[nends]
 
     # Finds the set of rawdata directories to bind
-    rawdata_paths = get_rawdata_bind_paths(input_files = sub_args.input)
+    rawdata_paths = get_rawdata_bind_paths(input_files = sub_args.input + sub_args.rna)
     config['project']['datapath'] = ','.join(rawdata_paths)
 
-    if 'rna' in ifiles and ifiles['rna']:
-        config['project']['rnapath'] = ifiles['rna']
-
-    import ipdb; ipdb.set_trace()
-
     # Add each sample's basename
-    config = add_sample_metadata(input_files = ifiles, config = config)
+    
+    if 'rna' in ifiles and ifiles['rna']:
+        config = add_sample_metadata(ifiles['dna'], config, rna_files=ifiles['rna'])
+    else:
+        config = add_sample_metadata(ifiles['dna'], config)
 
     return config
 
@@ -616,7 +593,7 @@ def dryrun(outdir, config='config.json', snakefile=os.path.join('workflow', 'Sna
         # displays the true number of cores a rule
         # will use, it uses the min(--cores CORES, N)
         dryrun_output = subprocess.check_output([
-            'snakemake', '-npr',
+            'snakemake', '-np',
             '-s', str(snakefile),
             '--use-singularity',
             '--rerun-incomplete',
@@ -641,9 +618,146 @@ def dryrun(outdir, config='config.json', snakefile=os.path.join('workflow', 'Sna
     return dryrun_output
 
 
-def runner(mode, outdir, alt_cache, logger, additional_bind_paths = None, 
-    threads=2,  jobname='pl:master', submission_script='run.sh',
-    tmp_dir = '/lscratch/$SLURM_JOBID/'):
+def run_coa_pipeline(mode, outdir, alt_cache, logger, tmp_dir, additional_bind_paths):
+    # gzip compression speed: ~10.5 MB/s 
+    # see: https://tukaani.org/lzma/benchmarks.html
+    # large fastq ~20GB
+    # 96 samples x 2 (R1 + R2) = 192 fastqs
+    # total size (high estimate): 192 fastqs * 20GB/fastq = 3,840 GB = 3,840,000 MB
+    # total compression time: 3,840,000 MB / (10.5 MB/s) = 365714 s = ~ 4 days
+    # pigz ~6.5 times faster than gzip
+    # https://github.com/neurolabusc/pigz-bench
+    # 3,840,000 MB / (10.5 MB/s * 6.5) = ~ 15.6 hours
+    # ~~~~~~~~~~~~~~    
+    
+    # Add additional singularity bind PATHs
+    # to mount the local filesystem to the 
+    # containers filesystem, NOTE: these 
+    # PATHs must be an absolute PATHs
+    outdir = os.path.abspath(outdir).strip()
+    # Add any default PATHs to bind to 
+    # the container's filesystem, like 
+    # tmp directories, /lscratch
+    addpaths = []
+    temp = os.path.dirname(tmp_dir.rstrip('/'))
+    if temp == os.sep:
+        temp = tmp_dir.rstrip('/')
+    if outdir not in additional_bind_paths.split(','):
+        addpaths.append(outdir)
+    if temp not in additional_bind_paths.split(','):
+        addpaths.append(temp)
+    bindpaths = ','.join(addpaths)
+
+    # Set ENV variable 'SINGULARITY_CACHEDIR' 
+    # to output directory
+    my_env = {}; my_env.update(os.environ)
+    cache = os.path.join(outdir, ".singularity")
+    my_env['SINGULARITY_CACHEDIR'] = cache
+    if alt_cache:
+        # Override the pipeline's default 
+        # cache location
+        my_env['SINGULARITY_CACHEDIR'] = alt_cache
+        cache = alt_cache
+
+    if additional_bind_paths:
+        # Add Bind PATHs for outdir and tmp dir
+        if bindpaths:
+            bindpaths = ",{}".format(bindpaths)
+        bindpaths = "{}{}".format(additional_bind_paths,bindpaths)
+
+    if not exists(os.path.join(outdir, 'logfiles')):
+        # Create directory for logfiles
+        os.makedirs(os.path.join(outdir, 'logfiles'))
+
+    # Create .singularity directory for 
+    # installations of snakemake without
+    # setuid which creates a sandbox in
+    # the SINGULARITY_CACHEDIR
+    if not exists(cache):
+        # Create directory for sandbox 
+        # and image layers
+        os.makedirs(cache, mode=0o755)
+
+    snakefile = os.path.abspath(os.path.join(__file__, '..', 'workflow', 'coa', 'Snakefile'))
+    slurm_dir = os.path.abspath(os.path.join(outdir, 'slurm'))
+    if not os.path.exists(slurm_dir):
+        os.mkdir(slurm_dir, mode=0o755)
+
+    CLUSTER_OPTS = "sbatch --gres {cluster.gres}" + \
+                   " --cpus-per-task {cluster.threads}" + \
+                   " -p {cluster.partition}" + \
+                   " -t {cluster.time}" + \
+                   " --mem {cluster.mem}" + \
+                   " --job-name={params.rname}" + \
+                   " -e $SLURM_DIR/slurm-%j_{params.rname}.out" + \
+                   " -o $SLURM_DIR/slurm-%j_{params.rname}.out" 
+    
+    sbatch_params = [
+        "#SBATCH --cpus-per-task=28",
+        "#SBATCH --mem=64g",
+        "#SBATCH --time=10-00:00:00",
+        "#SBATCH -p norm",
+        "#SBATCH --parsable",
+        "#SBATCH -J \"metagenome_coa\"",
+        "#SBATCH --mail-type=BEGIN,END,FAIL",
+        "#SBATCH --output \"" + outdir + "/logfiles/snakemake.log\"",
+        "#SBATCH --error \"" + outdir + "/logfiles/snakemake.log\"",
+    ]
+        
+    jobscript = [
+        "#!/usr/bin/env bash",
+        "module load snakemake singularity",
+        "snakemake \\",
+        "--latency-wait 120 \\",
+        "-s " + snakefile + " \\",
+        "-d \"{outdir}\" \\",
+        "--use-singularity \\",
+        "--singularity-args \"'-B " + bindpaths + "'\"  \\",
+        "--configfile=\"" + outdir + "/config.json\" \\",
+        "--printshellcmds \\",
+        "--cluster-config \"" + outdir + "/resources/cluster.json\" \\",
+        "--cluster \"" + CLUSTER_OPTS + "\" \\",
+        "--keep-going \\",
+        "--restart-times 3 \\",
+        "-j 500 \\",
+        "--rerun-incomplete --stats \"" + outdir + "/logfiles/runtime_statistics.json\" \\",
+        "--keep-remote \\",
+        "--local-cores 28 2>&1 | tee -a \"" + outdir + "/logfiles/master.log\"",
+    ]
+
+    exec_sh = 'bash'
+    if mode == 'slurm':
+        exec_sh = 'sbatch'
+        jobscript = [jobscript[0], *sbatch_params, *jobscript[1:]]
+    
+    coa_jobscript = os.path.join(slurm_dir, 'jobscript.sh')
+    with open(coa_jobscript, 'w') as fo:
+        fo.write("\n".join(jobscript))
+
+    coajob = subprocess.Popen([
+                exec_sh, str(coa_jobscript)
+            ], cwd = outdir, stderr=subprocess.STDOUT, stdout=logger, env=my_env)
+
+    coajob.wait()
+    return coajob.returncode
+
+
+try:
+    __job_name__ = 'metamorph_' + os.getlogin() + ':master'
+except OSError:
+    __job_name__ = 'metamorph:master'
+
+def runner(
+        mode, 
+        outdir, 
+        alt_cache, 
+        logger, 
+        additional_bind_paths = None, 
+        threads=2,  
+        jobname=__job_name__,
+        submission_script='run.sh',
+        tmp_dir = '/lscratch/$SLURM_JOBID/'
+    ):
     """Runs the pipeline via selected executor: local or slurm.
     If 'local' is selected, the pipeline is executed locally on a compute node/instance.
     If 'slurm' is selected, jobs will be submited to the cluster using SLURM job scheduler.

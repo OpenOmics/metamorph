@@ -9,7 +9,8 @@
         "threads": 8,
         "mem": "16g",
         "partition": "norm",
-        "time": "0-04:00:00"
+        "time": "0-04:00:00",
+        "gres": "None"
     },
     "metawrap_genome_assembly": {
         "threads": 24,
