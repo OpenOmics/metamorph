@@ -24,43 +24,49 @@ configfile: "config.json"  # Generated from user input and config/*.json
 rule all:
     input:
         # read qc and filtering
-        # ~~~~~~~~~~~~~~~~~~~~~
+        # ~~~~~~~~~~~~~~~
         expand(
             join(
-                workpath, "metawrap_readqc", "{name}", "{name}.R1_bmtagger_report.html"
+                workpath, config['project']['id'], "metawrap_qc", "{name}", "{name}.R1_bmtagger_report.html"
             ),
             name=samples,
         ),
         expand(
             join(
-                workpath, "metawrap_readqc", "{name}", "{name}.R2_bmtagger_report.html"
+                workpath, config['project']['id'], "metawrap_qc", "{name}", "{name}.R2_bmtagger_report.html"
             ),
             name=samples,
         ),
-        expand(join(workpath, "{name}", "{name}.R1_readqc.fastq"), name=samples),
-        expand(join(workpath, "{name}", "{name}.R2_readqc.fastq"), name=samples),
         # genome assembly
         # ~~~~~~~~~~~~~~~
         expand(
-            join(workpath, "metawrap_assembly", "{name}", "final_assembly.fasta"),
+            join(workpath, config['project']['id'], "metawrap_assembly", "{name}", "final_assembly.fasta"),
             name=samples,
         ),
         expand(
-            join(workpath, "metawrap_assembly", "{name}", "assembly_report.html"),
+            join(workpath, config['project']['id'], "metawrap_assembly", "{name}", "assembly_report.html"),
             name=samples,
         ),
         # taxonomic classification
-        # ~~~~~~~~~~~~~~~~~~~~~~~~
-        expand(join(workpath, "metawrap_taxonomy", "{name}", "final_assembly.krona"), name=samples),
-        expand(join(workpath, "metawrap_taxonomy", "{name}", "kronagram.html"), name=samples),
-        expand(join(workpath, "metawrap_taxonomy", "{name}", "final_assembly.krak2"), name=samples),
-        expand(join(workpath, "metawrap_taxonomy", "{name}", "final_assembly.kraken2"), name=samples),
-        # assembly binning and refinement
-        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        expand(join(workpath, "metawrap_binning", "{name}"), name=samples),
-        expand(join(workpath, "metawrap_refine_bins", "{name}"),  name=samples),
+        # ~~~~~~~~~~~~~~~
+        expand(join(workpath, config['project']['id'], "metawrap_kmer", "{name}", "final_assembly.krona"), name=samples),
+        expand(join(workpath, config['project']['id'], "metawrap_kmer", "{name}", "kronagram.html"), name=samples),
+        expand(join(workpath, config['project']['id'], "metawrap_kmer", "{name}", "final_assembly.krak2"), name=samples),
+        expand(join(workpath, config['project']['id'], "metawrap_kmer", "{name}", "final_assembly.kraken2"), name=samples),
+        # assembly binning
+        # ~~~~~~~~~~~~~~~
+        expand(join(workpath, config['project']['id'], "metawrap_binning", "{name}", "maxbin2_bins.contigs"), name=samples),
+        expand(join(workpath, config['project']['id'], "metawrap_binning", "{name}", "maxbin2_bins.stats"), name=samples),
+        expand(join(workpath, config['project']['id'], "metawrap_binning", "{name}", "metabat2_bins.contigs"), name=samples),
+        expand(join(workpath, config['project']['id'], "metawrap_binning", "{name}", "metabat2_bins.stats"), name=samples),
+        expand(join(workpath, config['project']['id'], "metawrap_binning", "{name}", "metawrap_50_5_bins.contigs"), name=samples),
+        expand(join(workpath, config['project']['id'], "metawrap_binning", "{name}", "metawrap_50_5_bins.stats"), name=samples),
+        expand(join(workpath, config['project']['id'], "metawrap_binning", "{name}", "figures", "binning_results.png"), name=samples),
+        # bin refinement
+        # ~~~~~~~~~~~~~~~
+        expand(join(workpath, config['project']['id'], "metawrap_bin_refine", "{name}", "dereplicated_bins"), name=samples),
+        
 
 
 # Import rules
-include: join("rules", "common.smk")
 include: join("rules", "metawrap.smk")

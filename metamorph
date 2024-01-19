@@ -24,10 +24,16 @@ express  or  implied,  including   warranties   of   performance,
 merchantability or fitness for any particular purpose.
 Please cite the author and NIH resources like the "Biowulf Cluster" 
 in any work or product based on this material.
+
 USAGE:
   $ metamorph <command> [OPTIONS]
 EXAMPLE:
-  $ metamorph run --input *.R?.fastq.gz --output output/
+    co-assembly:
+        $ metamorph run --coa --input *.R?.fastq.gz --output output/
+        $ metamorph run -C --input *.R?.fastq.gz --output output/
+
+    per-sample assembly:
+        $ metamorph run --input *.R?.fastq.gz --output output/
 """
 
 # Python standard library
@@ -39,17 +45,16 @@ import argparse  # potential python3 3rd party package, added in python/3.5
 
 # Local imports
 from src import version 
-from src.run import init, setup, bind, dryrun, runner
-from src.shells import bash 
+from src.run import init, setup, bind, dryrun, runner, run_coa_pipeline
 from src.utils import (
     Colors,
     err,
     exists,
     fatal,
-    hashed,
     permissions,
     check_cache,
-    require)
+    require
+)
 
 
 # Pipeline Metadata
@@ -127,6 +132,7 @@ def run(sub_args):
     )
 
     config['bindpaths'] = bindpaths
+    config['coassembly'] = sub_args.coa
 
     # Step 4. Save config to output directory
     with open(os.path.join(sub_args.output, 'config.json'), 'w') as fh:
@@ -152,8 +158,17 @@ def run(sub_args):
     else: 
         log = os.path.join(sub_args.output, 'logfiles', 'master.log')
     logfh = open(log, 'w')
+
+    if sub_args.coa:
+        cjob = run_coa_pipeline(sub_args.mode, 
+                                sub_args.output, 
+                                sub_args.singularity_cache, 
+                                logfh, 
+                                sub_args.tmp_dir,
+                                ",".join(bindpaths))
+
     mjob = runner(mode = sub_args.mode, 
-        outdir = sub_args.output, 
+        outdir = sub_args.output,
         # additional_bind_paths = all_bind_paths,
         alt_cache = sub_args.singularity_cache,  
         threads = int(sub_args.threads),
@@ -361,13 +376,20 @@ def parsed_arguments(name, description):
                          --mode slurm \\
                          --dry-run
 
-          # Step 2B.) Run the {0} pipeline
+          # Step 3A.) Run the {0} pipeline in per-sample fashion
           # The slurm mode will submit jobs to 
           # the cluster. It is recommended running 
           # the pipeline in this mode.
           ./{0} run --input .tests/*.R?.fastq.gz \\
                          --output /data/$USER/output \\
                          --mode slurm
+                                 
+          # Step 3B.) Run the {0} pipeline in co-assembly fashion
+          # with slurm
+          ./{0} run --coa --input .tests/*.R?.fastq.gz \\
+                         --output /data/$USER/output \\
+                         --mode slurm
+                                 
 
         {2}{3}Version:{4}
           {1}
@@ -424,6 +446,14 @@ def parsed_arguments(name, description):
         required = False,
         default = "slurm",
         choices = ['slurm', 'local'],
+        help = argparse.SUPPRESS
+    )
+
+    # a supported job scheduler, etc.
+    subparser_run.add_argument(
+        '-C', '--coa',
+        action="store_true",
+        required = False,
         help = argparse.SUPPRESS
     )
 
