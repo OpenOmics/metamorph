@@ -745,6 +745,12 @@ def run_coa_pipeline(mode, outdir, alt_cache, logger, tmp_dir, additional_bind_p
     coajob.wait()
     return coajob.returncode
 
+
+try:
+    __job_name__ = 'metagenome_' + os.getlogin() + ':master'
+except OSError:
+    __job_name__ = 'metamorph:master'
+
 def runner(
         mode, 
         outdir, 
@@ -752,7 +758,7 @@ def runner(
         logger, 
         additional_bind_paths = None, 
         threads=2,  
-        jobname='metagenome_' + os.getlogin() + ':master', 
+        jobname=__job_name__,
         submission_script='run.sh',
         tmp_dir = '/lscratch/$SLURM_JOBID/'
     ):
