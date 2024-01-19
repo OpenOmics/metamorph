@@ -592,6 +592,7 @@ def dryrun(outdir, config='config.json', snakefile=os.path.join('workflow', 'Sna
     @return dryrun_output <str>:
         Byte string representation of dryrun command
     """
+    import ipdb; ipdb.set_trace()
     try:
         # Setting cores to dummy high number so
         # displays the true number of cores a rule
