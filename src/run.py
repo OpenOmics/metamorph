@@ -597,7 +597,7 @@ def dryrun(outdir, config='config.json', snakefile=os.path.join('workflow', 'Sna
         # displays the true number of cores a rule
         # will use, it uses the min(--cores CORES, N)
         dryrun_output = subprocess.check_output([
-            'snakemake', '-npr',
+            'snakemake', '-np',
             '-s', str(snakefile),
             '--use-singularity',
             '--rerun-incomplete',
