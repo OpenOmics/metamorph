@@ -165,6 +165,9 @@ def run(sub_args):
         log = os.path.join(sub_args.output, 'logfiles', 'master.log')
     logfh = open(log, 'w')
 
+    if 'databases' in config:
+        bindpaths.extend([mount['from']+':'+mount['to']+':'+mount['mode'] for mount in config['databases']])
+
     if sub_args.coa:
         cjob = run_coa_pipeline(sub_args.mode, 
                                 sub_args.output, 

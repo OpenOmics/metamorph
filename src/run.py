@@ -225,27 +225,6 @@ def setup(sub_args, ifiles, repo_path, output_path):
     return config
 
 
-def unpacked(nested_dict):
-    """Generator to recursively retrieves all values in a nested dictionary.
-    @param nested_dict dict[<any>]:
-        Nested dictionary to unpack
-    @yields value in dictionary 
-    """
-    # Iterate over all values of 
-    # given dictionary
-    for value in nested_dict.values():
-        # Check if value is of dict type
-        if isinstance(value, dict):
-            # If value is dict then iterate 
-            # over all its values recursively
-            for v in unpacked(value):
-                yield v
-        else:
-            # If value is not dict type 
-            # then yield the value
-            yield value
-
-
 def get_fastq_screen_paths(fastq_screen_confs, match = 'DATABASE', file_index = -1):
     """Parses fastq_screen.conf files to get the paths of each fastq_screen database.
     This path contains bowtie2 indices for reference genome to screen against.
@@ -332,19 +311,30 @@ def bind(sub_args, config):
         List of singularity/docker bind paths 
     """
     bindpaths = []
-    for value in unpacked(config):
-        if not isinstance(value, str):
-            continue
-        if exists(value):
-            if os.path.isfile(value):
-                value = os.path.dirname(value)
-            if value not in bindpaths:
-                bindpaths.append(value)
+
+    if 'databases' in config:
+        dbs = config.pop('databases')
+        bindpaths.extend([mount['from']+':'+mount['to']+':'+mount['mode'] for mount in dbs])
+
+    if 'options' in config and 'input' in config['options']:
+        inrents = list(set([os.path.abspath(os.path.dirname(p)) for p in config['options']['input'] if os.path.exists(os.path.dirname(p)) and os.path.isdir(os.path.dirname(p))]))
+        bindpaths.extend(inrents)
+
+    if 'options' in config and 'rna' in config['options']:
+        rnarents = list(set([os.path.abspath(os.path.dirname(p)) for p in config['options']['rna'] if os.path.exists(os.path.dirname(p)) and os.path.isdir(os.path.dirname(p))]))
+        bindpaths.extend(rnarents)
+
+    if 'options' in config and 'output' in config['options']:
+        if os.path.exists(config['options']['output']) and os.path.isdir(config['options']['output']):
+            bindpaths.append(os.path.abspath(config['options']['output']))
+
+    if 'tmp_dir' in config:
+        bindpaths.append(config['tmp_dir'])
 
     rawdata_bind_paths = [os.path.abspath(p) for p in config['project']['datapath'].split(',')]
     working_directory =  os.path.realpath(config['project']['workpath'])
 
-    return bindpaths
+    return list(set(bindpaths))
 
 
 def mixed_inputs(ifiles):
@@ -410,12 +400,27 @@ def add_user_information(config):
 
 
 def add_sample_metadata(input_files, config, rna_files=None, group=None):
-    """
+    """Adds sample metadata such as sample basename, label, and group information.
+    If sample sheet is provided, it will default to using information in that file.
+    If no sample sheet is provided, it will only add sample basenames and labels.
+    @params input_files list[<str>]:
+        List containing pipeline input fastq files
+    @params config <dict>:
+        Config dictionary containing metadata to run pipeline
+    @params group <str>:
+        Sample sheet containing basename, group, and label for each sample
+    @return config <dict>:
+        Updated config with basenames, labels, and groups (if provided)
     """
     added = []
     config['samples'] = []
-    
-
+    for file in input_files:
+        # Split sample name on file extension
+        sample = re.split('\.R[12]\.fastq\.gz', os.path.basename(file))[0]
+        if sample not in added:
+            # Only add PE sample information once
+            added.append(sample)
+            config['samples'].append(sample)
     return config
 
 
@@ -446,15 +451,11 @@ def add_rawdata_information(sub_args, config, ifiles):
     config['project']['filetype'] = convert[nends]
 
     # Finds the set of rawdata directories to bind
-    rawdata_paths = get_rawdata_bind_paths(input_files = sub_args.input + sub_args.rna)
+    rawdata_paths = get_rawdata_bind_paths(input_files = sub_args.input)
     config['project']['datapath'] = ','.join(rawdata_paths)
 
     # Add each sample's basename
-    
-    if 'rna' in ifiles and ifiles['rna']:
-        config = add_sample_metadata(ifiles['dna'], config, rna_files=ifiles['rna'])
-    else:
-        config = add_sample_metadata(ifiles['dna'], config)
+    config = add_sample_metadata(ifiles['dna'], config)
 
     return config
 
@@ -813,7 +814,7 @@ def runner(
         # Add Bind PATHs for outdir and tmp dir
         if bindpaths:
             bindpaths = ",{}".format(bindpaths)
-        bindpaths = "{}{}".format(additional_bind_paths,bindpaths)
+        bindpaths = "{}{}".format(additional_bind_paths, bindpaths)
 
     if not exists(os.path.join(outdir, 'logfiles')):
         # Create directory for logfiles

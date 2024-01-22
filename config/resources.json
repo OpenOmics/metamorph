@@ -1,5 +1,5 @@
 {
-    "binds": [
+    "databases": [
         {
             "name": "KRAKEN_DB2",
             "to": "$HOME/KRAKEN_DB2",
@@ -29,11 +29,6 @@
             "name": "CHECKM_DB",
             "to": "$HOME/checkm",
             "from": "/data/OpenOmics/references/metamorph/checkm",
-            "mode": "rw"
-        }, {
-            "name": "CHECKM_CONFIG",
-            "to": "/opt/conda/envs/metawrap-env/lib/python2.7/site-packages/checkm/DATA_CONFIG",
-            "from": "/data/OpenOmics/references/metamorph/checkm/DATA_CONFIG",
             "mode": "rw"
         }
     ]

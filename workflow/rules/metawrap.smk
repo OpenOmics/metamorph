@@ -60,8 +60,8 @@ rule metawrap_read_qc:
             - FastQC html report and zip file on trimmed data
     """
     input:
-        R1                  = join(datapath, "{name}_R1.fastq.gz"),
-        R2                  = join(datapath, "{name}_R2.fastq.gz"),
+        R1                  = expand(join(datapath, "{name}_R1.fastq.gz"), name=config['samples']),
+        R2                  = expand(join(datapath, "{name}_R2.fastq.gz"), name=config['samples']),
     output:
         R1_bmtagger_report  = join(top_readqc_dir, "{name}", "{name}.R1_bmtagger_report.html"),
         R2_bmtagger_report  = join(top_readqc_dir, "{name}", "{name}.R2_bmtagger_report.html"),
