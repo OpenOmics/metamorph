@@ -16,4 +16,4 @@ RUN dos2unix /home/metaWRAP/bin/config-metawrap
 RUN chmod u+x /home/metaWRAP/bin/config-metawrap
 RUN mamba run -n metawrap-env pip3 install drep
 ENV BASH_ENV=/etc/skel/.bashrc
-ENTRYPOINT ["tini", "--", "/bin/bash", "--rcfile", "/etc/skel/.bashrc"]
+ENTRYPOINT ["/bin/bash"]
