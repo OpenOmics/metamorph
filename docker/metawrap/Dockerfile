@@ -7,8 +7,6 @@ RUN mamba install -y --only-deps -c ursky -n metawrap-env metawrap-mg==1.3.2
 RUN cd /home; git clone https://github.com/bxlab/metaWRAP.git; chmod -R 777 metaWRAP
 ENV PATH="/home/metaWRAP/bin:$PATH"
 COPY docker/metawrap/config-metawrap /home/metaWRAP/bin/config-metawrap
-COPY docker/metawrap/Dockerfile /Dockerfile
-RUN md5sum Dockerfile > /Dockerfile.md5
 ADD docker/metawrap/mw /home/metaWRAP/bin/mw
 RUN dos2unix /home/metaWRAP/bin/config-metawrap
 RUN chmod a+rx /home/metaWRAP/bin/config-metawrap /home/metaWRAP/bin/mw

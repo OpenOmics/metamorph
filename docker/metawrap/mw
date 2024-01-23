@@ -1,0 +1,5 @@
+#!/bin/bash
+set +eu
+source /opt/conda/etc/profile.d/conda.sh && conda activate metawrap-env
+set -eu
+/home/metaWRAP/bin/metawrap "$@"
