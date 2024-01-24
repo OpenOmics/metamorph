@@ -6,7 +6,7 @@ RUN conda config --add channels defaults; conda config --add channels conda-forg
 RUN mamba install -y --only-deps -c ursky -n metawrap-env metawrap-mg==1.3.2
 RUN cd /home; git clone https://github.com/bxlab/metaWRAP.git; chmod -R 777 metaWRAP
 RUN mamba run -n metawrap-env pip3 install drep
-ENV PATH="/home/metaWRAP/bin:$PATH"
+ENV PATH="/home/metaWRAP/bin:/opt/conda/envs/metawrap-env/bin:$PATH"
 COPY docker/metawrap/config-metawrap /home/metaWRAP/bin/config-metawrap
 COPY docker/metawrap/Dockerfile /Dockerfile
 RUN md5sum Dockerfile > /Dockerfile.md5
@@ -14,6 +14,7 @@ ADD docker/metawrap/mw /home/metaWRAP/bin/mw
 RUN dos2unix /home/metaWRAP/bin/config-metawrap
 RUN dos2unix /home/metaWRAP/bin/mw
 RUN chmod a+rx /home/metaWRAP/bin/config-metawrap /home/metaWRAP/bin/mw
+ENV BASH_ENV="/etc/bash.bashrc"
 RUN echo ". /opt/conda/etc/profile.d/conda.sh && conda activate metawrap-env" >> /etc/bash.bashrc
 RUN echo 'export PATH="/home/metaWRAP/bin:/opt/conda/envs/metawrap-env/bin:$PATH"' >> /etc/bash.bashrc
 ENTRYPOINT ["/bin/bash"]
