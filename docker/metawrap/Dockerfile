@@ -1,5 +1,5 @@
 FROM condaforge/miniforge3:latest
-RUN apt-get update; apt-get install -y -qq curl vim dos2unix bash python2.7
+RUN apt-get update; apt-get install -y -qq curl vim dos2unix bash python2.7 gnu-which
 RUN mamba create -y -n metawrap-env
 RUN conda config --add channels defaults; conda config --add channels conda-forge; \
     conda config --add channels bioconda;conda config --add channels ursky
