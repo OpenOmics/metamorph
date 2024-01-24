@@ -15,5 +15,4 @@ RUN dos2unix /home/metaWRAP/bin/config-metawrap
 RUN dos2unix /home/metaWRAP/bin/mw
 RUN chmod a+rx /home/metaWRAP/bin/config-metawrap /home/metaWRAP/bin/mw
 RUN echo ". /opt/conda/etc/profile.d/conda.sh && conda activate metawrap-env" >> /etc/bash.bashrc
-ENV BASH_ENV=/etc/bash.bashrc
 ENTRYPOINT ["/bin/bash"]
