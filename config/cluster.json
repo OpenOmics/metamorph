@@ -9,8 +9,8 @@
     "metawrap_read_qc": {
         "threads": 16,
         "mem": "32g",
-        "partition": "quick",
-        "time": "0-04:00:00"
+        "partition": "norm",
+        "time": "1-00:00:00"
     },
     "metawrap_genome_assembly": {
         "threads": 24,
