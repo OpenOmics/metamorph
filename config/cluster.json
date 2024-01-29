@@ -3,14 +3,14 @@
         "threads": 4,
         "mem": "8g",
         "partition": "norm",
-        "time": "0-04:00:00"
+        "time": "0-04:00:00",
+        "gres": "lscratch:64"
     },
     "metawrap_read_qc": {
-        "threads": 8,
-        "mem": "16g",
-        "partition": "norm",
-        "time": "0-04:00:00",
-        "gres": "None"
+        "threads": 16,
+        "mem": "32g",
+        "partition": "quick",
+        "time": "0-04:00:00"
     },
     "metawrap_genome_assembly": {
         "threads": 24,

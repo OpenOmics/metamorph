@@ -4,8 +4,8 @@
 # Python standard library
 from __future__ import print_function
 from shutil import copytree
-from uuid import uuid4
 from datetime import datetime
+from pathlib import Path
 import os, re, json, sys, subprocess
 
 # Local imports
@@ -311,10 +311,11 @@ def bind(sub_args, config):
         List of singularity/docker bind paths 
     """
     bindpaths = []
+    resolve = lambda x: str(Path(x).resolve())
 
     if 'databases' in config:
         dbs = config.pop('databases')
-        bindpaths.extend([mount['from']+':'+mount['to']+':'+mount['mode'] for mount in dbs])
+        bindpaths.extend([resolve(mount['from'])+':'+resolve(mount['to'])+':'+mount['mode'] for mount in dbs])
 
     if 'options' in config and 'input' in config['options']:
         inrents = list(set([os.path.abspath(os.path.dirname(p)) for p in config['options']['input'] if os.path.exists(os.path.dirname(p)) and os.path.isdir(os.path.dirname(p))]))
@@ -393,8 +394,9 @@ def add_user_information(config):
     # username
     config['project']['userhome'] = home
     config['project']['username'] = username
-    dt = datetime.now().strftime("%m/%d/%Y")
-    config['project']['id'] = f"{uuid4()}_{dt}_metagenome"
+
+    dt = datetime.now().strftime("%m_%d_%Y")
+    config['project']['id'] = f"{dt}_metagenome_results"
 
     return config
 
@@ -619,130 +621,6 @@ def dryrun(outdir, config='config.json', snakefile=os.path.join('workflow', 'Sna
     return dryrun_output
 
 
-def run_coa_pipeline(mode, outdir, alt_cache, logger, tmp_dir, additional_bind_paths):
-    # gzip compression speed: ~10.5 MB/s 
-    # see: https://tukaani.org/lzma/benchmarks.html
-    # large fastq ~20GB
-    # 96 samples x 2 (R1 + R2) = 192 fastqs
-    # total size (high estimate): 192 fastqs * 20GB/fastq = 3,840 GB = 3,840,000 MB
-    # total compression time: 3,840,000 MB / (10.5 MB/s) = 365714 s = ~ 4 days
-    # pigz ~6.5 times faster than gzip
-    # https://github.com/neurolabusc/pigz-bench
-    # 3,840,000 MB / (10.5 MB/s * 6.5) = ~ 15.6 hours
-    # ~~~~~~~~~~~~~~    
-    
-    # Add additional singularity bind PATHs
-    # to mount the local filesystem to the 
-    # containers filesystem, NOTE: these 
-    # PATHs must be an absolute PATHs
-    outdir = os.path.abspath(outdir).strip()
-    # Add any default PATHs to bind to 
-    # the container's filesystem, like 
-    # tmp directories, /lscratch
-    addpaths = []
-    temp = os.path.dirname(tmp_dir.rstrip('/'))
-    if temp == os.sep:
-        temp = tmp_dir.rstrip('/')
-    if outdir not in additional_bind_paths.split(','):
-        addpaths.append(outdir)
-    if temp not in additional_bind_paths.split(','):
-        addpaths.append(temp)
-    bindpaths = ','.join(addpaths)
-
-    # Set ENV variable 'SINGULARITY_CACHEDIR' 
-    # to output directory
-    my_env = {}; my_env.update(os.environ)
-    cache = os.path.join(outdir, ".singularity")
-    my_env['SINGULARITY_CACHEDIR'] = cache
-    if alt_cache:
-        # Override the pipeline's default 
-        # cache location
-        my_env['SINGULARITY_CACHEDIR'] = alt_cache
-        cache = alt_cache
-
-    if additional_bind_paths:
-        # Add Bind PATHs for outdir and tmp dir
-        if bindpaths:
-            bindpaths = ",{}".format(bindpaths)
-        bindpaths = "{}{}".format(additional_bind_paths,bindpaths)
-
-    if not exists(os.path.join(outdir, 'logfiles')):
-        # Create directory for logfiles
-        os.makedirs(os.path.join(outdir, 'logfiles'))
-
-    # Create .singularity directory for 
-    # installations of snakemake without
-    # setuid which creates a sandbox in
-    # the SINGULARITY_CACHEDIR
-    if not exists(cache):
-        # Create directory for sandbox 
-        # and image layers
-        os.makedirs(cache, mode=0o755)
-
-    snakefile = os.path.abspath(os.path.join(__file__, '..', 'workflow', 'coa', 'Snakefile'))
-    slurm_dir = os.path.abspath(os.path.join(outdir, 'slurm'))
-    if not os.path.exists(slurm_dir):
-        os.mkdir(slurm_dir, mode=0o755)
-
-    CLUSTER_OPTS = "sbatch --gres {cluster.gres}" + \
-                   " --cpus-per-task {cluster.threads}" + \
-                   " -p {cluster.partition}" + \
-                   " -t {cluster.time}" + \
-                   " --mem {cluster.mem}" + \
-                   " --job-name={params.rname}" + \
-                   " -e $SLURM_DIR/slurm-%j_{params.rname}.out" + \
-                   " -o $SLURM_DIR/slurm-%j_{params.rname}.out" 
-    
-    sbatch_params = [
-        "#SBATCH --cpus-per-task=28",
-        "#SBATCH --mem=64g",
-        "#SBATCH --time=10-00:00:00",
-        "#SBATCH -p norm",
-        "#SBATCH --parsable",
-        "#SBATCH -J \"metagenome_coa\"",
-        "#SBATCH --mail-type=BEGIN,END,FAIL",
-        "#SBATCH --output \"" + outdir + "/logfiles/snakemake.log\"",
-        "#SBATCH --error \"" + outdir + "/logfiles/snakemake.log\"",
-    ]
-        
-    jobscript = [
-        "#!/usr/bin/env bash",
-        "module load snakemake singularity",
-        "snakemake \\",
-        "--latency-wait 120 \\",
-        "-s " + snakefile + " \\",
-        "-d \"{outdir}\" \\",
-        "--use-singularity \\",
-        "--singularity-args \"'-B " + bindpaths + "'\"  \\",
-        "--configfile=\"" + outdir + "/config.json\" \\",
-        "--printshellcmds \\",
-        "--cluster-config \"" + outdir + "/resources/cluster.json\" \\",
-        "--cluster \"" + CLUSTER_OPTS + "\" \\",
-        "--keep-going \\",
-        "--restart-times 3 \\",
-        "-j 500 \\",
-        "--rerun-incomplete --stats \"" + outdir + "/logfiles/runtime_statistics.json\" \\",
-        "--keep-remote \\",
-        "--local-cores 28 2>&1 | tee -a \"" + outdir + "/logfiles/master.log\"",
-    ]
-
-    exec_sh = 'bash'
-    if mode == 'slurm':
-        exec_sh = 'sbatch'
-        jobscript = [jobscript[0], *sbatch_params, *jobscript[1:]]
-    
-    coa_jobscript = os.path.join(slurm_dir, 'jobscript.sh')
-    with open(coa_jobscript, 'w') as fo:
-        fo.write("\n".join(jobscript))
-
-    coajob = subprocess.Popen([
-                exec_sh, str(coa_jobscript)
-            ], cwd = outdir, stderr=subprocess.STDOUT, stdout=logger, env=my_env)
-
-    coajob.wait()
-    return coajob.returncode
-
-
 try:
     __job_name__ = 'metamorph_' + os.getlogin() + ':master'
 except OSError:
@@ -837,9 +715,11 @@ def runner(
         # replacing Popen subprocess with a direct
         # snakemake API call: https://snakemake.readthedocs.io/en/stable/api_reference/snakemake.html
         masterjob = subprocess.Popen([
-                'snakemake', '-pr', '--rerun-incomplete',
+                'snakemake', '-pr', 
+                #'--rerun-incomplete',
+                '--verbose',
                 '--use-singularity',
-                '--singularity-args', "'-B {}'".format(bindpaths),
+                '--singularity-args', "\\-C \\-B '{}'".format(bindpaths),
                 '--cores', str(threads),
                 '--configfile=config.json'
             ], cwd = outdir, stderr=subprocess.STDOUT, stdout=logger, env=my_env)

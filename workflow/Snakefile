@@ -5,9 +5,10 @@ from os import listdir
 from scripts.common import allocated, provided, references, str_bool
 
 
-workpath = config["project"]["workpath"]  # Pipeline"s output directory
-tmpdir = config["options"]["tmp_dir"]  # Temporary directory
-samples = config["samples"]  # List containing basename of samples
+workpath                   = config["project"]["workpath"]  # Pipeline"s output directory
+tmpdir                     = config["options"]["tmp_dir"]  # Temporary directory
+samples                    = config["samples"]  # List containing basename of samples
+top_readqc_dir             = join(workpath, config['project']['id'], "metawrap_read_qc")
 
 
 # Read in resource information, containing information about threads, mem, walltimes, etc.
@@ -25,28 +26,16 @@ rule all:
     input:
         # read qc and filtering
         # ~~~~~~~~~~~~~~~
-        expand(
-            join(
-                workpath, config['project']['id'], "metawrap_qc", "{name}", "{name}.R1_bmtagger_report.html"
-            ),
-            name=samples,
-        ),
-        expand(
-            join(
-                workpath, config['project']['id'], "metawrap_qc", "{name}", "{name}.R2_bmtagger_report.html"
-            ),
-            name=samples,
-        ),
+        expand(join(top_readqc_dir, "{name}", "{name}_R1_pretrim_report.html"), name=samples),
+        expand(join(top_readqc_dir, "{name}", "{name}_R2_pretrim_report.html"), name=samples),
+        expand(join(top_readqc_dir, "{name}", "{name}_R1_postrim_report.html"), name=samples),
+        expand(join(top_readqc_dir, "{name}", "{name}_R2_postrim_report.html"), name=samples),
+        expand(join(top_readqc_dir, "{name}", "{name}_R1_trimmed.fastq.gz"), name=samples),
+        expand(join(top_readqc_dir, "{name}", "{name}_R2_trimmed.fastq.gz"), name=samples),
         # genome assembly
         # ~~~~~~~~~~~~~~~
-        expand(
-            join(workpath, config['project']['id'], "metawrap_assembly", "{name}", "final_assembly.fasta"),
-            name=samples,
-        ),
-        expand(
-            join(workpath, config['project']['id'], "metawrap_assembly", "{name}", "assembly_report.html"),
-            name=samples,
-        ),
+        expand(join(workpath, config['project']['id'], "metawrap_assembly", "{name}", "final_assembly.fasta"), name=samples),
+        expand(join(workpath, config['project']['id'], "metawrap_assembly", "{name}", "assembly_report.html"), name=samples),
         # taxonomic classification
         # ~~~~~~~~~~~~~~~
         expand(join(workpath, config['project']['id'], "metawrap_kmer", "{name}", "final_assembly.krona"), name=samples),
@@ -67,6 +56,7 @@ rule all:
         expand(join(workpath, config['project']['id'], "metawrap_bin_refine", "{name}", "dereplicated_bins"), name=samples),
         
 
-
 # Import rules
-include: join("rules", "metawrap.smk")
+include: join("rules", "DNA.smk")
+include: join("rules", "RNA.smk")
+include: join("rules", "hooks.smk")

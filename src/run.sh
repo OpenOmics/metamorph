@@ -223,11 +223,12 @@ function submit(){
 set -euo pipefail
 # Main process of pipeline
 snakemake --latency-wait 120 -s "$3/workflow/Snakefile" -d "$3" \\
-  --use-singularity --singularity-args "'-B $4'" \\
-  --use-envmodules --configfile="$3/config.json" \\
+  --use-singularity --singularity-args "\\-C \\-B '$4'" \\
+  --use-envmodules --verbose --configfile="$3/config.json" \\
   --printshellcmds --cluster-config "$3/config/cluster.json" \\
-  --cluster "${CLUSTER_OPTS}" --keep-going --restart-times 3 -j 500 \\
+  --cluster "${CLUSTER_OPTS}" --keep-going -j 500 \\
   --rerun-incomplete --stats "$3/logfiles/runtime_statistics.json" \\
+  --keep-incomplete --restart-times 0 \\
   --keep-remote --local-cores 14 2>&1
 # Create summary report
 snakemake -d "$3" --report "Snakemake_Report.html"

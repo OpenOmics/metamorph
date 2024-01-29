@@ -10,13 +10,14 @@ from itertools import chain
 workpath                            = config["project"]["workpath"]
 datapath                            = config["project"]["datapath"]
 
-rule concat
 
 rule map_rna_to_metagenome:
     input:
-        concat_rna_read             = 
+        concat_rna_read             = ""
     output:
+        concat_rna_read             = ""
     params:
+        concat_rna_read             = ""
     shell:
         """
         humann --threads 16 --input $(ANALYSIS)/READ_QC_RNA/$${sample}_concat.fastq --remove-temp-output --input-format fastq --output-basename $${sample} --output ./

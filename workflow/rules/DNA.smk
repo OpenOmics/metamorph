@@ -12,8 +12,9 @@ workpath                   = config["project"]["workpath"]
 datapath                   = config["project"]["datapath"]
 default_threads            = cluster["__default__"]['threads']
 default_memory             = cluster["__default__"]['mem']
-top_log_dir                = join(workpath, config['project']['id'], "logs")
-top_readqc_dir             = join(workpath, config['project']['id'], "metawrap_qc")
+top_log_dir                = join(workpath, "logs")
+top_readqc_dir             = join(workpath, config['project']['id'], "metawrap_read_qc")
+top_trim_dir               = join(workpath, config['project']['id'], "trimmed_reads")
 top_assembly_dir           = join(workpath, config['project']['id'], "metawrap_assembly")
 top_tax_dir                = join(workpath, config['project']['id'], "metawrap_kmer")
 top_binning_dir            = join(workpath, config['project']['id'], "metawrap_binning")
@@ -22,6 +23,7 @@ metawrap_container         = config["containers"]["metawrap"]
 
 
 """
+    0. concat or no concat
     1. read qc
     2. assembly
     3. binning
@@ -30,66 +32,115 @@ metawrap_container         = config["containers"]["metawrap"]
     6. annotate bins
     7. index depreplicated genomes
     8. align DNA to assembly
-""" 
+"""
+
+if config['coassembly']:
+    start_r1 = join(workpath, "concatenated.R1.fastq")
+    start_r2 = join(workpath, "concatenated.R1.fastq")
+    start_dc = []
+else:
+    start_r1 = expand(join(workpath, "{name}_R1.fastq"), name=config['samples'])
+    start_r2 = expand(join(workpath, "{name}_R2.fastq"), name=config['samples'])
+    start_dc = join(datapath, "{stem}.fastq.gz")
+
+
+rule decompress_reads:
+    input:
+        this_compressed_read        = start_dc
+    output:
+        this_uncompressed_read      = join(workpath, "{stem}.fastq"),
+    params:
+        rname                       = "decompress_reads",
+    shell: 
+        "gunzip -c {input.this_compressed_read} > {output.this_uncompressed_read}"
+
+
+rule concat_reads:
+    input:
+        all_r1_reads                = expand(join(workpath, "{name}.R1.fastq"), name=config['samples']),
+        all_r2_reads                = expand(join(workpath, "{name}.R2.fastq"), name=config['samples']),
+    output:
+        big_read_r1                 = join(workpath, "concatenated.R1.fastq"),
+        big_read_r2                 = join(workpath, "concatenated.R2.fastq"),
+        big_compressed_read_r1      = join(workpath, "concatenated.R1.fastq.gz"),
+        big_compressed_read_r2      = join(workpath, "concatenated.R2.fastq.gz"),
+        big_read1_hash              = join(workpath, "concatenated.R1.md5"),
+        big_read2_hash              = join(workpath, "concatenated.R2.md5"),
+    params:
+        rname                       = "concat_reads",
+        input_dir                   = workpath,
+    threads: 28
+    shell: 
+        """
+        for fastq in {params.input_dir}\*R1*fastq; do cat $fastq > {output.big_read_r1}; done
+        for fastq in {params.input_dir}\*R2*fastq; do cat $fastq > {output.big_read_r2}; done
+        pigz -9 -p 28 -c {params.uncompressed_r1} > {output.big_compressed_read_r1}
+        pigz -9 -p 28 -c {params.uncompressed_r2} > {output.big_compressed_read_r2}
+        md5sum {output.big_compressed_read_r1} > {output.big_read1_hash}
+        md5sum {output.big_compressed_read_r2} > {output.big_read2_hash}
+        """
 
 
 rule metawrap_read_qc:
     """
-        Metawrap read quality control rule for producing high quality reads for assembly.
+    Metawrap read quality control rule for producing high quality reads for assembly.
 
-        Quality-control step accomplishes three tasks:
-            - Trims adapter sequences from input read pairs (.fastq.gz)
-            - Quality filters from input read pairs
-            - Removes human contamination from input read pairs
-        @Container requirements
-            - [MetaWrap](https://github.com/bxlab/metaWRAP) orchestrates execution of 
-              these tools in a psuedo-pipeline:
-                - [FastQC](https://github.com/s-andrews/FastQC)
-                - [bmtagger](ftp://ftp.ncbi.nlm.nih.gov/pub/agarwala/bmtagger/)
-                - [Trim-Galore](https://github.com/FelixKrueger/TrimGalore)
-                - [Cutadapt](https://github.com/marcelm/cutadapt)
+    Quality-control step accomplishes three tasks:
+        - Trims adapter sequences from input read pairs (.fastq.gz)
+        - Quality filters from input read pairs
+        - Removes human contamination from input read pairs
+    @Container requirements
+        - [MetaWrap](https://github.com/bxlab/metaWRAP) orchestrates execution of 
+            these tools in a psuedo-pipeline:
+            - [FastQC](https://github.com/s-andrews/FastQC)
+            - [bmtagger](ftp://ftp.ncbi.nlm.nih.gov/pub/agarwala/bmtagger/)
+            - [Trim-Galore](https://github.com/FelixKrueger/TrimGalore)
+            - [Cutadapt](https://github.com/marcelm/cutadapt)
+    
+    @Environment specifications
+        - minimum 16gb memory
+            - will load bmtagger index in memory (8gb)
+    @Input:
+        - Raw fastq.gz reads (R1 & R2 per-sample) from the instrument
         
-        @Environment specifications
-            - minimum 16gb memory
-                - will load bmtagger index in memory (8gb)
-        @Input:
-            - Raw fastq.gz reads (R1 & R2 per-sample) from the instrument
-            
-        @Outputs:
-            - Trimmed, quality filtered reads (R1 & R2)
-            - FastQC html report and zip file on trimmed data
+    @Outputs:
+        - Trimmed, quality filtered reads (R1 & R2)
+        - FastQC html report and zip file on trimmed data
     """
     input:
-        R1                  = expand(join(datapath, "{name}_R1.fastq.gz"), name=config['samples']),
-        R2                  = expand(join(datapath, "{name}_R2.fastq.gz"), name=config['samples']),
+        R1                  = start_r1,
+        R2                  = start_r2,
     output:
-        R1_bmtagger_report  = join(top_readqc_dir, "{name}", "{name}.R1_bmtagger_report.html"),
-        R2_bmtagger_report  = join(top_readqc_dir, "{name}", "{name}.R2_bmtagger_report.html"),
-        R1_fastqc_report    = join(top_readqc_dir, "{name}", "{name}.R1_fastqc_report.html"),
-        R2_fastqc_report    = join(top_readqc_dir, "{name}", "{name}.R2_fastqc_report.html"),
-        R1_qc_reads         = join(workpath, "{name}", "{name}.R1_readqc.fastq"),
-        R2_qc_reads         = join(workpath, "{name}", "{name}.R2_readqc.fastq"),
+        R1_pretrim_report   = join(top_readqc_dir, "{name}", "{name}_R1_pretrim_report.html"),
+        R2_pretrim_report   = join(top_readqc_dir, "{name}", "{name}_R2_pretrim_report.html"),
+        R1_postrim_report   = join(top_readqc_dir, "{name}", "{name}_R1_postrim_report.html"),
+        R2_postrim_report   = join(top_readqc_dir, "{name}", "{name}_R2_postrim_report.html"),
+        R1_trimmed          = join(top_readqc_dir, "{name}", "{name}_R1_trimmed.fastq"),
+        R2_trimmed          = join(top_readqc_dir, "{name}", "{name}_R2_trimmed.fastq"),
+        R1_trimmed_gz       = join(top_readqc_dir, "{name}", "{name}_R1_trimmed.fastq.gz"),
+        R2_trimmed_gz       = join(top_readqc_dir, "{name}", "{name}_R2_trimmed.fastq.gz"),
     params:
         rname               = "metawrap_read_qc",
+        sid                 = "{name}",
         this_qc_dir         = join(top_readqc_dir, "{name}"),
-        R1_mw_named         = join(top_readqc_dir, "{name}", "{name}_1.fastq"),
-        R2_mw_named         = join(top_readqc_dir, "{name}", "{name}_2.fastq"),
+        trim_out            = join(top_trim_dir, "{name}.fastq"),
     containerized: metawrap_container,
-    log: join(top_log_dir, "read_qc", "{name}")
+    log: join(top_log_dir, "read_qc", "{name}"),
     threads: int(cluster["metawrap_genome_assembly"].get('threads', default_threads)),
     shell: 
         """
-        gunzip -c {input.R1} > {params.R1_mw_named}
-        gunzip -c {input.R2} > {params.R2_mw_named}
-        metawrap read_qc -1 {params.R1_mw_named} -2 {params.R2_mw_named} -t {threads} -o {params.this_qc_dir}
-        mv {params.this_qc_dir}/final_pure_reads_1.fastq {output.R1_qc_reads}
-        rm -f {params.R1_mw_named}
-        cp {params.this_qc_dir}/post-QC_report/final_pure_reads_1_fastqc.html {output.R1_bmtagger_report}
-        cp {params.this_qc_dir}/pre-QC_report/{params.R1_mw_named}_fastqc.html {output.R1_fastqc_report}
-        mv {params.this_qc_dir}/final_pure_reads_2.fastq {output.R2_qc_reads}
-        rm -f {params.R2_mw_named}
-        cp {params.this_qc_dir}/post-QC_report/final_pure_reads_2_fastqc.html {output.R2_bmtagger_report}
-        cp {params.this_qc_dir}/pre-QC_report/{params.R2_mw_named}_fastqc.html {output.R2_fastqc_report}
+            mw read_qc -1 {input.R1} -2 {input.R2} -t {threads} -o {params.this_qc_dir}
+            mv {params.this_qc_dir}/final_pure_reads_1.fastq {params.this_qc_dir}/{params.sid}_R1_trimmed.fastq
+            mv {params.this_qc_dir}/final_pure_reads_2.fastq {params.this_qc_dir}/{params.sid}_R2_trimmed.fastq
+            pigz -9 -p {threads} -c {params.this_qc_dir}/{params.sid}_R1_trimmed.fastq > {params.this_qc_dir}/{params.sid}_R1_trimmed.fastq.gz
+            pigz -9 -p {threads} -c {params.this_qc_dir}/{params.sid}_R2_trimmed.fastq > {params.this_qc_dir}/{params.sid}_R2_trimmed.fastq.gz
+            mkdir -p {params.trim_out}
+            ln -s {params.this_qc_dir}/{params.sid}_R1_trimmed.fastq.gz {params.trim_out}/{params.sid}_R1.fastq.gz
+            ln -s {params.this_qc_dir}/{params.sid}_R1_trimmed.fastq.gz {params.trim_out}/{params.sid}_R2.fastq.gz
+            ln -s {params.this_qc_dir}/post-QC_report/final_pure_reads_1_fastqc.html {params.this_qc_dir}/{params.sid}_R1_postrim_report.html
+            ln -s {params.this_qc_dir}/post-QC_report/final_pure_reads_2_fastqc.html {params.this_qc_dir}/{params.sid}_R2_postrim_report.html
+            ln -s {params.this_qc_dir}/pre-QC_report/{params.sid}_1_fastqc.html {params.this_qc_dir}/{params.sid}_R1_pretrim_report.html
+            ln -s {params.this_qc_dir}/pre-QC_report/{params.sid}_2_fastqc.html {params.this_qc_dir}/{params.sid}_R2_pretrim_report.html
         """
 
 
@@ -104,8 +155,8 @@ rule metawrap_genome_assembly:
             Ensemble assembled contigs and reports
     """
     input:
-        R1                          = expand(join(workpath, "{name}", "{name}.R1_readqc.fastq"), name=samples),
-        R2                          = expand(join(workpath, "{name}", "{name}.R2_readqc.fastq"), name=samples),
+        R1                          = expand(join(top_readqc_dir, "{name}", "{name}_R1_trimmed.fastq"), name=samples),
+        R2                          = expand(join(top_readqc_dir, "{name}", "{name}_R2_trimmed.fastq"), name=samples),
     output:
         # megahit outputs
         megahit_assembly            = expand(join(top_assembly_dir, "{name}", "megahit", "final.contigs.fa"), name=samples),
@@ -136,7 +187,7 @@ rule metawrap_genome_assembly:
             ln -s {input.R1} {output.assembly_R1}
             ln -s {input.R2} {output.assembly_R2}
             # run genome assembler
-            metawrap assembly \
+            mw assembly \
             --megahit \
             --metaspades \
             -m {params.memlimit} \
@@ -153,7 +204,7 @@ rule metawrap_tax_classification:
         TODO: docstring
     """
     input:
-        reads                       = expand(join(workpath, "{name}", "{name}.R{pair}_readqc.fastq"), name=samples, pair=['1', '2']),
+        reads                       = expand(join(top_readqc_dir, "{name}", "{name}_R{pair}_trimmed.fastq"), name=samples, pair=['1', '2']),
         final_assembly              = expand(join(top_assembly_dir, "{name}", "final_assembly.fasta"), name=samples),
     output:
         krak2_asm                   = expand(join(top_tax_dir, "{name}", "final_assembly.krak2"), name=samples),
@@ -168,7 +219,7 @@ rule metawrap_tax_classification:
     threads: cluster["metawrap_tax_classification"].get("threads", default_threads),
     shell:
         """
-            metawrap kraken2 \
+            mw kraken2 \
             -t {threads} \
             -s {params.tax_subsample} \
             -o {output.tax_dir} \
@@ -177,26 +228,10 @@ rule metawrap_tax_classification:
         """
 
 
-rule metawrap_setup_binning:
-    input:
-        R1_from_qc                  = join(workpath, "{name}", "{name}.R1_readqc.fastq"),
-        R2_from_qc                  = join(workpath, "{name}", "{name}.R2_readqc.fastq"),
-    output:
-        R1_bin_name                 = join(workpath, "{name}", "{name}_1.fastq"),
-        R2_bin_name                 = join(workpath, "{name}", "{name}_2.fastq"),
-    params:
-        rname                       = "metawrap_setup_binning",
-    shell:
-        """
-        ln -s {input.R1_from_qc} {output.R1_bin_name}
-        ln -s {input.R2_from_qc} {output.R2_bin_name}
-        """
-
-
 rule metawrap_binning:
     input:
-        r1_read                     = join(workpath, "{name}", "{name}_1.fastq"),
-        r2_read                     = join(workpath, "{name}", "{name}_2.fastq"),
+        R1                          = expand(join(top_readqc_dir, "{name}", "{name}_R1_trimmed.fastq"), name=samples),
+        R2                          = expand(join(top_readqc_dir, "{name}", "{name}_R2_trimmed.fastq"), name=samples),
         assembly                    = join(top_assembly_dir, "{name}", "final_assembly.fasta"),
     output:
         maxbin_bins                 = directory(join(top_binning_dir, "{name}", "maxbin2_bins")),
@@ -220,14 +255,13 @@ rule metawrap_binning:
     threads: cluster["metawrap_tax_classification"].get("threads", default_threads),
     shell:
         """
-        # metawrap binning
-        metawrap binning \
+        mw binning \
         --metabat2 --maxbin2 --concoct \
         -m {params.bin_mem} \
         -t {threads} \
         -a {input.assembly} \
         -o {params.bin_dir} \
-        {input.r1_read} {input.r2_read}
+        {input.R1} {input.R2}
         # metawrap bin refinement
         metawrap bin_refinement \
         -o {params.refine_dir} \

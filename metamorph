@@ -27,13 +27,21 @@ in any work or product based on this material.
 
 USAGE:
   $ metamorph <command> [OPTIONS]
-EXAMPLE:
-    co-assembly:
-        $ metamorph run --coa --input *.R?.fastq.gz --output output/
-        $ metamorph run -C --input *.R?.fastq.gz --output output/
 
-    per-sample assembly:
-        $ metamorph run --input *.R?.fastq.gz --output output/
+EXAMPLES:
+    co-assembly dna-only:
+        $ metamorph run --coa --input *.R?.fastq.gz --output output
+        $ metamorph run -C --input *.R?.fastq.gz --output output
+
+    per-sample assembly dna-only:
+        $ metamorph run --input *.R?.fastq.gz --output output
+
+    co-assembly rna & dna:
+        $ metamorph run --coa --input *.R?.fastq.gz --rna rna/*.R?.fastq.gz --output output
+        $ metamorph run -C --input *.R?.fastq.gz --rna rna/*.R?.fastq.gz  --output output
+
+    per-sample assembly rna & dna:
+        $ metamorph run --input *.R?.fastq.gz --rna rna/*.R?.fastq.gz --output output
 """
 
 # Python standard library
@@ -45,7 +53,7 @@ import argparse  # potential python3 3rd party package, added in python/3.5
 
 # Local imports
 from src import version 
-from src.run import init, setup, bind, dryrun, runner, run_coa_pipeline
+from src.run import init, setup, bind, dryrun, runner
 from src.utils import (
     Colors,
     err,
@@ -168,14 +176,6 @@ def run(sub_args):
     if 'databases' in config:
         bindpaths.extend([mount['from']+':'+mount['to']+':'+mount['mode'] for mount in config['databases']])
 
-    if sub_args.coa:
-        cjob = run_coa_pipeline(sub_args.mode, 
-                                sub_args.output, 
-                                sub_args.singularity_cache, 
-                                logfh, 
-                                sub_args.tmp_dir,
-                                ",".join(bindpaths))
-
     mjob = runner(mode = sub_args.mode, 
         outdir = sub_args.output,
         # additional_bind_paths = all_bind_paths,
@@ -215,7 +215,6 @@ def run(sub_args):
 
 
 def cache(sub_args):
-
     """Caches remote resources or reference files stored on DockerHub and S3.
     Local SIFs will be created from images defined in 'config/containers/images.json'.
     @TODO: add option to cache other shared S3 resources (i.e. kraken db and fqscreen indices)
