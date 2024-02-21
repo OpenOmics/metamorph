@@ -5,10 +5,12 @@ from os import listdir
 from scripts.common import allocated, provided, references, str_bool
 
 
+datapath                   = config["project"]["datapath"]
 workpath                   = config["project"]["workpath"]  # Pipeline"s output directory
 tmpdir                     = config["options"]["tmp_dir"]  # Temporary directory
 samples                    = config["samples"]  # List containing basename of samples
 top_readqc_dir             = join(workpath, config['project']['id'], "metawrap_read_qc")
+top_trim_dir               = join(workpath, config['project']['id'], "trimmed_reads")
 
 
 # Read in resource information, containing information about threads, mem, walltimes, etc.
@@ -20,18 +22,30 @@ with open(join(workpath, "config", "cluster.json")) as fh:
 # Global workflow variables
 configfile: "config.json"  # Generated from user input and config/*.json
 
+if config['coassembly']:
+    start_r1 = join(workpath, "concatenated.R1.fastq")
+    start_r2 = join(workpath, "concatenated.R1.fastq")
+    start_dc = []
+else:
+    start_r1 = expand(join(workpath, "dna", "{name}_R1.fastq"), name=config['samples'])
+    start_r2 = expand(join(workpath, "dna", "{name}_R2.fastq"), name=config['samples'])
+    start_dc = join(datapath, "{stem}.fastq.gz")
 
 # Final ouput files of the pipeline
 rule all:
     input:
+        # dna read decompress
+        # ~~~~~~~~~~~~~~~
+        start_r1,
+        start_r2,
         # read qc and filtering
         # ~~~~~~~~~~~~~~~
         expand(join(top_readqc_dir, "{name}", "{name}_R1_pretrim_report.html"), name=samples),
         expand(join(top_readqc_dir, "{name}", "{name}_R2_pretrim_report.html"), name=samples),
         expand(join(top_readqc_dir, "{name}", "{name}_R1_postrim_report.html"), name=samples),
         expand(join(top_readqc_dir, "{name}", "{name}_R2_postrim_report.html"), name=samples),
-        expand(join(top_readqc_dir, "{name}", "{name}_R1_trimmed.fastq.gz"), name=samples),
-        expand(join(top_readqc_dir, "{name}", "{name}_R2_trimmed.fastq.gz"), name=samples),
+        expand(join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq.gz"), name=samples),
+        expand(join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq.gz"), name=samples),
         # genome assembly
         # ~~~~~~~~~~~~~~~
         expand(join(workpath, config['project']['id'], "metawrap_assembly", "{name}", "final_assembly.fasta"), name=samples),
@@ -58,5 +72,5 @@ rule all:
 
 # Import rules
 include: join("rules", "DNA.smk")
-include: join("rules", "RNA.smk")
+# include: join("rules", "RNA.smk")
 include: join("rules", "hooks.smk")
