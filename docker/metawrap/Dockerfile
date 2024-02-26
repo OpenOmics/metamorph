@@ -1,14 +1,16 @@
 FROM condaforge/miniforge3:latest
-RUN apt-get update; apt-get install -y -qq curl vim dos2unix bash python2.7
+RUN apt-get update; apt-get install -y -qq curl build-essential vim dos2unix bash python2.7
 RUN mamba create -y -n metawrap-env
 RUN conda config --add channels defaults; conda config --add channels conda-forge; \
     conda config --add channels bioconda;conda config --add channels ursky
 RUN mamba install -y --only-deps -c ursky -n metawrap-env metawrap-mg==1.3.2
-RUN cd /home; git clone https://github.com/bxlab/metaWRAP.git; chmod -R 777 metaWRAP
+RUN cd /home; git clone https://github.com/rroutsong/metaWRAP.git; chmod -R 777 metaWRAP
 RUN mamba run -n metawrap-env pip3 install drep
 ENV PATH="/home/metaWRAP/bin:/opt/conda/envs/metawrap-env/bin:$PATH"
 COPY docker/metawrap/config-metawrap /home/metaWRAP/bin/config-metawrap
 COPY docker/metawrap/Dockerfile /Dockerfile
+RUN mkdir /install; cd /install; wget https://carlowood.github.io/which/which-2.21.tar.gz; tar xvf which-2.21.tar.gz
+RUN cd /install/which-2.21; ./configure; make && make install
 RUN md5sum Dockerfile > /Dockerfile.md5
 ADD docker/metawrap/mw /home/metaWRAP/bin/mw
 RUN dos2unix /home/metaWRAP/bin/config-metawrap
