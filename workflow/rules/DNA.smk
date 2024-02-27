@@ -229,7 +229,7 @@ rule metawrap_genome_assembly:
     shell:
         """
             # remove empty directories by snakemake, to prevent metawrap error
-            rm -rf {params.mh_dir}
+            rm -rf {params.mh_dir:q}
             # link to the file names metawrap expects
             ln -s {input.R1} {output.assembly_R1}
             ln -s {input.R2} {output.assembly_R2}
@@ -355,9 +355,8 @@ rule metawrap_binning:
         bin_figure                  = join(top_binning_dir, "{name}", "figures", "binning_results.png"),
     params:
         rname                       = "metawrap_binning",
-        bin_parent_dir              = top_binning_dir
+        bin_parent_dir              = top_binning_dir,
         bin_dir                     = join(top_binning_dir, "{name}"),
-        bin_summary_dir             = join(bin_dir, "summary"),
         bin_mem                     = mem2int(cluster['metawrap_binning'].get("mem", default_memory)),
         mw_trim_linker_R1           = join(top_trim_dir, "{name}", "{name}_1.fastq"),
         mw_trim_linker_R2           = join(top_trim_dir, "{name}", "{name}_2.fastq"),
@@ -395,8 +394,6 @@ rule metawrap_binning:
         -B {params.bin_dir}/maxbin2_bins \
         -c {params.min_perc_complete} \
         -x {params.max_perc_contam}
-
-
         """
 
 

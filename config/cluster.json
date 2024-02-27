@@ -38,7 +38,7 @@
         "threads": 48,
         "mem": "128G",
         "partition": "norm",
-        "time": "5-00:00:00"
+        "time": "10-00:00:00"
     },
     "metawrap_tax_classification": {
         "threads": 32,
