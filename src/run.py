@@ -18,6 +18,10 @@ from utils import (git_commit_hash,
 
 from . import version as __version__
 
+FASTQ_INPUT_EXT = ".fastq.gz"
+FASTQ_R1_POSTFIX = f"_R1{FASTQ_INPUT_EXT}"
+FASTQ_R2_POSTFIX = f"_R2{FASTQ_INPUT_EXT}"
+
 
 def init(repo_path, output_path, links=[], required=['workflow', 'resources', 'config']):
     """Initialize the output directory. If user provides a output
@@ -125,19 +129,19 @@ def rename(filename):
     # key = regex to match string and value = how it will be renamed
     extensions = {
         # Matches: _R[12]_fastq.gz, _R[12].fastq.gz, _R[12]_fq.gz, etc.
-        ".R1.f(ast)?q.gz$": ".R1.fastq.gz",
-        ".R2.f(ast)?q.gz$": ".R2.fastq.gz",
+        ".R1.f(ast)?q.gz$": FASTQ_R1_POSTFIX,
+        ".R2.f(ast)?q.gz$": FASTQ_R2_POSTFIX,
         # Matches: _R[12]_001_fastq_gz, _R[12].001.fastq.gz, _R[12]_001.fq.gz, etc.
         # Capture lane information as named group
-        ".R1.(?P<lane>...).f(ast)?q.gz$": ".R1.fastq.gz",
-        ".R2.(?P<lane>...).f(ast)?q.gz$": ".R2.fastq.gz",
+        ".R1.(?P<lane>...).f(ast)?q.gz$": FASTQ_R1_POSTFIX,
+        ".R2.(?P<lane>...).f(ast)?q.gz$": FASTQ_R2_POSTFIX,
         # Matches: _[12].fastq.gz, _[12].fq.gz, _[12]_fastq_gz, etc.
-        "_1.f(ast)?q.gz$": ".R1.fastq.gz",
-        "_2.f(ast)?q.gz$": ".R2.fastq.gz"
+        "_1.f(ast)?q.gz$": FASTQ_R1_POSTFIX,
+        "_2.f(ast)?q.gz$": FASTQ_R2_POSTFIX
     }
 
-    if (filename.endswith('.R1.fastq.gz') or
-        filename.endswith('.R2.fastq.gz')):
+    if (filename.endswith(FASTQ_R1_POSTFIX) or
+        filename.endswith(FASTQ_R2_POSTFIX)):
         # Filename is already in the correct format
         return filename
 
@@ -349,7 +353,7 @@ def mixed_inputs(ifiles):
     fastqs = False
     bams = False
     for file in ifiles:
-        if file.endswith('.R1.fastq.gz') or file.endswith('.R2.fastq.gz'):
+        if file.endswith(FASTQ_R1_POSTFIX) or file.endswith(FASTQ_R2_POSTFIX):
             fastqs = True 
             fq_files.append(file)
         elif file.endswith('.bam'):
@@ -395,13 +399,17 @@ def add_user_information(config):
     config['project']['userhome'] = home
     config['project']['username'] = username
 
-    dt = datetime.now().strftime("%m_%d_%Y")
-    config['project']['id'] = f"{dt}_metagenome_results"
+    # dt = datetime.now().strftime("%m_%d_%Y")
+    # config['project']['id'] = f"{dt}_metagenome_results"
+    
+    # TODO: figure up way to uniquely ID results, engineering out
+    #   the problem of misidentifing results files
+    config['project']['id'] = "metagenome_results"
 
     return config
 
 
-def add_sample_metadata(input_files, config, rna_files=None, group=None):
+def add_sample_metadata(input_files, config, group_key='samples'):
     """Adds sample metadata such as sample basename, label, and group information.
     If sample sheet is provided, it will default to using information in that file.
     If no sample sheet is provided, it will only add sample basenames and labels.
@@ -415,14 +423,14 @@ def add_sample_metadata(input_files, config, rna_files=None, group=None):
         Updated config with basenames, labels, and groups (if provided)
     """
     added = []
-    config['samples'] = []
+    config[group_key] = []
     for file in input_files:
         # Split sample name on file extension
-        sample = re.split('\.R[12]\.fastq\.gz', os.path.basename(file))[0]
+        sample = re.split('[\S]R[12]', os.path.basename(file))[0]
         if sample not in added:
             # Only add PE sample information once
             added.append(sample)
-            config['samples'].append(sample)
+            config[group_key].append(sample)
     return config
 
 
@@ -453,11 +461,15 @@ def add_rawdata_information(sub_args, config, ifiles):
     config['project']['filetype'] = convert[nends]
 
     # Finds the set of rawdata directories to bind
-    rawdata_paths = get_rawdata_bind_paths(input_files = sub_args.input)
-    config['project']['datapath'] = ','.join(rawdata_paths)
+    config['project']['datapath'] = ','.join(get_rawdata_bind_paths(input_files = sub_args.input))
+    if sub_args.rna:
+        config["project"]["rna_datapath"] = ','.join(get_rawdata_bind_paths(input_files = sub_args.rna))
 
     # Add each sample's basename
     config = add_sample_metadata(ifiles['dna'], config)
+    
+    if 'rna' in ifiles:
+        config = add_sample_metadata(ifiles['rna'], config, group_key='rna')
 
     return config
 
@@ -517,7 +529,7 @@ def get_nends(ifiles):
             bam_files = True
             nends_status = -1
             break
-        elif file.endswith('.R2.fastq.gz'):
+        elif file.endswith(FASTQ_R2_POSTFIX):
             paired_end = True
             nends_status = 2
             break # dataset is paired-end
@@ -528,7 +540,7 @@ def get_nends(ifiles):
         nends = {} # keep count of R1 and R2 for each sample
         for file in ifiles:
             # Split sample name on file extension
-            sample = re.split('\.R[12]\.fastq\.gz', os.path.basename(file))[0]
+            sample = re.split('\_R[12]\.fastq\.gz', os.path.basename(file))[0]
             if sample not in nends:
                 nends[sample] = 0
 
@@ -542,8 +554,8 @@ def get_nends(ifiles):
                 both mates (R1 and R2) for the following samples:\n\t\t{}\n
                 Please check that the basename for each sample is consistent across mates.
                 Here is an example of a consistent basename across mates:
-                  consistent_basename.R1.fastq.gz
-                  consistent_basename.R2.fastq.gz
+                  consistent_basename_R1.fastq.gz
+                  consistent_basename_R2.fastq.gz
 
                 Please do not run the pipeline with a mixture of single-end and paired-end
                 samples. This feature is currently not supported within {}, and it is
@@ -635,7 +647,7 @@ def runner(
         threads=2,  
         jobname=__job_name__,
         submission_script='run.sh',
-        tmp_dir = '/lscratch/$SLURM_JOBID/'
+        tmp_dir = '/lscratch/$SLURM_JOB_ID/'
     ):
     """Runs the pipeline via selected executor: local or slurm.
     If 'local' is selected, the pipeline is executed locally on a compute node/instance.
@@ -716,10 +728,11 @@ def runner(
         # snakemake API call: https://snakemake.readthedocs.io/en/stable/api_reference/snakemake.html
         masterjob = subprocess.Popen([
                 'snakemake', '-pr', 
-                #'--rerun-incomplete',
+                '--rerun-incomplete',
+                '--rerun-triggers input',
                 '--verbose',
                 '--use-singularity',
-                '--singularity-args', "\\-C \\-B '{}'".format(bindpaths),
+                '--singularity-args', "\\-c \\-B '{}'".format(bindpaths),
                 '--cores', str(threads),
                 '--configfile=config.json'
             ], cwd = outdir, stderr=subprocess.STDOUT, stdout=logger, env=my_env)

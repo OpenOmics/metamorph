@@ -209,11 +209,10 @@ function submit(){
           if [[ ${6#\'} != /lscratch* ]]; then
             CLUSTER_OPTS="sbatch --cpus-per-task {cluster.threads} -p {cluster.partition} -t {cluster.time} --mem {cluster.mem} --job-name={params.rname} -e $SLURM_DIR/slurm-%j_{params.rname}.out -o $SLURM_DIR/slurm-%j_{params.rname}.out"
           fi
-          # Create sbacth script to build index
     cat << EOF > kickoff.sh
 #!/usr/bin/env bash
-#SBATCH --cpus-per-task=16 
-#SBATCH --mem=96g
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=32g
 #SBATCH --time=5-00:00:00
 #SBATCH --parsable
 #SBATCH -J "$2"
@@ -222,16 +221,29 @@ function submit(){
 #SBATCH --error "$3/logfiles/snakemake.log"
 set -euo pipefail
 # Main process of pipeline
-snakemake --latency-wait 120 -s "$3/workflow/Snakefile" -d "$3" \\
-  --use-singularity --singularity-args "\\-C \\-B '$4'" \\
-  --use-envmodules --verbose --configfile="$3/config.json" \\
-  --printshellcmds --cluster-config "$3/config/cluster.json" \\
-  --cluster "${CLUSTER_OPTS}" --keep-going -j 500 \\
-  --rerun-incomplete --stats "$3/logfiles/runtime_statistics.json" \\
-  --keep-incomplete --restart-times 0 \\
-  --keep-remote --local-cores 14 2>&1
+snakemake \\
+  -p \\
+  --latency-wait 120 \\
+  -s "$3/workflow/Snakefile" \\
+  -d "$3" \\
+  --use-singularity \\
+  --singularity-args "\\-c \\-B '$4'" \\
+  --use-envmodules \\
+  --verbose \\
+  --configfile "$3/config.json" \\
+  --printshellcmds \\
+  --cluster-config $3/config/cluster.json \\
+  --cluster "${CLUSTER_OPTS}" \\
+  --keep-going \\
+  --rerun-incomplete \\
+  --jobs 500 \\
+  --keep-remote \\
+  --stats "$3/logfiles/runtime_statistics.json" \\
+  --restart-times 0 \\
+  --keep-incomplete \\
+  --local-cores "14" 2>&1
 # Create summary report
-snakemake -d "$3" --report "Snakemake_Report.html"
+snakemake -s "$3/workflow/Snakefile" -d "$3" --configfile="$3/config.json" --report "Snakemake_Report.html"
 EOF
     chmod +x kickoff.sh
     job_id=$(sbatch kickoff.sh | tee -a "$3"/logfiles/master.log)
