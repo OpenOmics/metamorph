@@ -11,6 +11,7 @@ COPY docker/metawrap/config-metawrap /home/metaWRAP/bin/config-metawrap
 COPY docker/metawrap/Dockerfile /Dockerfile
 RUN mkdir /install; cd /install; wget https://carlowood.github.io/which/which-2.21.tar.gz; tar xvf which-2.21.tar.gz
 RUN cd /install/which-2.21; ./configure; make && make install
+RUN rm /usr/bin/which; ln -s /usr/local/bin/which /usr/bin/which
 RUN md5sum Dockerfile > /Dockerfile.md5
 ADD docker/metawrap/mw /home/metaWRAP/bin/mw
 RUN dos2unix /home/metaWRAP/bin/config-metawrap
