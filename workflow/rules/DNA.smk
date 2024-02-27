@@ -41,10 +41,6 @@ mem2int                    = lambda x: int(str(x).lower().replace('gb', '').repl
         8. align DNA to assembly
 """
 
-start_r1 = expand(join(workpath, "dna", "{name}_R1.fastq.gz"), name=samples)
-start_r2 = expand(join(workpath, "dna", "{name}_R2.fastq.gz"), name=samples)
-
-
 rule concat_reads:
     input:
         all_r1_reads                = expand(join(workpath, "dna", "{sid}_R1.fastq.gz"), sid=config['samples'] if config['coassembly'] else []),
@@ -126,8 +122,8 @@ rule metawrap_read_qc:
         - FastQC html report and zip file on trimmed data
     """
     input:
-        R1                  = start_r1,
-        R2                  = start_r2,
+        R1                  = join(workpath, "dna", "{name}_R1.fastq.gz"),
+        R2                  = join(workpath, "dna", "{name}_R2.fastq.gz"),
     output:
         R1_pretrim_report   = join(top_readqc_dir, "{name}", "{name}_R1_pretrim_report.html"),
         R2_pretrim_report   = join(top_readqc_dir, "{name}", "{name}_R2_pretrim_report.html"),
@@ -359,7 +355,9 @@ rule metawrap_binning:
         bin_figure                  = join(top_binning_dir, "{name}", "figures", "binning_results.png"),
     params:
         rname                       = "metawrap_binning",
+        bin_parent_dir              = top_binning_dir
         bin_dir                     = join(top_binning_dir, "{name}"),
+        bin_summary_dir             = join(bin_dir, "summary"),
         bin_mem                     = mem2int(cluster['metawrap_binning'].get("mem", default_memory)),
         mw_trim_linker_R1           = join(top_trim_dir, "{name}", "{name}_1.fastq"),
         mw_trim_linker_R2           = join(top_trim_dir, "{name}", "{name}_2.fastq"),
@@ -373,9 +371,9 @@ rule metawrap_binning:
         export CHECKM_DATA_PATH="/data2/CHECKM_DB"
 
         # make base dir if not exists
-        mkdir -p """+top_binning_dir+"""
+        mkdir -p {params.bin_parent_dir}
         if [ -d "{params.bin_dir}" ]; then rm -rf {params.bin_dir}; fi
-        
+
         # setup links for metawrap input
         [[ -f "{params.mw_trim_linker_R1}" ]] || ln -s {input.R1} {params.mw_trim_linker_R1}
         [[ -f "{params.mw_trim_linker_R2}" ]] || ln -s {input.R2} {params.mw_trim_linker_R2}
@@ -397,6 +395,8 @@ rule metawrap_binning:
         -B {params.bin_dir}/maxbin2_bins \
         -c {params.min_perc_complete} \
         -x {params.max_perc_contam}
+
+
         """
 
 
@@ -407,8 +407,12 @@ rule derep_bins:
         of average nucleotide identity.
 
         @Input:
+            maxbin2 ssembly bins, contigs, stat summaries
+            metabat2 ssembly bins, contigs, stat summaries
+            metawrap ssembly bins, contigs, stat summaries
 
         @Output:
+            directory of consensus ensemble bins (deterministic output)
 
     """
     input:

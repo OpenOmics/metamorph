@@ -21,8 +21,7 @@ metawrap_container                  = config["containers"]["metawrap"]
 pairedness                          = list(range(1, config['project']['nends']+1))
 
 if rna_included:
-    start_r1_rna                    = expand(join(workpath, "rna", "{rname}_R1.fastq.gz"), rname=rna_sample_stems)
-    start_r2_rna                    = expand(join(workpath, "rna", "{rname}_R2.fastq.gz"), rname=rna_sample_stems)
+
 else:
     start_r1_rna, start_r2_rna = [], []
 
@@ -72,8 +71,8 @@ rule concat_rna_reads:
 
 rule rna_read_qc:
     input:
-        R1                  = start_r1_rna,
-        R2                  = start_r2_rna,
+        R1                  = join(workpath, "rna", "{rname}_R1.fastq.gz")
+        R2                  = join(workpath, "rna", "{rname}_R2.fastq.gz")
     output:
         R1_pretrim_report   = join(top_readqc_dir_rna, "{rname}", "{rname}_R1_pretrim_report.html"),
         R2_pretrim_report   = join(top_readqc_dir_rna, "{rname}", "{rname}_R2_pretrim_report.html"),
