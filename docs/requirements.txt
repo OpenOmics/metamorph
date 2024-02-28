@@ -31,4 +31,5 @@ tornado==6.0.4
 tqdm==4.48.2
 zipp==3.1.0
 mkdocs-git-revision-date-plugin
+mkdocs-snakemake-rule-plugin
 mike

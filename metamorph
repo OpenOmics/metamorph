@@ -27,25 +27,34 @@ in any work or product based on this material.
 
 USAGE:
   $ metamorph <command> [OPTIONS]
-EXAMPLE:
-    co-assembly:
-        $ metamorph run --coa --input *.R?.fastq.gz --output output/
-        $ metamorph run -C --input *.R?.fastq.gz --output output/
 
-    per-sample assembly:
-        $ metamorph run --input *.R?.fastq.gz --output output/
+EXAMPLES:
+    co-assembly dna-only:
+        $ metamorph run --coa --input *.R?.fastq.gz --output output
+        $ metamorph run -C --input *.R?.fastq.gz --output output
+
+    per-sample assembly dna-only:
+        $ metamorph run --input *.R?.fastq.gz --output output
+
+    co-assembly rna & dna:
+        $ metamorph run --coa --input *.R?.fastq.gz --rna rna/*.R?.fastq.gz --output output
+        $ metamorph run -C --input *.R?.fastq.gz --rna rna/*.R?.fastq.gz  --output output
+
+    per-sample assembly rna & dna:
+        $ metamorph run --input *.R?.fastq.gz --rna rna/*.R?.fastq.gz --output output
 """
 
 # Python standard library
 from __future__ import print_function
 import sys, os, subprocess, re, json, textwrap
+from datetime import timezone, datetime
 
 # 3rd party imports from pypi
-import argparse  # potential python3 3rd party package, added in python/3.5
+import argparse
 
 # Local imports
 from src import version 
-from src.run import init, setup, bind, dryrun, runner, run_coa_pipeline
+from src.run import init, setup, bind, dryrun, runner
 from src.utils import (
     Colors,
     err,
@@ -62,6 +71,7 @@ __version__ = version
 __authors__ = 'Neelam Redekar, Skyler Kuhn'
 __email__ = 'neelam.redekar <AT> nih.gov, skyler.kuhn <AT> nih.gov'
 __home__  =  os.path.dirname(os.path.abspath(__file__))
+_datetime = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
 _name = os.path.basename(sys.argv[0])
 _description = 'An awesome metagenomics and metatranscriptomics pipeline'
 
@@ -79,7 +89,10 @@ def unlock(sub_args):
 
     try:
         unlock_output = subprocess.check_output([
-            'snakemake', '--unlock',
+            'snakemake', 
+            '--unlock',
+            '--force',
+            '-s', os.path.abspath(f'{outdir}/workflow/Snakefile'),
             '--cores', '1',
             '--configfile=config.json'
         ], cwd = outdir,
@@ -108,10 +121,16 @@ def run(sub_args):
     # copy over required resources to run 
     # the pipeline
     git_repo = __home__
+  
+    fastq_inputs = [sub_args.input]
+    
+    if sub_args.rna:
+        fastq_inputs.append(sub_args.rna)
+
     input_files = init(
         repo_path = git_repo,
         output_path = sub_args.output,
-        links = sub_args.input
+        links = fastq_inputs
     )
 
     # Step 2. Setup pipeline for execution, 
@@ -132,7 +151,8 @@ def run(sub_args):
     )
 
     config['bindpaths'] = bindpaths
-    config['coassembly'] = sub_args.coa
+    # config['coassembly'] = sub_args.coa
+    config['coassembly'] = False
 
     # Step 4. Save config to output directory
     with open(os.path.join(sub_args.output, 'config.json'), 'w') as fh:
@@ -159,13 +179,8 @@ def run(sub_args):
         log = os.path.join(sub_args.output, 'logfiles', 'master.log')
     logfh = open(log, 'w')
 
-    if sub_args.coa:
-        cjob = run_coa_pipeline(sub_args.mode, 
-                                sub_args.output, 
-                                sub_args.singularity_cache, 
-                                logfh, 
-                                sub_args.tmp_dir,
-                                ",".join(bindpaths))
+    if 'databases' in config:
+        bindpaths.extend([mount['from']+':'+mount['to']+':'+mount['mode'] for mount in config['databases']])
 
     mjob = runner(mode = sub_args.mode, 
         outdir = sub_args.output,
@@ -176,7 +191,7 @@ def run(sub_args):
         submission_script=os.path.join(__home__, 'src', 'run.sh'),
         logger = logfh,
         additional_bind_paths = ",".join(bindpaths),
-        tmp_dir = sub_args.tmp_dir, 
+        tmp_dir = sub_args.tmp_dir,
     )
     
     # Step 6. Wait for subprocess to complete,
@@ -283,9 +298,7 @@ def parsed_arguments(name, description):
                                 provided working directory has not been initialized,
                                 it will be created automatically.
                                   Example: --output /data/$USER/output
-
-        {3}{4}Analysis options:{5}
-          ...coming soon!
+                                           
 
         {3}{4}Orchestration options:{5}
           --mode {{slurm,local}}  
@@ -363,35 +376,50 @@ def parsed_arguments(name, description):
 
     # Display example usage in epilog
     run_epilog = textwrap.dedent("""\
-        {2}{3}Example:{4}
-          # Step 1.) Grab an interactive node,
-          # do not run on head node!
-          srun -N 1 -n 1 --time=1:00:00 --mem=8gb  --cpus-per-task=2 --pty bash
-          module purge
-          module load singularity snakemake
+        {2}{3}INPUT MODES:{4}
+        # Step 1.) Grab an interactive node,
+        # do not run on head node!
+        srun -N 1 -n 1 --time=1:00:00 --mem=8gb  --cpus-per-task=2 --pty bash
+        module purge
+        module load singularity snakemake
 
-          # Step 2A.) Dry-run the pipeline
-          ./{0} run --input .tests/*.R?.fastq.gz \\
-                         --output /data/$USER/output \\
-                         --mode slurm \\
-                         --dry-run
+        # Step 2A.) Dry-run the pipeline
+        ./{0} run --input .tests/*.R?.fastq.gz \\
+                        --output /data/$USER/output \\
+                        --mode slurm \\
+                        --dry-run
 
-          # Step 3A.) Run the {0} pipeline in per-sample fashion
-          # The slurm mode will submit jobs to 
-          # the cluster. It is recommended running 
-          # the pipeline in this mode.
-          ./{0} run --input .tests/*.R?.fastq.gz \\
-                         --output /data/$USER/output \\
-                         --mode slurm
+        # Step 3A.) Run the {0} pipeline in per-sample fashion
+        # The slurm mode will submit jobs to 
+        # the cluster. It is recommended running 
+        # the pipeline in this mode.
+        ./{0} run --input .tests/*.R?.fastq.gz \\
+                        --output /data/$USER/output \\
+                        --mode slurm
+                                
+        # Step 3B.) Run the {0} pipeline in co-assembly fashion
+        # with slurm
+        ./{0} run --coa --input .tests/*.R?.fastq.gz \\
+                        --output /data/$USER/output \\
+                        --mode slurm
+
+        {2}{3}EXAMPLES:{4}
+            co-assembly dna-only:
+                $ metamorph run --coa --input *.R?.fastq.gz --output output
+                $ metamorph run -C --input *.R?.fastq.gz --output output
+
+            per-sample assembly dna-only:
+                $ metamorph run --input *.R?.fastq.gz --output output
+
+            co-assembly rna & dna:
+                $ metamorph run --coa --input *.R?.fastq.gz --rna rna/*.R?.fastq.gz --output output
+                $ metamorph run -C --input *.R?.fastq.gz --rna rna/*.R?.fastq.gz  --output output
+
+            per-sample assembly rna & dna:
+                $ metamorph run --input *.R?.fastq.gz --rna rna/*.R?.fastq.gz --output output
                                  
-          # Step 3B.) Run the {0} pipeline in co-assembly fashion
-          # with slurm
-          ./{0} run --coa --input .tests/*.R?.fastq.gz \\
-                         --output /data/$USER/output \\
-                         --mode slurm
-                                 
 
-        {2}{3}Version:{4}
+        {2}{3}VERSION:{4}
           {1}
         """.format(name, __version__, c.bold, c.url, c.end))
 
@@ -415,6 +443,16 @@ def parsed_arguments(name, description):
         nargs = '+',
         help = argparse.SUPPRESS
     )
+
+    subparser_run.add_argument(
+        '--rna',
+        # Check if the file exists and if it is readable
+        type = lambda file: permissions(parser, file, os.R_OK),
+        required = False,
+        nargs = '+',
+        help = argparse.SUPPRESS
+    )
+
 
     # Output Directory, i.e 
     # working directory
@@ -450,12 +488,19 @@ def parsed_arguments(name, description):
     )
 
     # a supported job scheduler, etc.
-    subparser_run.add_argument(
-        '-C', '--coa',
-        action="store_true",
-        required = False,
-        help = argparse.SUPPRESS
-    )
+    # subparser_run.add_argument(
+    #     '-C', '--coa',
+    #     action="store_true",
+    #     required = False,
+    #     help = argparse.SUPPRESS
+    # )
+
+    # subparser_run.add_argument(
+    #     '-R', '--rnacoa',
+    #     action="store_true",
+    #     required = False,
+    #     help = argparse.SUPPRESS
+    # )
 
     # Name of master job
     subparser_run.add_argument(
@@ -510,7 +555,7 @@ def parsed_arguments(name, description):
         '--tmp-dir',
         type = str,
         required = False,
-        default = '/lscratch/$SLURM_JOBID/',
+        default = '/lscratch/$SLURM_JOB_ID/',
         help = argparse.SUPPRESS
     )
 

@@ -4,8 +4,8 @@
 # Python standard library
 from __future__ import print_function
 from shutil import copytree
-from uuid import uuid4
 from datetime import datetime
+from pathlib import Path
 import os, re, json, sys, subprocess
 
 # Local imports
@@ -17,6 +17,10 @@ from utils import (git_commit_hash,
     err)
 
 from . import version as __version__
+
+FASTQ_INPUT_EXT = ".fastq.gz"
+FASTQ_R1_POSTFIX = f"_R1{FASTQ_INPUT_EXT}"
+FASTQ_R2_POSTFIX = f"_R2{FASTQ_INPUT_EXT}"
 
 
 def init(repo_path, output_path, links=[], required=['workflow', 'resources', 'config']):
@@ -52,7 +56,17 @@ def init(repo_path, output_path, links=[], required=['workflow', 'resources', 'c
 
     # Create renamed symlinks for each rawdata 
     # file provided as input to the pipeline
-    inputs = sym_safe(input_data = links, target = output_path)
+    try:
+        os.mkdir(os.path.join(output_path, 'dna'))
+    except FileExistsError:
+        pass
+    inputs = dict(dna=sym_safe(input_data = links[0], target = os.path.join(output_path, 'dna')))
+    if len(links) == 2 and links[1]:
+        try:
+            os.mkdir(os.path.join(output_path, 'rna'))
+        except FileExistsError:
+            pass 
+        inputs['rna'] = sym_safe(input_data = links[1], target = os.path.join(output_path, 'rna'))
 
     return inputs
 
@@ -115,19 +129,19 @@ def rename(filename):
     # key = regex to match string and value = how it will be renamed
     extensions = {
         # Matches: _R[12]_fastq.gz, _R[12].fastq.gz, _R[12]_fq.gz, etc.
-        ".R1.f(ast)?q.gz$": ".R1.fastq.gz",
-        ".R2.f(ast)?q.gz$": ".R2.fastq.gz",
+        ".R1.f(ast)?q.gz$": FASTQ_R1_POSTFIX,
+        ".R2.f(ast)?q.gz$": FASTQ_R2_POSTFIX,
         # Matches: _R[12]_001_fastq_gz, _R[12].001.fastq.gz, _R[12]_001.fq.gz, etc.
         # Capture lane information as named group
-        ".R1.(?P<lane>...).f(ast)?q.gz$": ".R1.fastq.gz",
-        ".R2.(?P<lane>...).f(ast)?q.gz$": ".R2.fastq.gz",
+        ".R1.(?P<lane>...).f(ast)?q.gz$": FASTQ_R1_POSTFIX,
+        ".R2.(?P<lane>...).f(ast)?q.gz$": FASTQ_R2_POSTFIX,
         # Matches: _[12].fastq.gz, _[12].fq.gz, _[12]_fastq_gz, etc.
-        "_1.f(ast)?q.gz$": ".R1.fastq.gz",
-        "_2.f(ast)?q.gz$": ".R2.fastq.gz"
+        "_1.f(ast)?q.gz$": FASTQ_R1_POSTFIX,
+        "_2.f(ast)?q.gz$": FASTQ_R2_POSTFIX
     }
 
-    if (filename.endswith('.R1.fastq.gz') or
-        filename.endswith('.R2.fastq.gz')):
+    if (filename.endswith(FASTQ_R1_POSTFIX) or
+        filename.endswith(FASTQ_R2_POSTFIX)):
         # Filename is already in the correct format
         return filename
 
@@ -213,27 +227,6 @@ def setup(sub_args, ifiles, repo_path, output_path):
 
 
     return config
-
-
-def unpacked(nested_dict):
-    """Generator to recursively retrieves all values in a nested dictionary.
-    @param nested_dict dict[<any>]:
-        Nested dictionary to unpack
-    @yields value in dictionary 
-    """
-    # Iterate over all values of 
-    # given dictionary
-    for value in nested_dict.values():
-        # Check if value is of dict type
-        if isinstance(value, dict):
-            # If value is dict then iterate 
-            # over all its values recursively
-            for v in unpacked(value):
-                yield v
-        else:
-            # If value is not dict type 
-            # then yield the value
-            yield value
 
 
 def get_fastq_screen_paths(fastq_screen_confs, match = 'DATABASE', file_index = -1):
@@ -322,19 +315,31 @@ def bind(sub_args, config):
         List of singularity/docker bind paths 
     """
     bindpaths = []
-    for value in unpacked(config):
-        if not isinstance(value, str):
-            continue
-        if exists(value):
-            if os.path.isfile(value):
-                value = os.path.dirname(value)
-            if value not in bindpaths:
-                bindpaths.append(value)
+    resolve = lambda x: str(Path(x).resolve())
+
+    if 'databases' in config:
+        dbs = config.pop('databases')
+        bindpaths.extend([resolve(mount['from'])+':'+resolve(mount['to'])+':'+mount['mode'] for mount in dbs])
+
+    if 'options' in config and 'input' in config['options']:
+        inrents = list(set([os.path.abspath(os.path.dirname(p)) for p in config['options']['input'] if os.path.exists(os.path.dirname(p)) and os.path.isdir(os.path.dirname(p))]))
+        bindpaths.extend(inrents)
+
+    if 'options' in config and 'rna' in config['options']:
+        rnarents = list(set([os.path.abspath(os.path.dirname(p)) for p in config['options']['rna'] if os.path.exists(os.path.dirname(p)) and os.path.isdir(os.path.dirname(p))]))
+        bindpaths.extend(rnarents)
+
+    if 'options' in config and 'output' in config['options']:
+        if os.path.exists(config['options']['output']) and os.path.isdir(config['options']['output']):
+            bindpaths.append(os.path.abspath(config['options']['output']))
+
+    if 'tmp_dir' in config:
+        bindpaths.append(config['tmp_dir'])
 
     rawdata_bind_paths = [os.path.abspath(p) for p in config['project']['datapath'].split(',')]
     working_directory =  os.path.realpath(config['project']['workpath'])
 
-    return bindpaths
+    return list(set(bindpaths))
 
 
 def mixed_inputs(ifiles):
@@ -348,7 +353,7 @@ def mixed_inputs(ifiles):
     fastqs = False
     bams = False
     for file in ifiles:
-        if file.endswith('.R1.fastq.gz') or file.endswith('.R2.fastq.gz'):
+        if file.endswith(FASTQ_R1_POSTFIX) or file.endswith(FASTQ_R2_POSTFIX):
             fastqs = True 
             fq_files.append(file)
         elif file.endswith('.bam'):
@@ -393,13 +398,18 @@ def add_user_information(config):
     # username
     config['project']['userhome'] = home
     config['project']['username'] = username
-    dt = datetime.now().strftime("%m/%d/%Y")
-    config['project']['id'] = f"{uuid4()}_{dt}_metagenome"
+
+    # dt = datetime.now().strftime("%m_%d_%Y")
+    # config['project']['id'] = f"{dt}_metagenome_results"
+    
+    # TODO: figure up way to uniquely ID results, engineering out
+    #   the problem of misidentifing results files
+    config['project']['id'] = "metagenome_results"
 
     return config
 
 
-def add_sample_metadata(input_files, config, group=None):
+def add_sample_metadata(input_files, config, group_key='samples'):
     """Adds sample metadata such as sample basename, label, and group information.
     If sample sheet is provided, it will default to using information in that file.
     If no sample sheet is provided, it will only add sample basenames and labels.
@@ -412,20 +422,15 @@ def add_sample_metadata(input_files, config, group=None):
     @return config <dict>:
         Updated config with basenames, labels, and groups (if provided)
     """
-    import re
-
-    # TODO: Add functionality for basecase 
-    # when user has samplesheet
     added = []
-    config['samples'] = []
+    config[group_key] = []
     for file in input_files:
         # Split sample name on file extension
-        sample = re.split('\.R[12]\.fastq\.gz', os.path.basename(file))[0]
+        sample = re.split('[\S]R[12]', os.path.basename(file))[0]
         if sample not in added:
             # Only add PE sample information once
             added.append(sample)
-            config['samples'].append(sample)
-
+            config[group_key].append(sample)
     return config
 
 
@@ -448,17 +453,23 @@ def add_rawdata_information(sub_args, config, ifiles):
     # or single-end
     # Updates config['project']['nends'] where
     # 1 = single-end, 2 = paired-end, -1 = bams
+
     convert = {1: 'single-end', 2: 'paired-end', -1: 'bam'}
-    nends = get_nends(ifiles)  # Checks PE data for both mates (R1 and R2)
+
+    nends = get_nends(ifiles['dna'])  # Checks PE data for both mates (R1 and R2)
     config['project']['nends'] = nends
     config['project']['filetype'] = convert[nends]
 
     # Finds the set of rawdata directories to bind
-    rawdata_paths = get_rawdata_bind_paths(input_files = sub_args.input)
-    config['project']['datapath'] = ','.join(rawdata_paths)
+    config['project']['datapath'] = ','.join(get_rawdata_bind_paths(input_files = sub_args.input))
+    if sub_args.rna:
+        config["project"]["rna_datapath"] = ','.join(get_rawdata_bind_paths(input_files = sub_args.rna))
 
     # Add each sample's basename
-    config = add_sample_metadata(input_files = ifiles, config = config)
+    config = add_sample_metadata(ifiles['dna'], config)
+    
+    if 'rna' in ifiles:
+        config = add_sample_metadata(ifiles['rna'], config, group_key='rna')
 
     return config
 
@@ -518,7 +529,7 @@ def get_nends(ifiles):
             bam_files = True
             nends_status = -1
             break
-        elif file.endswith('.R2.fastq.gz'):
+        elif file.endswith(FASTQ_R2_POSTFIX):
             paired_end = True
             nends_status = 2
             break # dataset is paired-end
@@ -529,7 +540,7 @@ def get_nends(ifiles):
         nends = {} # keep count of R1 and R2 for each sample
         for file in ifiles:
             # Split sample name on file extension
-            sample = re.split('\.R[12]\.fastq\.gz', os.path.basename(file))[0]
+            sample = re.split('\_R[12]\.fastq\.gz', os.path.basename(file))[0]
             if sample not in nends:
                 nends[sample] = 0
 
@@ -543,8 +554,8 @@ def get_nends(ifiles):
                 both mates (R1 and R2) for the following samples:\n\t\t{}\n
                 Please check that the basename for each sample is consistent across mates.
                 Here is an example of a consistent basename across mates:
-                  consistent_basename.R1.fastq.gz
-                  consistent_basename.R2.fastq.gz
+                  consistent_basename_R1.fastq.gz
+                  consistent_basename_R2.fastq.gz
 
                 Please do not run the pipeline with a mixture of single-end and paired-end
                 samples. This feature is currently not supported within {}, and it is
@@ -622,130 +633,6 @@ def dryrun(outdir, config='config.json', snakefile=os.path.join('workflow', 'Sna
     return dryrun_output
 
 
-def run_coa_pipeline(mode, outdir, alt_cache, logger, tmp_dir, additional_bind_paths):
-    # gzip compression speed: ~10.5 MB/s 
-    # see: https://tukaani.org/lzma/benchmarks.html
-    # large fastq ~20GB
-    # 96 samples x 2 (R1 + R2) = 192 fastqs
-    # total size (high estimate): 192 fastqs * 20GB/fastq = 3,840 GB = 3,840,000 MB
-    # total compression time: 3,840,000 MB / (10.5 MB/s) = 365714 s = ~ 4 days
-    # pigz ~6.5 times faster than gzip
-    # https://github.com/neurolabusc/pigz-bench
-    # 3,840,000 MB / (10.5 MB/s * 6.5) = ~ 15.6 hours
-    # ~~~~~~~~~~~~~~    
-    
-    # Add additional singularity bind PATHs
-    # to mount the local filesystem to the 
-    # containers filesystem, NOTE: these 
-    # PATHs must be an absolute PATHs
-    outdir = os.path.abspath(outdir).strip()
-    # Add any default PATHs to bind to 
-    # the container's filesystem, like 
-    # tmp directories, /lscratch
-    addpaths = []
-    temp = os.path.dirname(tmp_dir.rstrip('/'))
-    if temp == os.sep:
-        temp = tmp_dir.rstrip('/')
-    if outdir not in additional_bind_paths.split(','):
-        addpaths.append(outdir)
-    if temp not in additional_bind_paths.split(','):
-        addpaths.append(temp)
-    bindpaths = ','.join(addpaths)
-
-    # Set ENV variable 'SINGULARITY_CACHEDIR' 
-    # to output directory
-    my_env = {}; my_env.update(os.environ)
-    cache = os.path.join(outdir, ".singularity")
-    my_env['SINGULARITY_CACHEDIR'] = cache
-    if alt_cache:
-        # Override the pipeline's default 
-        # cache location
-        my_env['SINGULARITY_CACHEDIR'] = alt_cache
-        cache = alt_cache
-
-    if additional_bind_paths:
-        # Add Bind PATHs for outdir and tmp dir
-        if bindpaths:
-            bindpaths = ",{}".format(bindpaths)
-        bindpaths = "{}{}".format(additional_bind_paths,bindpaths)
-
-    if not exists(os.path.join(outdir, 'logfiles')):
-        # Create directory for logfiles
-        os.makedirs(os.path.join(outdir, 'logfiles'))
-
-    # Create .singularity directory for 
-    # installations of snakemake without
-    # setuid which creates a sandbox in
-    # the SINGULARITY_CACHEDIR
-    if not exists(cache):
-        # Create directory for sandbox 
-        # and image layers
-        os.makedirs(cache, mode=0o755)
-
-    snakefile = os.path.abspath(os.path.join(__file__, '..', 'workflow', 'coa', 'Snakefile'))
-    slurm_dir = os.path.abspath(os.path.join(outdir, 'slurm'))
-    if not os.path.exists(slurm_dir):
-        os.mkdir(slurm_dir, mode=0o755)
-
-    CLUSTER_OPTS = "sbatch --gres {cluster.gres}" + \
-                   " --cpus-per-task {cluster.threads}" + \
-                   " -p {cluster.partition}" + \
-                   " -t {cluster.time}" + \
-                   " --mem {cluster.mem}" + \
-                   " --job-name={params.rname}" + \
-                   " -e $SLURM_DIR/slurm-%j_{params.rname}.out" + \
-                   " -o $SLURM_DIR/slurm-%j_{params.rname}.out" 
-    
-    sbatch_params = [
-        "#SBATCH --cpus-per-task=28",
-        "#SBATCH --mem=64g",
-        "#SBATCH --time=10-00:00:00",
-        "#SBATCH -p norm",
-        "#SBATCH --parsable",
-        "#SBATCH -J \"metagenome_coa\"",
-        "#SBATCH --mail-type=BEGIN,END,FAIL",
-        "#SBATCH --output \"" + outdir + "/logfiles/snakemake.log\"",
-        "#SBATCH --error \"" + outdir + "/logfiles/snakemake.log\"",
-    ]
-        
-    jobscript = [
-        "#!/usr/bin/env bash",
-        "module load snakemake singularity",
-        "snakemake \\",
-        "--latency-wait 120 \\",
-        "-s " + snakefile + " \\",
-        "-d \"{outdir}\" \\",
-        "--use-singularity \\",
-        "--singularity-args \"'-B " + bindpaths + "'\"  \\",
-        "--configfile=\"" + outdir + "/config.json\" \\",
-        "--printshellcmds \\",
-        "--cluster-config \"" + outdir + "/resources/cluster.json\" \\",
-        "--cluster \"" + CLUSTER_OPTS + "\" \\",
-        "--keep-going \\",
-        "--restart-times 3 \\",
-        "-j 500 \\",
-        "--rerun-incomplete --stats \"" + outdir + "/logfiles/runtime_statistics.json\" \\",
-        "--keep-remote \\",
-        "--local-cores 28 2>&1 | tee -a \"" + outdir + "/logfiles/master.log\"",
-    ]
-
-    exec_sh = 'bash'
-    if mode == 'slurm':
-        exec_sh = 'sbatch'
-        jobscript = [jobscript[0], *sbatch_params, *jobscript[1:]]
-    
-    coa_jobscript = os.path.join(slurm_dir, 'jobscript.sh')
-    with open(coa_jobscript, 'w') as fo:
-        fo.write("\n".join(jobscript))
-
-    coajob = subprocess.Popen([
-                exec_sh, str(coa_jobscript)
-            ], cwd = outdir, stderr=subprocess.STDOUT, stdout=logger, env=my_env)
-
-    coajob.wait()
-    return coajob.returncode
-
-
 try:
     __job_name__ = 'metamorph_' + os.getlogin() + ':master'
 except OSError:
@@ -760,7 +647,7 @@ def runner(
         threads=2,  
         jobname=__job_name__,
         submission_script='run.sh',
-        tmp_dir = '/lscratch/$SLURM_JOBID/'
+        tmp_dir = '/lscratch/$SLURM_JOB_ID/'
     ):
     """Runs the pipeline via selected executor: local or slurm.
     If 'local' is selected, the pipeline is executed locally on a compute node/instance.
@@ -817,7 +704,7 @@ def runner(
         # Add Bind PATHs for outdir and tmp dir
         if bindpaths:
             bindpaths = ",{}".format(bindpaths)
-        bindpaths = "{}{}".format(additional_bind_paths,bindpaths)
+        bindpaths = "{}{}".format(additional_bind_paths, bindpaths)
 
     if not exists(os.path.join(outdir, 'logfiles')):
         # Create directory for logfiles
@@ -840,9 +727,12 @@ def runner(
         # replacing Popen subprocess with a direct
         # snakemake API call: https://snakemake.readthedocs.io/en/stable/api_reference/snakemake.html
         masterjob = subprocess.Popen([
-                'snakemake', '-pr', '--rerun-incomplete',
+                'snakemake', '-pr', 
+                '--rerun-incomplete',
+                '--rerun-triggers input',
+                '--verbose',
                 '--use-singularity',
-                '--singularity-args', "'-B {}'".format(bindpaths),
+                '--singularity-args', "\\-c \\-B '{}'".format(bindpaths),
                 '--cores', str(threads),
                 '--configfile=config.json'
             ], cwd = outdir, stderr=subprocess.STDOUT, stdout=logger, env=my_env)

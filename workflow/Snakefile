@@ -2,12 +2,25 @@ import json
 import os, sys
 from os.path import join
 from os import listdir
-from scripts.common import allocated, provided, references, str_bool
+from scripts.common import allocated, provided, references, str_bool, list_bool
 
 
-workpath = config["project"]["workpath"]  # Pipeline"s output directory
-tmpdir = config["options"]["tmp_dir"]  # Temporary directory
-samples = config["samples"]  # List containing basename of samples
+# Global workflow variables
+configfile: "config.json"  # Generated from user input and config/*.json
+
+datapath                   = config["project"]["datapath"]
+rna_datapath               = config["project"].get("rna_datapath", [])
+workpath                   = config["project"]["workpath"]
+tmpdir                     = config["options"]["tmp_dir"]
+coassemble                 = config['coassembly'] is True
+rna_included               = list_bool(config.get("rna", 'false'))
+rna_coasm                  = str_bool(config["options"].get("rnacoa", 'False'))
+rna_sample_stems           = config.get("rna", [])
+samples                    = config["samples"] if not coassemble else ['concatenated']
+top_readqc_dir             = join(workpath, config['project']['id'], "metawrap_read_qc")
+top_trim_dir               = join(workpath, config['project']['id'], "trimmed_reads")
+top_readqc_dir_rna         = join(workpath, config['project']['id'], "metawrap_read_qc_RNA")
+top_trim_dir_rna           = join(workpath, config['project']['id'], "trimmed_reads_RNA")
 
 
 # Read in resource information, containing information about threads, mem, walltimes, etc.
@@ -15,38 +28,46 @@ samples = config["samples"]  # List containing basename of samples
 with open(join(workpath, "config", "cluster.json")) as fh:
     cluster = json.load(fh)
 
+if coassemble:
+    start_r1 = expand(join(workpath, "dna", "{name}_R1.fastq.gz"), name=['concatenated'])
+    start_r2 = expand(join(workpath, "dna", "{name}_R2.fastq.gz"), name=['concatenated'])
+else:
+    start_r1 = expand(join(workpath, "dna", "{name}_R1.fastq.gz"), name=samples)
+    start_r2 = expand(join(workpath, "dna", "{name}_R2.fastq.gz"), name=samples)
 
-# Global workflow variables
-configfile: "config.json"  # Generated from user input and config/*.json
+if rna_included:
+    if rna_coasm:
+        start_r1_rna = expand(join(workpath, "rna", "{name}_R1.fastq.gz"), name=['concatenated'])
+        start_r2_rna = expand(join(workpath, "rna", "{name}_R2.fastq.gz"), name=['concatenated'])
+    else:
+        start_r1_rna = expand(join(workpath, "rna", "{rname}_R1.fastq.gz"), rname=rna_sample_stems)
+        start_r2_rna = expand(join(workpath, "rna", "{rname}_R2.fastq.gz"), rname=rna_sample_stems)
+else:
+    start_r1_rna, start_r2_rna = [], []
 
 
 # Final ouput files of the pipeline
 rule all:
     input:
+        #################
+        #  DNA outputs  #
+        #################
+        # dna read decompress
+        # ~~~~~~~~~~~~~~~
+        start_r1,
+        start_r2,
         # read qc and filtering
         # ~~~~~~~~~~~~~~~
-        expand(
-            join(
-                workpath, config['project']['id'], "metawrap_qc", "{name}", "{name}.R1_bmtagger_report.html"
-            ),
-            name=samples,
-        ),
-        expand(
-            join(
-                workpath, config['project']['id'], "metawrap_qc", "{name}", "{name}.R2_bmtagger_report.html"
-            ),
-            name=samples,
-        ),
+        expand(join(top_readqc_dir, "{name}", "{name}_R1_pretrim_report.html"), name=samples),
+        expand(join(top_readqc_dir, "{name}", "{name}_R2_pretrim_report.html"), name=samples),
+        expand(join(top_readqc_dir, "{name}", "{name}_R1_postrim_report.html"), name=samples),
+        expand(join(top_readqc_dir, "{name}", "{name}_R2_postrim_report.html"), name=samples),
+        expand(join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq.gz"), name=samples),
+        expand(join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq.gz"), name=samples),
         # genome assembly
         # ~~~~~~~~~~~~~~~
-        expand(
-            join(workpath, config['project']['id'], "metawrap_assembly", "{name}", "final_assembly.fasta"),
-            name=samples,
-        ),
-        expand(
-            join(workpath, config['project']['id'], "metawrap_assembly", "{name}", "assembly_report.html"),
-            name=samples,
-        ),
+        expand(join(workpath, config['project']['id'], "metawrap_assembly", "{name}", "final_assembly.fasta"), name=samples),
+        expand(join(workpath, config['project']['id'], "metawrap_assembly", "{name}", "assembly_report.html"), name=samples),
         # taxonomic classification
         # ~~~~~~~~~~~~~~~
         expand(join(workpath, config['project']['id'], "metawrap_kmer", "{name}", "final_assembly.krona"), name=samples),
@@ -65,8 +86,24 @@ rule all:
         # bin refinement
         # ~~~~~~~~~~~~~~~
         expand(join(workpath, config['project']['id'], "metawrap_bin_refine", "{name}", "dereplicated_bins"), name=samples),
-        
+        #################
+        #  RNA outputs  #
+        #################
+        # rna read decompress
+        # ~~~~~~~~~~~~~~~
+        start_r1_rna,
+        start_r1_rna,
+        # read qc and filtering
+        # ~~~~~~~~~~~~~~~
+        expand(join(top_readqc_dir_rna, "{rname}", "{rname}_R1_pretrim_report.html"), rname=rna_sample_stems),
+        expand(join(top_readqc_dir_rna, "{rname}", "{rname}_R2_pretrim_report.html"), rname=rna_sample_stems),
+        expand(join(top_readqc_dir_rna, "{rname}", "{rname}_R1_postrim_report.html"), rname=rna_sample_stems),
+        expand(join(top_readqc_dir_rna, "{rname}", "{rname}_R2_postrim_report.html"), rname=rna_sample_stems),
+        expand(join(top_trim_dir_rna, "{rname}", "{rname}_R1_trimmed.fastq.gz"), rname=rna_sample_stems),
+        expand(join(top_trim_dir_rna, "{rname}", "{rname}_R2_trimmed.fastq.gz"), rname=rna_sample_stems),
 
 
 # Import rules
-include: join("rules", "metawrap.smk")
+include: join("rules", "DNA.smk")
+include: join("rules", "RNA.smk")
+include: join("rules", "hooks.smk")

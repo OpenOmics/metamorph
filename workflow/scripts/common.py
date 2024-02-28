@@ -65,6 +65,8 @@ def allocated(resource, rule, lookup, default="__default__"):
 
 def str_bool(s):
     """
+        Deprecated from stdlib in 3.10, see: https://peps.python.org/pep-0632/
+
         Converts a string to boolean. It is dangerous to try to
         typecast a string into a boolean value using the built-in 
         `bool()` function. This function avoids any issues that can
@@ -74,6 +76,8 @@ def str_bool(s):
             boolean('False') returns False
             boolean('asdas') raises TypeError
     """
+    if not isinstance(s, str):
+        s = str(s)
     val = s.lower()
     if val in ['true', '1', 'y', 'yes']:
         return True
@@ -83,3 +87,12 @@ def str_bool(s):
         # Provided value could not be
         # type casted into a boolean
         raise TypeError('Fatal: cannot type cast {} into a boolean'.format(val))
+
+
+def list_bool(l):
+    # some lists are strings of "None" if no files input
+    # type checking instead of string manip
+    if isinstance(l, list):
+        if len(l) > 0:
+            return True
+    return False

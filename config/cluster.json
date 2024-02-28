@@ -1,32 +1,60 @@
 {
     "__default__": {
         "threads": 4,
-        "mem": "8g",
-        "partition": "norm",
-        "time": "0-04:00:00"
-    },
-    "metawrap_read_qc": {
-        "threads": 8,
-        "mem": "16g",
+        "mem": "8G",
         "partition": "norm",
         "time": "0-04:00:00",
-        "gres": "None"
+        "gres": "lscratch:64"
+    },
+    "concat_reads": {
+        "threads": 28,
+        "mem": "16G",
+        "partition": "norm",
+        "time": "1-00:00:00",
+        "gres": "lscratch:400"
+    },
+    "concat_rna_reads": {
+        "threads": 28,
+        "mem": "16G",
+        "partition": "norm",
+        "time": "1-00:00:00",
+        "gres": "lscratch:400"
+    },
+    "metawrap_read_qc": {
+        "threads": 16,
+        "mem": "32G",
+        "partition": "norm",
+        "time": "1-00:00:00",
+        "gres": "lscratch:400"
+    },
+    "rna_read_qc": {
+        "threads": 16,
+        "mem": "32G",
+        "partition": "norm",
+        "time": "1-00:00:00",
+        "gres": "lscratch:400"
     },
     "metawrap_genome_assembly": {
-        "threads": 24,
-        "mem": "128g",
+        "threads": 48,
+        "mem": "128G",
         "partition": "norm",
-        "time": "2-00:00:00"
+        "time": "5-00:00:00"
     },
     "metawrap_tax_classification": {
-        "threads": 12,
-        "mem": "32g",
-        "partition": "quick",
-        "time": "0-04:00:00"
-    },
-    "metawrap_assembly_binning": {
-        "threads": 16,
-        "mem": "64g",
+        "threads": 32,
+        "mem": "64G",
+        "partition": "norm",
+        "time": "5-00:00:00"
+    }, 
+    "metawrap_binning": {
+        "threads": 32,
+        "mem": "64G",
+        "partition": "norm",
+        "time": "2-00:00:00"
+    }, 
+    "derep_bins": {
+        "threads": 32,
+        "mem": "32G",
         "partition": "norm",
         "time": "2-00:00:00"
     }

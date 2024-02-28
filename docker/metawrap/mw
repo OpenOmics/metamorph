@@ -1,0 +1,5 @@
+#!/bin/bash
+set +eu
+source /etc/bash.bashrc
+/home/metaWRAP/bin/metawrap "$@"
+set -eu
