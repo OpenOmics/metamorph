@@ -344,8 +344,8 @@ rule metawrap_binning:
 
     """
     input:
-        R1                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq")
-        R2                          = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq")
+        R1                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq"),
+        R2                          = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq"),
         assembly                    = join(top_assembly_dir, "{name}", "final_assembly.fasta"),
     output:
         maxbin_bins                 = directory(join(top_binning_dir, "{name}", "maxbin2_bins")),
