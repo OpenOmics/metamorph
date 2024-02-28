@@ -138,12 +138,18 @@ rule metawrap_read_qc:
         sid                 = "{name}",
         this_qc_dir         = join(top_readqc_dir, "{name}"),
         trim_out            = join(top_trim_dir, "{name}"),
-        tmpr1               = lambda _, output, input: join(config['options']['tmp_dir'], str(basename(str(input.R1))).replace('_R1.', '_1.').replace('.gz', '')),
-        tmpr2               = lambda _, output, input: join(config['options']['tmp_dir'], str(basename(str(input.R2))).replace('_R2.', '_2.').replace('.gz', '')),
+        tmp_safe_dir        = join(config['options']['tmp_dir'], 'read_qc'),
+        tmpr1               = lambda _, output, input: join(config['options']['tmp_dir'], 'read_qc', str(basename(str(input.R1))).replace('_R1.', '_1.').replace('.gz', '')),
+        tmpr2               = lambda _, output, input: join(config['options']['tmp_dir'], 'read_qc', str(basename(str(input.R2))).replace('_R2.', '_2.').replace('.gz', '')),
     containerized: metawrap_container,
     threads: int(cluster["metawrap_genome_assembly"].get('threads', default_threads)),
     shell: 
         """
+            # safe temp directory
+            if [ ! -d "{params.tmp_safe_dir}" ]; then mkdir -p "{params.tmp_safe_dir}"; fi
+            tmp=$(mktemp -d -p "{params.tmp_safe_dir}")
+            trap 'rm -rf "{params.tmp_safe_dir}"' EXIT
+
             # uncompress to lscratch
             rone="{input.R1}"
             ext=$(echo "${{rone: -2}}" | tr '[:upper:]' '[:lower:]')
@@ -152,7 +158,6 @@ rule metawrap_read_qc:
             else
                 ln -s {input.R1} {params.tmpr1}
             fi;
-
             rtwo="{input.R2}"
             ext=$(echo "${{rtwo: -2}}" | tr '[:upper:]' '[:lower:]')
             if [[ "$ext" == "gz" ]]; then
