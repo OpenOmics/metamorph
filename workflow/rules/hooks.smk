@@ -56,10 +56,12 @@ if config["options"]["mode"] == "slurm":
                 # is run and no child jobs are submitted
                 touch failed_jobs_${{timestamp}}.tsv
             }}
-            failed_wc=$(wc -l failed_jobs_${{timestamp}}.tsv);
-            if [ "$failed_wc" -le "1" ]; then
-                rm failed_jobs_${{timestamp}}.tsv;
-            fi
+            for fn in failed_jobs_*.tsv; do
+                failed_wc=$(wc -l < $fn);
+                if [ $failed_wc -le 1 ]; then
+                    rm $fn
+                fi
+            done
             touch COMPLETED
             """
         )

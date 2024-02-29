@@ -1,6 +1,7 @@
 # ~~~~~~~~~~
 # Metawrap metagenome assembly and analysis rules
 # ~~~~~~~~~~
+from os import listdir
 from os.path import join, basename
 from itertools import chain
 from uuid import uuid4
@@ -12,6 +13,7 @@ from uuid import uuid4
 # resource defaults
 default_threads            = cluster["__default__"]['threads']
 default_memory             = cluster["__default__"]['mem']
+
 # directories
 workpath                   = config["project"]["workpath"]
 datapath                   = config["project"]["datapath"]
@@ -22,7 +24,7 @@ top_trim_dir               = join(workpath, config['project']['id'], "trimmed_re
 top_assembly_dir           = join(workpath, config['project']['id'], "metawrap_assembly")
 top_tax_dir                = join(workpath, config['project']['id'], "metawrap_kmer")
 top_binning_dir            = join(workpath, config['project']['id'], "metawrap_binning")
-top_refine_dir             = join(workpath, config['project']['id'], "metawrap_bin_refine")
+
 # workflow flags
 metawrap_container         = config["containers"]["metawrap"]
 pairedness                 = list(range(1, config['project']['nends']+1))
@@ -204,8 +206,8 @@ rule metawrap_genome_assembly:
             Ensemble assembled contigs and reports
     """
     input:
-        R1                          = expand(join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq"), name=samples),
-        R2                          = expand(join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq"), name=samples),
+        R1                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq")
+        R2                          = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq")
     output:
         # megahit outputs
         megahit_assembly            = expand(join(top_assembly_dir, "{name}", "megahit", "final.contigs.fa"), name=samples),
@@ -270,13 +272,15 @@ rule metawrap_tax_classification:
 
     """
     input:
-        reads                       = expand(join(top_trim_dir, "{name}", "{name}_R{pair}_trimmed.fastq"), name=samples, pair=['1', '2']),
-        final_assembly              = expand(join(top_assembly_dir, "{name}", "final_assembly.fasta"), name=samples),
+        r1                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq"), 
+        r2                          = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq"),
+        final_assembly              = join(top_assembly_dir, "{name}", "final_assembly.fasta"),
     output:
         krak2_asm                   = expand(join(top_tax_dir, "{name}", "final_assembly.krak2"), name=samples),
         kraken2_asm                 = expand(join(top_tax_dir, "{name}", "final_assembly.kraken2"), name=samples),
         krona_asm                   = expand(join(top_tax_dir, "{name}", "final_assembly.krona"), name=samples),
         kronagram                   = expand(join(top_tax_dir, "{name}", "kronagram.html"), name=samples),
+        reads                       = lambda _, output, input: ' '.join([input.R1, input.R2])
     params:
         tax_dir                     = expand(join(top_tax_dir, "{name}"), name=samples),
         rname                       = "metawrap_tax_classification",
@@ -291,7 +295,7 @@ rule metawrap_tax_classification:
             -s {params.tax_subsample} \
             -o {params.tax_dir} \
             {input.final_assembly} \
-            {input.reads}
+            {params.reads}
         """
 
 
@@ -362,6 +366,7 @@ rule metawrap_binning:
         rname                       = "metawrap_binning",
         bin_parent_dir              = top_binning_dir,
         bin_dir                     = join(top_binning_dir, "{name}"),
+        bin_refine_dir              = join(top_binning_dir, "{name}"),
         bin_mem                     = mem2int(cluster['metawrap_binning'].get("mem", default_memory)),
         mw_trim_linker_R1           = join(top_trim_dir, "{name}", "{name}_1.fastq"),
         mw_trim_linker_R2           = join(top_trim_dir, "{name}", "{name}_2.fastq"),
@@ -399,6 +404,79 @@ rule metawrap_binning:
         -B {params.bin_dir}/maxbin2_bins \
         -c {params.min_perc_complete} \
         -x {params.max_perc_contam}
+        """
+
+
+rule bin_stats:
+    input:
+        maxbin_bins                 = directory(join(top_binning_dir, "{name}", "maxbin2_bins")),
+        metabat2_bins               = directory(join(top_binning_dir, "{name}", "metabat2_bins")),
+        metawrap_bins               = directory(join(top_binning_dir, "{name}", "metawrap_50_5_bins")),
+        maxbin_stats                = join(top_binning_dir, "{name}", "maxbin2_bins.stats"),
+        metabat2_stats              = join(top_binning_dir, "{name}", "metabat2_bins.stats"),
+        metawrap_stats              = join(top_binning_dir, "{name}", "metawrap_50_5_bins.stats"),
+    output:
+        this_refine_summary         = join(top_refine_dir, "{name}", "RefinedBins_summmary.txt"),
+        named_stats_maxbin2         = join(top_refine_dir, "{name}", "named_maxbin2_bins.stats"),
+        named_stats_metabat2        = join(top_refine_dir, "{name}", "named_metabat2_bins.stats"),
+        named_stats_metawrap        = join(top_refine_dir, "{name}", "named_metawrap_bins.stats"),
+    params:
+        sid                         = "{name}"
+        this_bin_dir                = join(top_refine_dir, "{name}"),
+        # count number of fasta files in the bin folders to get count of bins
+        metabat2_num_bins           = lambda wc, _out, _in: str(len([fn for fn in os.listdir(_in.metabat2_bins) if "unbinned" not in fn.lower()]))
+        maxbin_num_bins             = lambda wc, _out, _in: str(len([fn for fn in os.listdir(_in.maxbin_bins) if "unbinned" not in fn.lower()]))
+        metawrap_num_bins           = lambda wc, _out, _in: str(len([fn for fn in os.listdir(_in.metawrap_bins) if "unbinned" not in fn.lower()]))
+    shell:
+        """
+        # count cumulative lines starting with `>`
+        metabat2_contigs=$(cat {input.metabat2_bins}/*fa | grep -c "^>")
+        maxbin_configs=$(cat {input.maxbin_bins}/*fa | grep -c "^>")
+        metawrap_contigs=$(cat {input.metawrap_bins}/*fa | grep -c "^>")
+        echo "SampleID\tmetabat2_bins\tmaxbin2_bins\tmetaWRAP_50_5_bins\tmetabat2_contigs\tmaxbin2_contigs\tmetaWRAP_50_5_contigs" > {output.this_refine_summary}
+        echo "{params.sid}\t{params.metabat2_num_bins}\t{params.maxbin_num_bins}\t{params.metawrap_num_bins}\t$metabat2_contigs\t$maxbin_configs\t$metawrap_contigs"
+
+        # name contigs with SID
+        cat {input.maxbin_stats} | sed 's/^bin./{name}_bin./g' > {output.named_stats_maxbin2}
+		cat {input.metabat2_stats} | sed 's/^bin./{name}_bin./g' > {output.named_stats_metabat2}
+		cat {input.metawrap_stats} | sed 's/^bin./{name}_bin./g' > {output.named_stats_metawrap}
+        """
+
+
+rule cumulative_bin_stats:
+    input:
+        this_refine_summary         = expand(join(top_binning_dir, "{name}", "RefinedBins_summmary.txt"), name=samples),
+    output:
+        cumulative_bin_summary      = join(top_refine_dir, "{name}", "RefinedBins_summmary.txt"),
+        cumulative_maxbin_stats     = join(top_refine_dir, "{name}", "cumulative_stats_maxbin.txt"),
+        cumulative_metabat2_stats   = join(top_refine_dir, "{name}", "cumulative_stats_metabat2.txt"),
+        cumulative_metawrap_stats   = join(top_refine_dir, "{name}", "cumulative_stats_metawrap.txt"),
+    params:
+        bin_dir                     = top_binning_dir
+    shell:
+        """
+        # generate cumulative binning summary
+        echo "SampleID\tmetabat2_bins\tmaxbin2_bins\tmetaWRAP_50_5_bins\tmetabat2_contigs\tmaxbin2_contigs\tmetaWRAP_50_5_contigs" > {output.cumulative_bin_summary}
+        for report in {params.bin_dir}/*/RefinedBins_summmary.txt; do 
+            tail -n+2 $report >> {output.cumulative_bin_summary}
+            echo "tail -n+2 $report >> {output.cumulative_bin_summary}"
+        done
+
+        # generate cumulative statistic report for binning
+        for report in {params.bin_dir}/*/named_maxbin2_bins.stats; do
+            cat $report >> {output.cumulative_maxbin_stats}
+        done
+        for report in {params.bin_dir}/*/named_maxbin2_bins.stats; do
+            cat $report >> {output.cumulative_metabat2_stats}
+        done
+        for report in {params.bin_dir}/*/named_maxbin2_bins.stats; do
+            cat $report >> {output.cumulative_metawrap_stats}
+        done
+
+        if $(wc -l < {output.cumulative_bin_summary}) -le 1; then
+            echo "No information in bin refinement summary!" 1>&2
+            exit 1
+        fi
         """
 
 
