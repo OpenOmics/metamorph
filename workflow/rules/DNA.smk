@@ -206,8 +206,8 @@ rule metawrap_genome_assembly:
             Ensemble assembled contigs and reports
     """
     input:
-        R1                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq")
-        R2                          = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq")
+        R1                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq"),
+        R2                          = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq"),
     output:
         # megahit outputs
         megahit_assembly            = expand(join(top_assembly_dir, "{name}", "megahit", "final.contigs.fa"), name=samples),
@@ -280,7 +280,7 @@ rule metawrap_tax_classification:
         kraken2_asm                 = expand(join(top_tax_dir, "{name}", "final_assembly.kraken2"), name=samples),
         krona_asm                   = expand(join(top_tax_dir, "{name}", "final_assembly.krona"), name=samples),
         kronagram                   = expand(join(top_tax_dir, "{name}", "kronagram.html"), name=samples),
-        reads                       = lambda _, output, input: ' '.join([input.R1, input.R2])
+        reads                       = lambda _, output, input: ' '.join([input.R1, input.R2]),
     params:
         tax_dir                     = expand(join(top_tax_dir, "{name}"), name=samples),
         rname                       = "metawrap_tax_classification",
