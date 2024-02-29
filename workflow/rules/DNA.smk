@@ -425,9 +425,9 @@ rule bin_stats:
         sid                         = "{name}",
         this_bin_dir                = join(top_refine_dir, "{name}"),
         # count number of fasta files in the bin folders to get count of bins
-        metabat2_num_bins           = lambda wc, _out, _in: str(len([fn for fn in os.listdir(_in.metabat2_bins) if "unbinned" not in fn.lower()])),
-        maxbin_num_bins             = lambda wc, _out, _in: str(len([fn for fn in os.listdir(_in.maxbin_bins) if "unbinned" not in fn.lower()])),
-        metawrap_num_bins           = lambda wc, _out, _in: str(len([fn for fn in os.listdir(_in.metawrap_bins) if "unbinned" not in fn.lower()])),
+        metabat2_num_bins           = lambda _, output, input: str(len([fn for fn in os.listdir(input.metabat2_bins) if "unbinned" not in fn.lower()])),
+        maxbin_num_bins             = lambda _, output, input: str(len([fn for fn in os.listdir(input.maxbin_bins) if "unbinned" not in fn.lower()])),
+        metawrap_num_bins           = lambda _, output, input: str(len([fn for fn in os.listdir(input.metawrap_bins) if "unbinned" not in fn.lower()])),
     shell:
         """
         # count cumulative lines starting with `>`
@@ -446,12 +446,15 @@ rule bin_stats:
 
 rule cumulative_bin_stats:
     input:
-        this_refine_summary         = expand(join(top_binning_dir, "{name}", "RefinedBins_summmary.txt"), name=samples),
+        this_refine_summary         = expand(join(top_refine_dir, "{name}", "RefinedBins_summmary.txt"), name=samples),
+        named_stats_maxbin2         = expand(join(top_refine_dir, "{name}", "named_maxbin2_bins.stats"), name=samples),
+        named_stats_metabat2        = expand(join(top_refine_dir, "{name}", "named_metabat2_bins.stats"), name=samples),
+        named_stats_metawrap        = expand(join(top_refine_dir, "{name}", "named_metawrap_bins.stats"), name=samples),
     output:
-        cumulative_bin_summary      = join(top_refine_dir, "{name}", "RefinedBins_summmary.txt"),
-        cumulative_maxbin_stats     = join(top_refine_dir, "{name}", "cumulative_stats_maxbin.txt"),
-        cumulative_metabat2_stats   = join(top_refine_dir, "{name}", "cumulative_stats_metabat2.txt"),
-        cumulative_metawrap_stats   = join(top_refine_dir, "{name}", "cumulative_stats_metawrap.txt"),
+        cumulative_bin_summary      = join(top_refine_dir, "RefinedBins_summmary.txt"),
+        cumulative_maxbin_stats     = join(top_refine_dir, "cumulative_stats_maxbin.txt"),
+        cumulative_metabat2_stats   = join(top_refine_dir, "cumulative_stats_metabat2.txt"),
+        cumulative_metawrap_stats   = join(top_refine_dir, "cumulative_stats_metawrap.txt"),
     params:
         bin_dir                     = top_binning_dir
     shell:

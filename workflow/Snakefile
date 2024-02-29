@@ -87,6 +87,10 @@ rule all:
         # bin refinement
         # ~~~~~~~~~~~~~~~
         expand(join(top_refine_dir, "{name}", "dereplicated_bins"), name=samples),
+        join(top_refine_dir, "RefinedBins_summmary.txt"),
+        join(top_refine_dir, "cumulative_stats_maxbin.txt"),
+        join(top_refine_dir, "cumulative_stats_metabat2.txt"),
+        join(top_refine_dir, "cumulative_stats_metawrap.txt"),
         #################
         #  RNA outputs  #
         #################
