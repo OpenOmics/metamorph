@@ -24,6 +24,7 @@ top_trim_dir               = join(workpath, config['project']['id'], "trimmed_re
 top_assembly_dir           = join(workpath, config['project']['id'], "metawrap_assembly")
 top_tax_dir                = join(workpath, config['project']['id'], "metawrap_kmer")
 top_binning_dir            = join(workpath, config['project']['id'], "metawrap_binning")
+top_refine_dir             = join(workpath, config['project']['id'], "metawrap_bin_refinement")
 
 # workflow flags
 metawrap_container         = config["containers"]["metawrap"]
@@ -280,11 +281,11 @@ rule metawrap_tax_classification:
         kraken2_asm                 = expand(join(top_tax_dir, "{name}", "final_assembly.kraken2"), name=samples),
         krona_asm                   = expand(join(top_tax_dir, "{name}", "final_assembly.krona"), name=samples),
         kronagram                   = expand(join(top_tax_dir, "{name}", "kronagram.html"), name=samples),
-        reads                       = lambda _, output, input: ' '.join([input.R1, input.R2]),
     params:
         tax_dir                     = expand(join(top_tax_dir, "{name}"), name=samples),
         rname                       = "metawrap_tax_classification",
         tax_subsample               = str(int(1e6)),
+        reads                       = lambda _, output, input: ' '.join([input.R1, input.R2]),
     singularity: metawrap_container,
     threads: int(cluster["metawrap_tax_classification"].get("threads", default_threads)),
     shell:
@@ -421,12 +422,12 @@ rule bin_stats:
         named_stats_metabat2        = join(top_refine_dir, "{name}", "named_metabat2_bins.stats"),
         named_stats_metawrap        = join(top_refine_dir, "{name}", "named_metawrap_bins.stats"),
     params:
-        sid                         = "{name}"
+        sid                         = "{name}",
         this_bin_dir                = join(top_refine_dir, "{name}"),
         # count number of fasta files in the bin folders to get count of bins
-        metabat2_num_bins           = lambda wc, _out, _in: str(len([fn for fn in os.listdir(_in.metabat2_bins) if "unbinned" not in fn.lower()]))
-        maxbin_num_bins             = lambda wc, _out, _in: str(len([fn for fn in os.listdir(_in.maxbin_bins) if "unbinned" not in fn.lower()]))
-        metawrap_num_bins           = lambda wc, _out, _in: str(len([fn for fn in os.listdir(_in.metawrap_bins) if "unbinned" not in fn.lower()]))
+        metabat2_num_bins           = lambda wc, _out, _in: str(len([fn for fn in os.listdir(_in.metabat2_bins) if "unbinned" not in fn.lower()])),
+        maxbin_num_bins             = lambda wc, _out, _in: str(len([fn for fn in os.listdir(_in.maxbin_bins) if "unbinned" not in fn.lower()])),
+        metawrap_num_bins           = lambda wc, _out, _in: str(len([fn for fn in os.listdir(_in.metawrap_bins) if "unbinned" not in fn.lower()])),
     shell:
         """
         # count cumulative lines starting with `>`
