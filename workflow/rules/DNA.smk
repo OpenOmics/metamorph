@@ -230,8 +230,8 @@ rule metawrap_genome_assembly:
     params:
         rname                       = "metawrap_genome_assembly",
         memlimit                    = mem2int(cluster["metawrap_genome_assembly"].get('mem', default_memory)),
-        mh_dir                      = join(top_assembly_dir, "{name}", "megahit")
-        assembly_dir                = join(top_assembly_dir, "{name}")
+        mh_dir                      = join(top_assembly_dir, "{name}", "megahit"),
+        assembly_dir                = join(top_assembly_dir, "{name}"),
         contig_min_len              = "1000",
     threads: int(cluster["metawrap_genome_assembly"].get('threads', default_threads)),
     shell:
@@ -239,8 +239,8 @@ rule metawrap_genome_assembly:
             # remove empty directories by snakemake, to prevent metawrap error
             rm -rf {params.mh_dir:q}
             # link to the file names metawrap expects
-            ln -s {input.R1} {output.assembly_R1}
-            ln -s {input.R2} {output.assembly_R2}
+            ln -s {input.R1_trimmed} {output.assembly_R1}
+            ln -s {input.R2_trimmed} {output.assembly_R2}
             # run genome assembler
             mw assembly \
             --megahit \
@@ -285,7 +285,7 @@ rule metawrap_tax_classification:
         tax_dir                     = join(top_tax_dir, "{name}"),
         rname                       = "metawrap_tax_classification",
         tax_subsample               = str(int(1e6)),
-        reads                       = lambda _, output, input: ' '.join([input.R1, input.R2]),
+        reads                       = lambda _, output, input: ' '.join([input.r1, input.r2]),
     singularity: metawrap_container,
     threads: int(cluster["metawrap_tax_classification"].get("threads", default_threads)),
     shell:
