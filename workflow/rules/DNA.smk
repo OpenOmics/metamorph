@@ -362,6 +362,7 @@ rule metawrap_binning:
         metabat2_stats              = join(top_binning_dir, "{name}", "metabat2_bins.stats"),
         metawrap_contigs            = join(top_binning_dir, "{name}", "metawrap_50_5_bins.contigs"),
         metawrap_stats              = join(top_binning_dir, "{name}", "metawrap_50_5_bins.stats"),
+        bin_breadcrumb              = join(top_binning_dir, "{name}", "{name}_BINNING_COMPLETE"),
         bin_figure                  = join(top_binning_dir, "{name}", "figures", "binning_results.png"),
     params:
         rname                       = "metawrap_binning",
@@ -500,22 +501,15 @@ rule derep_bins:
 
     """
     input:
-        maxbin_contigs              = join(top_binning_dir, "{name}", "maxbin2_bins.contigs"),
-        maxbin_stats                = join(top_binning_dir, "{name}", "maxbin2_bins.stats"),
-        metabat2_contigs            = join(top_binning_dir, "{name}", "metabat2_bins.contigs"),
-        metabat2_stats              = join(top_binning_dir, "{name}", "metabat2_bins.stats"),
-        metawrap_contigs            = join(top_binning_dir, "{name}", "metawrap_50_5_bins.contigs"),
-        metawrap_stats              = join(top_binning_dir, "{name}", "metawrap_50_5_bins.stats"),
+        bin_breadcrumb              = join(top_binning_dir, "{name}", "{name}_BINNING_COMPLETE"),
     output:
         dereplicated_bins           = directory(join(top_refine_dir, "{name}", "dereplicated_bins")),
     singularity: metawrap_container,
     threads: int(cluster["derep_bins"].get("threads", default_threads)),
     params:
         rname                       = "derep_bins",
-        sid                         = "{name}",
-        maxbin_bins                 = join(top_binning_dir, "{name}", "maxbin2_bins"),
-        metabat2_bins               = join(top_binning_dir, "{name}", "metabat2_bins"),
         metawrap_bins               = join(top_binning_dir, "{name}", "metawrap_50_5_bins"),
+        sid                         = "{name}",
         # -l LENGTH: Minimum genome length (default: 50000)
         minimum_genome_length = "1000",
         # -pa[--P_ani] P_ANI: ANI threshold to form primary (MASH) clusters (default: 0.9)
