@@ -442,6 +442,24 @@ rule bin_stats:
 		cat {input.metawrap_stats} | sed 's/^bin./{name}_bin./g' > {output.named_stats_metawrap}
         """
 
+rule contig_annotation:
+    shell:
+        """
+        CAT bins \
+            -b $(ANALYSIS)/METAWRAP_dereplicated_bins/dereplicated_genomes 
+            -d /data/NCBR/projects/NCBR-173/ref/CAT_prepare_20210107/2021-01-07_CAT_database 
+            -t /data/NCBR/projects/NCBR-173/ref/CAT_prepare_20210107/2021-01-07_taxonomy 
+            --path_to_diamond /data/NCBR/projects/NCBR-173/ref/CAT_prepare_20210107/Diamond_2.0.6/diamond 
+            --bin_suffix .fa -n 16 --force 
+        CAT add_names \
+        -i ./out.BAT.bin2classification.txt -o out.BAT.bin2classification.official_names.txt \
+        -t /data/NCBR/projects/NCBR-173/ref/CAT_prepare_20210107/2021-01-07_taxonomy \
+        --only_official
+        CAT summarise \
+            -i out.BAT.bin2classification.official_names.txt \
+            -o out.BAT.bin2classification.summary.txt
+        """
+
 
 rule cumulative_bin_stats:
     input:
