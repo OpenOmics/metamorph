@@ -86,7 +86,7 @@ rule all:
         expand(join(workpath, config['project']['id'], "metawrap_binning", "{name}", "figures", "binning_results.png"), name=samples),
         # bin refinement
         # ~~~~~~~~~~~~~~~
-        expand(join(top_refine_dir, "{name}", "dereplicated_bins"), name=samples),
+        expand(join(top_refine_dir, "{name}", "{name}_dREP_COMPLETE"), name=samples),
         join(top_refine_dir, "RefinedBins_summmary.txt"),
         join(top_refine_dir, "cumulative_stats_maxbin.txt"),
         join(top_refine_dir, "cumulative_stats_metabat2.txt"),

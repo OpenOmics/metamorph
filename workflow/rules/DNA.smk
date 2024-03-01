@@ -504,6 +504,7 @@ rule derep_bins:
         bin_breadcrumb              = join(top_binning_dir, "{name}", "{name}_BINNING_COMPLETE"),
     output:
         dereplicated_bins           = directory(join(top_refine_dir, "{name}", "dereplicated_bins")),
+        deprep_bc                   = join(top_refine_dir, "{name}", "{name}_dREP_COMPLETE"),
     singularity: metawrap_container,
     threads: int(cluster["derep_bins"].get("threads", default_threads)),
     params:
@@ -532,4 +533,5 @@ rule derep_bins:
         -nc {params.min_overlap} \
         -cm {params.coverage_method} \
         {output.dereplicated_bins}
+        touch {output.deprep_bc}
         """
