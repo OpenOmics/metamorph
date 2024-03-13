@@ -18,6 +18,8 @@ RUN cd /install; wget https://github.com/hyattpd/Prodigal/archive/refs/tags/v2.6
 RUN cd /install/Prodigal-2.6.3; make install INSTALLDIR=/usr/bin
 RUN cd /install; wget https://github.com/bbuchfink/diamond/archive/refs/tags/v2.1.9.tar.gz; tar xvf v2.1.9.tar.gz
 RUN cd /install/diamond-2.1.9; mkdir bin; cd bin; cmake ..; make -j4; ln -s /install/diamond-2.1.9/bin/diamond /usr/bin/diamond
+RUN cd /install; mkdir mash; cd mash; wget https://github.com/marbl/Mash/releases/download/v2.3/mash-Linux64-v2.3.tar; tar xvf mash-Linux64-v2.3.tar
+RUN cd /install; mkdir mummer; cd mummer;wget https://github.com/mummer4/mummer/releases/download/v4.0.0rc1/mummer-4.0.0rc1.tar.gz; tar xvf mummer-4.0.0rc1.tar.gz
 COPY docker/metawrap/config-metawrap /home/metaWRAP/bin/config-metawrap
 COPY docker/metawrap/Dockerfile /Dockerfile
 RUN md5sum Dockerfile > /Dockerfile.md5
