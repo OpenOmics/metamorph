@@ -9,7 +9,6 @@ RUN conda config --add channels defaults; conda config --add channels conda-forg
 RUN mamba install -y --only-deps -c ursky -n metawrap-env metawrap-mg==1.3.2
 RUN cd /home; git clone https://github.com/rroutsong/metaWRAP.git; chmod -R 777 metaWRAP
 RUN mamba run -n metawrap-env pip3 install drep
-ENV PATH="/home/metaWRAP/bin:/opt/conda/envs/metawrap-env/bin:$PATH"
 RUN mkdir /install; cd /install; wget https://carlowood.github.io/which/which-2.21.tar.gz; tar xvf which-2.21.tar.gz
 RUN cd /install/which-2.21; ./configure; make && make install
 RUN rm /usr/bin/which; ln -s /usr/local/bin/which /usr/bin/which
@@ -18,8 +17,12 @@ RUN cd /install; wget https://github.com/hyattpd/Prodigal/archive/refs/tags/v2.6
 RUN cd /install/Prodigal-2.6.3; make install INSTALLDIR=/usr/bin
 RUN cd /install; wget https://github.com/bbuchfink/diamond/archive/refs/tags/v2.1.9.tar.gz; tar xvf v2.1.9.tar.gz
 RUN cd /install/diamond-2.1.9; mkdir bin; cd bin; cmake ..; make -j4; ln -s /install/diamond-2.1.9/bin/diamond /usr/bin/diamond
+RUN cd /home; wget https://sourceforge.net/projects/bbmap/files/BBMap_39.06.tar.gz; tar xvf BBMap_39.06.tar.gz 
+ENV PATH="/home/metaWRAP/bin:/opt/conda/envs/metawrap-env/bin:/home/bbmap:$PATH"
 RUN cd /install; mkdir mash; cd mash; wget https://github.com/marbl/Mash/releases/download/v2.3/mash-Linux64-v2.3.tar; tar xvf mash-Linux64-v2.3.tar
-RUN cd /install; mkdir mummer; cd mummer;wget https://github.com/mummer4/mummer/releases/download/v4.0.0rc1/mummer-4.0.0rc1.tar.gz; tar xvf mummer-4.0.0rc1.tar.gz
+RUN ln -s /install/mash/mash-Linux64-v2.3/mash /usr/bin/mash
+RUN cd /install; mkdir mummer; cd mummer; wget https://github.com/mummer4/mummer/releases/download/v4.0.0rc1/mummer-4.0.0rc1.tar.gz; tar xvf mummer-4.0.0rc1.tar.gz
+RUN cd /install/mummer/mummer-4.0.0rc1; ./configure --prefix=/usr; make && make install
 COPY docker/metawrap/config-metawrap /home/metaWRAP/bin/config-metawrap
 COPY docker/metawrap/Dockerfile /Dockerfile
 RUN md5sum Dockerfile > /Dockerfile.md5
