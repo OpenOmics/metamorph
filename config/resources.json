@@ -33,7 +33,7 @@
         }, {
             "name": "NCBI_TAX",
             "to": "/data2/NCBI_TAX_DB",
-            "from": "/data/OpenOmics/references/metamorph/taxonomy",
+            "from": "/data/OpenOmics/references/metamorph/NCBI_tax",
             "mode": "rw"
         }, {
             "name": "CHECKM_DB",
@@ -41,9 +41,24 @@
             "from": "/data/OpenOmics/references/metamorph/checkm",
             "mode": "rw"
         },  {
-            "name": "CHECKM_CONFIG",
+            "name": "CHECKM_CONFIG3.9",
+            "to": "/opt/conda/envs/checkm/lib/python3.9/site-packages/checkm/DATA_CONFIG",
+            "from": "/data/OpenOmics/references/metamorph/checkm/DATA_CONFIG",
+            "mode": "rw"
+        }, {
+            "name": "CHECKM_CONFIG2.7",
             "to": "/opt/conda/envs/metawrap-env/lib/python2.7/site-packages/checkm/DATA_CONFIG",
             "from": "/data/OpenOmics/references/metamorph/checkm/DATA_CONFIG",
+            "mode": "rw"
+        }, {
+            "name": "CAT_db",
+            "to": "/data2/CAT",
+            "from": "/vf/users/OpenOmics/references/metamorph/CAT_pack_prepare/cat_db/db",
+            "mode": "rw"
+        }, {
+            "name": "CAT_tax",
+            "to": "/data2/CAT_tax",
+            "from": "/vf/users/OpenOmics/references/metamorph/CAT_pack_prepare/cat_db/db",
             "mode": "rw"
         }
     ]
