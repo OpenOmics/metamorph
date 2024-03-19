@@ -9,7 +9,7 @@ RUN conda config --add channels defaults; conda config --add channels conda-forg
 RUN mamba install -y --only-deps -c ursky -n metawrap-env metawrap-mg==1.3.2
 RUN cd /home; git clone https://github.com/rroutsong/metaWRAP.git; chmod -R 777 metaWRAP
 RUN mamba create -n checkm python=3.9
-RUN mamba install -n checkm -c bioconda numpy matplotlib pysam hmmer prodigal pplacer fastani
+RUN mamba install -n checkm -c bioconda numpy matplotlib pysam hmmer prodigal pplacer fastani samtools bowtie2
 RUN mamba run -n checkm pip3 install checkm-genome drep
 RUN mkdir /install; cd /install; wget https://carlowood.github.io/which/which-2.21.tar.gz; tar xvf which-2.21.tar.gz
 RUN cd /install/which-2.21; ./configure; make && make install
