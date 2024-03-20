@@ -54,7 +54,26 @@
     }, 
     "derep_bins": {
         "threads": 32,
+        "mem": "64G",
+        "partition": "norm",
+        "time": "2-00:00:00",
+        "gres": "lscratch:400"
+    },
+    "contig_annotation": {
+        "threads": 32,
         "mem": "32G",
+        "partition": "norm",
+        "time": "2-00:00:00"
+    },
+    "bbtools_index_map": {
+        "threads": 48,
+        "mem": "64G",
+        "partition": "norm",
+        "time": "2-00:00:00"
+    }, 
+    "map_dna_to_mags": {
+        "threads": 16,
+        "mem": "64G",
         "partition": "norm",
         "time": "2-00:00:00"
     }
