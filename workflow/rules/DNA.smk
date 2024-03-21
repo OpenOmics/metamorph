@@ -24,7 +24,9 @@ top_trim_dir               = join(workpath, config['project']['id'], "trimmed_re
 top_assembly_dir           = join(workpath, config['project']['id'], "metawrap_assembly")
 top_tax_dir                = join(workpath, config['project']['id'], "metawrap_kmer")
 top_binning_dir            = join(workpath, config['project']['id'], "metawrap_binning")
-top_refine_dir             = join(workpath, config['project']['id'], "metawrap_bin_refinement")
+top_refine_dir             = join(workpath, config['project']['id'], "metawrap_bin_refine")
+top_mags_dir               = join(workpath, config['project']['id'], "mags")
+top_mapping_dir            = join(workpath, config['project']['id'], "mapping")
 
 # workflow flags
 metawrap_container         = config["containers"]["metawrap"]
@@ -207,8 +209,8 @@ rule metawrap_genome_assembly:
             Ensemble assembled contigs and reports
     """
     input:
-        R1_trimmed                  = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq"),
-        R2_trimmed                  = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq"),
+        R1                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq"),
+        R2                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq"),
     output:
         # megahit outputs
         megahit_assembly            = join(top_assembly_dir, "{name}", "megahit", "final.contigs.fa"),
@@ -219,8 +221,7 @@ rule metawrap_genome_assembly:
         metaspades_graph            = join(top_assembly_dir, "{name}", "metaspades", "assembly_graph.fastg"),
         metaspades_longscaffolds    = join(top_assembly_dir, "{name}", "metaspades", "long_scaffolds.fasta"),
         metaspades_scaffolds        = join(top_assembly_dir, "{name}", "metaspades", "scaffolds.fasta"),
-        metaspades_cor_readsr1      = join(top_assembly_dir, "{name}", "metaspades", "corrected", "{name}_1.00.0_0.cor.fastq.gz"),
-        metaspades_cor_readsr2      = join(top_assembly_dir, "{name}", "metaspades", "corrected", "{name}_2.00.0_0.cor.fastq.gz"),
+        metaspades_cor_reads        = directory(join(top_assembly_dir, "{name}", "metaspades", "corrected")),
         # ensemble outputs
         final_assembly              = join(top_assembly_dir, "{name}", "final_assembly.fasta"),
         final_assembly_report       = join(top_assembly_dir, "{name}", "assembly_report.html"),
@@ -239,8 +240,8 @@ rule metawrap_genome_assembly:
             # remove empty directories by snakemake, to prevent metawrap error
             rm -rf {params.mh_dir:q}
             # link to the file names metawrap expects
-            ln -s {input.R1_trimmed} {output.assembly_R1}
-            ln -s {input.R2_trimmed} {output.assembly_R2}
+            ln -s {input.R1} {output.assembly_R1}
+            ln -s {input.R2} {output.assembly_R2}
             # run genome assembler
             mw assembly \
             --megahit \
@@ -273,8 +274,8 @@ rule metawrap_tax_classification:
 
     """
     input:
-        r1                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq"), 
-        r2                          = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq"),
+        R1                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq"), 
+        R2                          = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq"),
         final_assembly              = join(top_assembly_dir, "{name}", "final_assembly.fasta"),
     output:
         krak2_asm                   = join(top_tax_dir, "{name}", "final_assembly.krak2"),
@@ -282,10 +283,10 @@ rule metawrap_tax_classification:
         krona_asm                   = join(top_tax_dir, "{name}", "final_assembly.krona"),
         kronagram                   = join(top_tax_dir, "{name}", "kronagram.html"),
     params:
+        reads                       = lambda _, output, input: ' '.join([input.R1, input.R2]),
         tax_dir                     = join(top_tax_dir, "{name}"),
         rname                       = "metawrap_tax_classification",
         tax_subsample               = str(int(1e6)),
-        reads                       = lambda _, output, input: ' '.join([input.r1, input.r2]),
     singularity: metawrap_container,
     threads: int(cluster["metawrap_tax_classification"].get("threads", default_threads)),
     shell:
@@ -379,6 +380,7 @@ rule metawrap_binning:
     shell:
         """
         # set checkm data
+        checkm data setRoot /data2/CHECKM_DB
         export CHECKM_DATA_PATH="/data2/CHECKM_DB"
 
         # make base dir if not exists
@@ -426,9 +428,9 @@ rule bin_stats:
         sid                         = "{name}",
         this_bin_dir                = join(top_refine_dir, "{name}"),
         # count number of fasta files in the bin folders to get count of bins
-        metabat2_num_bins           = lambda _, output, input: str(len([fn for fn in os.listdir(input.metabat2_bins) if "unbinned" not in fn.lower()])),
-        maxbin_num_bins             = lambda _, output, input: str(len([fn for fn in os.listdir(input.maxbin_bins) if "unbinned" not in fn.lower()])),
-        metawrap_num_bins           = lambda _, output, input: str(len([fn for fn in os.listdir(input.metawrap_bins) if "unbinned" not in fn.lower()])),
+        metabat2_num_bins           = lambda wc, _out, _in: str(len([fn for fn in os.listdir(_in.metabat2_bins) if "unbinned" not in fn.lower()])),
+        maxbin_num_bins             = lambda wc, _out, _in: str(len([fn for fn in os.listdir(_in.maxbin_bins) if "unbinned" not in fn.lower()])),
+        metawrap_num_bins           = lambda wc, _out, _in: str(len([fn for fn in os.listdir(_in.metawrap_bins) if "unbinned" not in fn.lower()])),
     shell:
         """
         # count cumulative lines starting with `>`
@@ -498,33 +500,44 @@ rule derep_bins:
 
         @Output:
             directory of consensus ensemble bins (deterministic output)
-
     """
     input:
         bin_breadcrumb              = join(top_binning_dir, "{name}", "{name}_BINNING_COMPLETE"),
     output:
-        dereplicated_bins           = directory(join(top_refine_dir, "{name}", "dereplicated_bins")),
-        deprep_bc                   = join(top_refine_dir, "{name}", "{name}_dREP_COMPLETE"),
+        derep_genome_info           = join(top_refine_dir, "{name}", "dRep", "data_tables", "Widb.csv"),
+        derep_winning_figure        = join(top_refine_dir, "{name}", "dRep", "figures", "Winning_genomes.pdf"),
+        derep_args                  = join(top_refine_dir, "{name}", "dRep", "log", "cluster_arguments.json"),
     singularity: metawrap_container,
     threads: int(cluster["derep_bins"].get("threads", default_threads)),
     params:
         rname                       = "derep_bins",
-        metawrap_bins               = join(top_binning_dir, "{name}", "metawrap_50_5_bins"),
         sid                         = "{name}",
+        tmpdir                      = config['options']['tmp_dir'],
+        derep_dir                   = join(top_refine_dir, "{name}", "dRep"),
+        metawrap_bins               = join(top_binning_dir, "{name}", "metawrap_50_5_bins"),
         # -l LENGTH: Minimum genome length (default: 50000)
-        minimum_genome_length = "1000",
+        minimum_genome_length       = "1000",
         # -pa[--P_ani] P_ANI: ANI threshold to form primary (MASH) clusters (default: 0.9)
-        ani_primary_threshold = "0.9",
+        ani_primary_threshold       = "0.9",
         # -sa[--S_ani] S_ANI: ANI threshold to form secondary clusters (default: 0.95)
-        ani_secondary_threshold = "0.95",
+        ani_secondary_threshold     = "0.95",
         # -nc[--cov_thresh] COV_THRESH: Minmum level of overlap between genomes when doing secondary comparisons (default: 0.1)
-        min_overlap = "0.1",
+        min_overlap                 = "0.1",
         # -cm[--coverage_method] {total,larger}  {total,larger}: Method to calculate coverage of an alignment
-        coverage_method = 'larger',
+        coverage_method             = 'larger'
     shell:
         """
-        mkdir -p {output.dereplicated_bins}
-        dRep dereplicate \
+        # tmp directory creation and destruction
+        if [ ! -d "{params.tmpdir}" ]; then mkdir -p "{params.tmpdir}"; fi
+        tmp=$(mktemp -d -p "{params.tmpdir}")
+        export TMPDIR=${{tmp}}
+        trap 'rm -rf "${{tmp}}"' EXIT
+
+        # checkm & dRep need py3+, metawrap is py2.7
+        . /opt/conda/etc/profile.d/conda.sh && conda activate checkm
+
+        mkdir -p {params.derep_dir}
+        dRep dereplicate -d \
         -g $(ls {params.metawrap_bins}/* | tr '\\n' ' ') \
         -p {threads} \
         -l {params.minimum_genome_length} \
@@ -532,6 +545,137 @@ rule derep_bins:
         -sa {params.ani_secondary_threshold} \
         -nc {params.min_overlap} \
         -cm {params.coverage_method} \
-        {output.dereplicated_bins}
-        touch {output.deprep_bc}
+        {params.derep_dir}
         """
+
+
+rule contig_annotation:
+    input:
+        derep_genome_info           = join(top_refine_dir, "{name}", "dRep", "data_tables", "Widb.csv"),
+        derep_winning_figure        = join(top_refine_dir, "{name}", "dRep", "figures", "Winning_genomes.pdf"),
+        derep_args                  = join(top_refine_dir, "{name}", "dRep", "log", "cluster_arguments.json"),
+    output:
+        cat_bin2cls_filename        = join(top_refine_dir, "{name}", "contig_annotation", "out.BAT.bin2classification.txt"),
+        cat_bing2cls_official       = join(top_refine_dir, "{name}", "contig_annotation", "out.BAT.bin2classification.official_names.txt"),
+        cat_bing2cls_summary        = join(top_refine_dir, "{name}", "contig_annotation", "out.BAT.bin2classification.summary.txt"),
+    params:
+        cat_dir                     = join(top_refine_dir, "{name}", "contig_annotation"),
+        dRep_dir                    = join(top_refine_dir, "{name}", "dRep", "dereplicated_genomes"),
+        rname                       = "contig_annotation",
+        sid                         = "{name}",
+        cat_db                      = "/data2/CAT", # from <root>/config/images.json
+        tax_db                      = "/data2/NCBI_TAX_DB", # from <root>/config/images.json
+        diamond_exec                = "/usr/bin/diamond",
+    threads: int(cluster["contig_annotation"].get("threads", default_threads)),
+    singularity: metawrap_container,
+    shell:
+        """
+        if [ ! -d "{params.cat_dir}" ]; then mkdir -p "{params.cat_dir}"; fi
+        cd {params.cat_dir} && CAT bins \
+            -b {params.dRep_dir} \
+            -d {params.cat_db} \
+            -t {params.tax_db} \
+            --path_to_diamond {params.diamond_exec} \
+            --bin_suffix .fa \
+            -n {threads} \
+            --force
+        cd {params.cat_dir} && CAT add_names \
+            -i {output.cat_bin2cls_filename} \
+            -o {output.cat_bing2cls_official} \
+            -t {params.tax_db} \
+            --only_official
+        cd {params.cat_dir} && CAT summarise \
+            -i {output.cat_bing2cls_official} \
+            -o {output.cat_bing2cls_summary}
+        """
+
+    
+rule bbtools_index_map:
+    input:
+        derep_genome_info           = join(top_refine_dir, "{name}", "dRep", "data_tables", "Widb.csv"),
+        derep_winning_figure        = join(top_refine_dir, "{name}", "dRep", "figures", "Winning_genomes.pdf"),
+        derep_args                  = join(top_refine_dir, "{name}", "dRep", "log", "cluster_arguments.json"),
+        cat_bin2cls_filename        = join(top_refine_dir, "{name}", "contig_annotation", "out.BAT.bin2classification.txt"),
+        cat_bing2cls_official       = join(top_refine_dir, "{name}", "contig_annotation", "out.BAT.bin2classification.official_names.txt"),
+        cat_bing2cls_summary        = join(top_refine_dir, "{name}", "contig_annotation", "out.BAT.bin2classification.summary.txt"),
+        R1                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq"),
+        R2                          = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq"),
+    output:
+        index                       = directory(join(top_mags_dir, "{name}", "index")),
+        statsfile                   = join(top_mags_dir, "{name}", "DNA", "{name}.statsfile"),
+        scafstats                   = join(top_mags_dir, "{name}", "DNA", "{name}.scafstats"),
+        covstats                    = join(top_mags_dir, "{name}", "DNA", "{name}.covstat"),
+        rpkm                        = join(top_mags_dir, "{name}", "DNA", "{name}.rpkm"),
+        refstats                    = join(top_mags_dir, "{name}", "DNA", "{name}.refstats"),
+    params:
+        rname                       = "bbtools_index_map",
+        sid                         = "{name}",
+        this_mag_dir                = join(top_mags_dir, "{name}"),
+        dRep_dir                    = join(top_refine_dir, "{name}", "dRep", "dereplicated_genomes"),
+    singularity: metawrap_container,
+    threads: int(cluster["bbtools_index_map"].get("threads", default_threads)),
+    shell:
+        """
+	    cd {params.this_mag_dir} && bbsplit.sh -Xmx100g threads={threads} ref={params.dRep_dir}
+        mkdir -p {params.this_mag_dir}/DNA
+        bbsplit.sh \
+            -Xmx100g \
+            unpigz=t \
+            threads={threads} \
+            minid=0.90 \
+            path={params.this_mag_dir}/index \
+            ref={params.dRep_dir} \
+            sortscafs=f \
+            nzo=f \
+            statsfile={params.this_mag_dir}/DNA/{params.sid}.statsfile \
+            scafstats={params.this_mag_dir}/DNA/{params.sid}.scafstats \
+            covstats={params.this_mag_dir}/DNA/{params.sid}.covstat \
+            rpkm={params.this_mag_dir}/DNA/{params.sid}.rpkm \
+            refstats={params.this_mag_dir}/DNA/{params.sid}.refstats \
+            in={input.R1} \
+            in2={input.R2}
+        """
+
+# mapping DNA to MAGs with bowtie2
+# rule map_dna_to_mags:
+#     input:
+#         R1                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq"),
+#         R2                          = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq"),
+#         derep_genome_info           = join(top_refine_dir, "{name}", "dRep", "data_tables", "Widb.csv"),
+#         derep_winning_figure        = join(top_refine_dir, "{name}", "dRep", "figures", "Winning_genomes.pdf"),
+#         derep_args                  = join(top_refine_dir, "{name}", "dRep", "log", "cluster_arguments.json"),
+#     output:
+#         coverages                   = join(top_mapping_dir, "{name}", ".mags_mapped"),
+#     params:
+#         rname                       = "map_dna_to_mags",
+#         sid                         = "{name}",
+#         dRep_dir                    = join(top_refine_dir, "{name}", "dRep", "dereplicated_genomes"),
+#         this_map_dir                = join(top_mapping_dir, "{name}"),
+#         bowtie_indexes              = join(top_mapping_dir, "{name}", "bowtie2-Asm-indices"),
+#     threads: int(cluster["map_dna_to_mags"].get("threads", default_threads)),
+#     singularity: metawrap_container,
+#     shell:
+#         """
+#         # activate bowtie2 and samtools environment
+#         . /opt/conda/etc/profile.d/conda.sh && conda activate checkm
+#         # make mapping and index dirs
+#         if [ ! -d "{params.bowtie_indexes}" ]; then mkdir -p "{params.bowtie_indexes}"; fi
+
+#         for mag in {params.dRep_dir}/*.fa; do
+#             mag_base=$(basename $mag)
+#             mag_fn="${{mag_base%.*}}"
+#             idx_name="${{mag_fn}}_{params.sid}"
+#             cd {params.bowtie_indexes} && bowtie2-build --seed 42 --threads {threads} $mag $idx_name
+#             cd {params.this_map_dir}
+#             bowtie2 \
+#             -p {threads} \
+#             --very-sensitive-local \
+#             -x {params.bowtie_indexes}/$idx_name \
+#             -1 {input.R1} -2 {input.R2} > "${{idx_name}}.sam"
+#             samtools view -C -@ {threads} -q 30 -T $mag "${{idx_name}}.sam" > "${{idx_name}}_unsorted.cram"
+#             samtools sort -@ {threads} -O CRAM "${{idx_name}}_unsorted.cram" > "${{idx_name}}_sorted.cram"
+#             samtools coverage --reference $mag "${{idx_name}}_sorted.cram" > "{params.this_map_dir}/${{mag_fn}}_coverage.txt"
+#             rm "${{idx_name}}.sam" "${{idx_name}}_unsorted.cram"
+#         done
+#         touch {params.this_map_dir}/.mags_mapped
+#         """
