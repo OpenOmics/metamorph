@@ -15,13 +15,18 @@ tmpdir                     = config["options"]["tmp_dir"]
 coassemble                 = config['coassembly'] is True
 rna_included               = list_bool(config.get("rna", 'false'))
 rna_coasm                  = str_bool(config["options"].get("rnacoa", 'False'))
-rna_sample_stems           = config.get("rna", [])
+rna_sample_stems           = config.get("rna", []) if not rna_coasm else ['concatenated']
 samples                    = config["samples"] if not coassemble else ['concatenated']
+top_assembly_dir           = join(workpath, config['project']['id'], "metawrap_assembly")
 top_readqc_dir             = join(workpath, config['project']['id'], "metawrap_read_qc")
 top_trim_dir               = join(workpath, config['project']['id'], "trimmed_reads")
 top_readqc_dir_rna         = join(workpath, config['project']['id'], "metawrap_read_qc_RNA")
+top_refine_dir             = join(workpath, config['project']['id'], "metawrap_bin_refine")
 top_trim_dir_rna           = join(workpath, config['project']['id'], "trimmed_reads_RNA")
-top_refine_dir             = join(workpath, config['project']['id'], "metawrap_bin_refinement")
+top_tax_dir                = join(workpath, config['project']['id'], "metawrap_kmer")
+top_binning_dir            = join(workpath, config['project']['id'], "metawrap_binning")
+top_mags_dir               = join(workpath, config['project']['id'], "mags")
+top_mapping_dir            = join(workpath, config['project']['id'], "mapping")
 
 
 # Read in resource information, containing information about threads, mem, walltimes, etc.
@@ -29,20 +34,12 @@ top_refine_dir             = join(workpath, config['project']['id'], "metawrap_b
 with open(join(workpath, "config", "cluster.json")) as fh:
     cluster = json.load(fh)
 
-if coassemble:
-    start_r1 = expand(join(workpath, "dna", "{name}_R1.fastq.gz"), name=['concatenated'])
-    start_r2 = expand(join(workpath, "dna", "{name}_R2.fastq.gz"), name=['concatenated'])
-else:
-    start_r1 = expand(join(workpath, "dna", "{name}_R1.fastq.gz"), name=samples)
-    start_r2 = expand(join(workpath, "dna", "{name}_R2.fastq.gz"), name=samples)
+start_r1 = expand(join(workpath, "dna", "{name}_R1.fastq.gz"), name=samples)
+start_r2 = expand(join(workpath, "dna", "{name}_R2.fastq.gz"), name=samples)
 
 if rna_included:
-    if rna_coasm:
-        start_r1_rna = expand(join(workpath, "rna", "{name}_R1.fastq.gz"), name=['concatenated'])
-        start_r2_rna = expand(join(workpath, "rna", "{name}_R2.fastq.gz"), name=['concatenated'])
-    else:
-        start_r1_rna = expand(join(workpath, "rna", "{rname}_R1.fastq.gz"), rname=rna_sample_stems)
-        start_r2_rna = expand(join(workpath, "rna", "{rname}_R2.fastq.gz"), rname=rna_sample_stems)
+    start_r1_rna = expand(join(workpath, "rna", "{rname}_R1.fastq.gz"), rname=rna_sample_stems)
+    start_r2_rna = expand(join(workpath, "rna", "{rname}_R2.fastq.gz"), rname=rna_sample_stems)
 else:
     start_r1_rna, start_r2_rna = [], []
 
@@ -67,30 +64,43 @@ rule all:
         expand(join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq.gz"), name=samples),
         # genome assembly
         # ~~~~~~~~~~~~~~~
-        expand(join(workpath, config['project']['id'], "metawrap_assembly", "{name}", "final_assembly.fasta"), name=samples),
-        expand(join(workpath, config['project']['id'], "metawrap_assembly", "{name}", "assembly_report.html"), name=samples),
+        expand(join(top_assembly_dir, "{name}", "final_assembly.fasta"), name=samples),
+        expand(join(top_assembly_dir, "{name}", "assembly_report.html"), name=samples),
         # taxonomic classification
         # ~~~~~~~~~~~~~~~
-        expand(join(workpath, config['project']['id'], "metawrap_kmer", "{name}", "final_assembly.krona"), name=samples),
-        expand(join(workpath, config['project']['id'], "metawrap_kmer", "{name}", "kronagram.html"), name=samples),
-        expand(join(workpath, config['project']['id'], "metawrap_kmer", "{name}", "final_assembly.krak2"), name=samples),
-        expand(join(workpath, config['project']['id'], "metawrap_kmer", "{name}", "final_assembly.kraken2"), name=samples),
+        expand(join(top_tax_dir, "{name}", "final_assembly.krona"), name=samples),
+        expand(join(top_tax_dir, "{name}", "kronagram.html"), name=samples),
+        expand(join(top_tax_dir, "{name}", "final_assembly.krak2"), name=samples),
+        expand(join(top_tax_dir, "{name}", "final_assembly.kraken2"), name=samples),
         # assembly binning
         # ~~~~~~~~~~~~~~~
-        expand(join(workpath, config['project']['id'], "metawrap_binning", "{name}", "maxbin2_bins.contigs"), name=samples),
-        expand(join(workpath, config['project']['id'], "metawrap_binning", "{name}", "maxbin2_bins.stats"), name=samples),
-        expand(join(workpath, config['project']['id'], "metawrap_binning", "{name}", "metabat2_bins.contigs"), name=samples),
-        expand(join(workpath, config['project']['id'], "metawrap_binning", "{name}", "metabat2_bins.stats"), name=samples),
-        expand(join(workpath, config['project']['id'], "metawrap_binning", "{name}", "metawrap_50_5_bins.contigs"), name=samples),
-        expand(join(workpath, config['project']['id'], "metawrap_binning", "{name}", "metawrap_50_5_bins.stats"), name=samples),
-        expand(join(workpath, config['project']['id'], "metawrap_binning", "{name}", "figures", "binning_results.png"), name=samples),
+        expand(join(top_binning_dir, "{name}", "maxbin2_bins.contigs"), name=samples),
+        expand(join(top_binning_dir, "{name}", "maxbin2_bins.stats"), name=samples),
+        expand(join(top_binning_dir, "{name}", "metabat2_bins.contigs"), name=samples),
+        expand(join(top_binning_dir, "{name}", "metabat2_bins.stats"), name=samples),
+        expand(join(top_binning_dir, "{name}", "metawrap_50_5_bins.contigs"), name=samples),
+        expand(join(top_binning_dir, "{name}", "metawrap_50_5_bins.stats"), name=samples),
+        expand(join(top_binning_dir, "{name}", "figures", "binning_results.png"), name=samples),
         # bin refinement
         # ~~~~~~~~~~~~~~~
-        expand(join(top_refine_dir, "{name}", "{name}_dREP_COMPLETE"), name=samples),
-        join(top_refine_dir, "RefinedBins_summmary.txt"),
-        join(top_refine_dir, "cumulative_stats_maxbin.txt"),
-        join(top_refine_dir, "cumulative_stats_metabat2.txt"),
-        join(top_refine_dir, "cumulative_stats_metawrap.txt"),
+        expand(join(top_refine_dir, "{name}", "dRep", "data_tables", "Widb.csv"), name=samples),
+        expand(join(top_refine_dir, "{name}", "dRep", "figures", "Winning_genomes.pdf"), name=samples),
+        expand(join(top_refine_dir, "{name}", "dRep", "log", "cluster_arguments.json"), name=samples),
+        # contig annotation
+        # ~~~~~~~~~~~~~~~
+        expand(join(top_refine_dir, "{name}", "contig_annotation", "out.BAT.bin2classification.summary.txt"), name=samples),
+        # BBMap mapping to MAGs
+        # ~~~~~~~~~~~~~~~
+        expand(join(top_mags_dir, "{name}", "index"), name=samples),
+        expand(join(top_mags_dir, "{name}", "DNA", "{name}.statsfile"), name=samples),
+        expand(join(top_mags_dir, "{name}", "DNA", "{name}.scafstats"), name=samples),
+        expand(join(top_mags_dir, "{name}", "DNA", "{name}.covstat"), name=samples),
+        expand(join(top_mags_dir, "{name}", "DNA", "{name}.rpkm"), name=samples),
+        expand(join(top_mags_dir, "{name}", "DNA", "{name}.refstats"), name=samples),
+        # Bowtie2 mapping to MAGs
+        # ~~~~~~~~~~~~~~~
+        # expand(join(top_mapping_dir, "{name}", ".mags_mapped"), name=samples),
+
         #################
         #  RNA outputs  #
         #################
