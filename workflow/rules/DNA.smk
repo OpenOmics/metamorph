@@ -24,6 +24,7 @@ top_trim_dir               = join(workpath, config['project']['id'], "trimmed_re
 top_assembly_dir           = join(workpath, config['project']['id'], "metawrap_assembly")
 top_tax_dir                = join(workpath, config['project']['id'], "metawrap_kmer")
 top_binning_dir            = join(workpath, config['project']['id'], "metawrap_binning")
+top_refine_dir             = join(workpath, config['project']['id'], "metawrap_bin_refinement")
 
 # workflow flags
 metawrap_container         = config["containers"]["metawrap"]
@@ -206,31 +207,31 @@ rule metawrap_genome_assembly:
             Ensemble assembled contigs and reports
     """
     input:
-        R1                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq")
-        R2                          = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq")
+        R1_trimmed                  = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq"),
+        R2_trimmed                  = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq"),
     output:
         # megahit outputs
-        megahit_assembly            = expand(join(top_assembly_dir, "{name}", "megahit", "final.contigs.fa"), name=samples),
-        megahit_longcontigs         = expand(join(top_assembly_dir, "{name}", "megahit", "long.contigs.fa"), name=samples),
-        megahit_log                 = expand(join(top_assembly_dir, "{name}", "megahit", "log"), name=samples),
+        megahit_assembly            = join(top_assembly_dir, "{name}", "megahit", "final.contigs.fa"),
+        megahit_longcontigs         = join(top_assembly_dir, "{name}", "megahit", "long.contigs.fa"),
+        megahit_log                 = join(top_assembly_dir, "{name}", "megahit", "log"),
         # metaspades outsputs
-        metaspades_assembly         = expand(join(top_assembly_dir, "{name}", "metaspades", "contigs.fasta"), name=samples),
-        metaspades_graph            = expand(join(top_assembly_dir, "{name}", "metaspades", "assembly_graph.fastg"), name=samples),
-        metaspades_longscaffolds    = expand(join(top_assembly_dir, "{name}", "metaspades", "long_scaffolds.fasta"), name=samples),
-        metaspades_scaffolds        = expand(join(top_assembly_dir, "{name}", "metaspades", "scaffolds.fasta"), name=samples),
-        metaspades_cor_readsr1      = expand(join(top_assembly_dir, "{name}", "metaspades", "corrected", "{name}_1.00.0_0.cor.fastq.gz"), name=samples),
-        metaspades_cor_readsr2      = expand(join(top_assembly_dir, "{name}", "metaspades", "corrected", "{name}_2.00.0_0.cor.fastq.gz"), name=samples),
+        metaspades_assembly         = join(top_assembly_dir, "{name}", "metaspades", "contigs.fasta"),
+        metaspades_graph            = join(top_assembly_dir, "{name}", "metaspades", "assembly_graph.fastg"),
+        metaspades_longscaffolds    = join(top_assembly_dir, "{name}", "metaspades", "long_scaffolds.fasta"),
+        metaspades_scaffolds        = join(top_assembly_dir, "{name}", "metaspades", "scaffolds.fasta"),
+        metaspades_cor_readsr1      = join(top_assembly_dir, "{name}", "metaspades", "corrected", "{name}_1.00.0_0.cor.fastq.gz"),
+        metaspades_cor_readsr2      = join(top_assembly_dir, "{name}", "metaspades", "corrected", "{name}_2.00.0_0.cor.fastq.gz"),
         # ensemble outputs
-        final_assembly              = expand(join(top_assembly_dir, "{name}", "final_assembly.fasta"), name=samples),
-        final_assembly_report       = expand(join(top_assembly_dir, "{name}", "assembly_report.html"), name=samples),
-        assembly_R1                 = expand(join(top_assembly_dir, "{name}", "{name}_1.fastq"), name=samples),
-        assembly_R2                 = expand(join(top_assembly_dir, "{name}", "{name}_2.fastq"), name=samples),
+        final_assembly              = join(top_assembly_dir, "{name}", "final_assembly.fasta"),
+        final_assembly_report       = join(top_assembly_dir, "{name}", "assembly_report.html"),
+        assembly_R1                 = join(top_assembly_dir, "{name}", "{name}_1.fastq"),
+        assembly_R2                 = join(top_assembly_dir, "{name}", "{name}_2.fastq"),
     singularity: metawrap_container,
     params:
         rname                       = "metawrap_genome_assembly",
         memlimit                    = mem2int(cluster["metawrap_genome_assembly"].get('mem', default_memory)),
-        mh_dir                      = expand(join(top_assembly_dir, "{name}", "megahit"), name=samples),
-        assembly_dir                = expand(join(top_assembly_dir, "{name}"), name=samples),
+        mh_dir                      = join(top_assembly_dir, "{name}", "megahit"),
+        assembly_dir                = join(top_assembly_dir, "{name}"),
         contig_min_len              = "1000",
     threads: int(cluster["metawrap_genome_assembly"].get('threads', default_threads)),
     shell:
@@ -238,8 +239,8 @@ rule metawrap_genome_assembly:
             # remove empty directories by snakemake, to prevent metawrap error
             rm -rf {params.mh_dir:q}
             # link to the file names metawrap expects
-            ln -s {input.R1} {output.assembly_R1}
-            ln -s {input.R2} {output.assembly_R2}
+            ln -s {input.R1_trimmed} {output.assembly_R1}
+            ln -s {input.R2_trimmed} {output.assembly_R2}
             # run genome assembler
             mw assembly \
             --megahit \
@@ -276,15 +277,15 @@ rule metawrap_tax_classification:
         r2                          = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq"),
         final_assembly              = join(top_assembly_dir, "{name}", "final_assembly.fasta"),
     output:
-        krak2_asm                   = expand(join(top_tax_dir, "{name}", "final_assembly.krak2"), name=samples),
-        kraken2_asm                 = expand(join(top_tax_dir, "{name}", "final_assembly.kraken2"), name=samples),
-        krona_asm                   = expand(join(top_tax_dir, "{name}", "final_assembly.krona"), name=samples),
-        kronagram                   = expand(join(top_tax_dir, "{name}", "kronagram.html"), name=samples),
-        reads                       = lambda _, output, input: ' '.join([input.R1, input.R2])
+        krak2_asm                   = join(top_tax_dir, "{name}", "final_assembly.krak2"),
+        kraken2_asm                 = join(top_tax_dir, "{name}", "final_assembly.kraken2"),
+        krona_asm                   = join(top_tax_dir, "{name}", "final_assembly.krona"),
+        kronagram                   = join(top_tax_dir, "{name}", "kronagram.html"),
     params:
-        tax_dir                     = expand(join(top_tax_dir, "{name}"), name=samples),
+        tax_dir                     = join(top_tax_dir, "{name}"),
         rname                       = "metawrap_tax_classification",
         tax_subsample               = str(int(1e6)),
+        reads                       = lambda _, output, input: ' '.join([input.r1, input.r2]),
     singularity: metawrap_container,
     threads: int(cluster["metawrap_tax_classification"].get("threads", default_threads)),
     shell:
@@ -361,6 +362,7 @@ rule metawrap_binning:
         metabat2_stats              = join(top_binning_dir, "{name}", "metabat2_bins.stats"),
         metawrap_contigs            = join(top_binning_dir, "{name}", "metawrap_50_5_bins.contigs"),
         metawrap_stats              = join(top_binning_dir, "{name}", "metawrap_50_5_bins.stats"),
+        bin_breadcrumb              = join(top_binning_dir, "{name}", "{name}_BINNING_COMPLETE"),
         bin_figure                  = join(top_binning_dir, "{name}", "figures", "binning_results.png"),
     params:
         rname                       = "metawrap_binning",
@@ -409,9 +411,9 @@ rule metawrap_binning:
 
 rule bin_stats:
     input:
-        maxbin_bins                 = directory(join(top_binning_dir, "{name}", "maxbin2_bins")),
-        metabat2_bins               = directory(join(top_binning_dir, "{name}", "metabat2_bins")),
-        metawrap_bins               = directory(join(top_binning_dir, "{name}", "metawrap_50_5_bins")),
+        maxbin_bins                 = join(top_binning_dir, "{name}", "maxbin2_bins"),
+        metabat2_bins               = join(top_binning_dir, "{name}", "metabat2_bins"),
+        metawrap_bins               = join(top_binning_dir, "{name}", "metawrap_50_5_bins"),
         maxbin_stats                = join(top_binning_dir, "{name}", "maxbin2_bins.stats"),
         metabat2_stats              = join(top_binning_dir, "{name}", "metabat2_bins.stats"),
         metawrap_stats              = join(top_binning_dir, "{name}", "metawrap_50_5_bins.stats"),
@@ -421,12 +423,12 @@ rule bin_stats:
         named_stats_metabat2        = join(top_refine_dir, "{name}", "named_metabat2_bins.stats"),
         named_stats_metawrap        = join(top_refine_dir, "{name}", "named_metawrap_bins.stats"),
     params:
-        sid                         = "{name}"
+        sid                         = "{name}",
         this_bin_dir                = join(top_refine_dir, "{name}"),
         # count number of fasta files in the bin folders to get count of bins
-        metabat2_num_bins           = lambda wc, _out, _in: str(len([fn for fn in os.listdir(_in.metabat2_bins) if "unbinned" not in fn.lower()]))
-        maxbin_num_bins             = lambda wc, _out, _in: str(len([fn for fn in os.listdir(_in.maxbin_bins) if "unbinned" not in fn.lower()]))
-        metawrap_num_bins           = lambda wc, _out, _in: str(len([fn for fn in os.listdir(_in.metawrap_bins) if "unbinned" not in fn.lower()]))
+        metabat2_num_bins           = lambda _, output, input: str(len([fn for fn in os.listdir(input.metabat2_bins) if "unbinned" not in fn.lower()])),
+        maxbin_num_bins             = lambda _, output, input: str(len([fn for fn in os.listdir(input.maxbin_bins) if "unbinned" not in fn.lower()])),
+        metawrap_num_bins           = lambda _, output, input: str(len([fn for fn in os.listdir(input.metawrap_bins) if "unbinned" not in fn.lower()])),
     shell:
         """
         # count cumulative lines starting with `>`
@@ -463,12 +465,15 @@ rule contig_annotation:
 
 rule cumulative_bin_stats:
     input:
-        this_refine_summary         = expand(join(top_binning_dir, "{name}", "RefinedBins_summmary.txt"), name=samples),
+        this_refine_summary         = expand(join(top_refine_dir, "{name}", "RefinedBins_summmary.txt"), name=samples),
+        named_stats_maxbin2         = expand(join(top_refine_dir, "{name}", "named_maxbin2_bins.stats"), name=samples),
+        named_stats_metabat2        = expand(join(top_refine_dir, "{name}", "named_metabat2_bins.stats"), name=samples),
+        named_stats_metawrap        = expand(join(top_refine_dir, "{name}", "named_metawrap_bins.stats"), name=samples),
     output:
-        cumulative_bin_summary      = join(top_refine_dir, "{name}", "RefinedBins_summmary.txt"),
-        cumulative_maxbin_stats     = join(top_refine_dir, "{name}", "cumulative_stats_maxbin.txt"),
-        cumulative_metabat2_stats   = join(top_refine_dir, "{name}", "cumulative_stats_metabat2.txt"),
-        cumulative_metawrap_stats   = join(top_refine_dir, "{name}", "cumulative_stats_metawrap.txt"),
+        cumulative_bin_summary      = join(top_refine_dir, "RefinedBins_summmary.txt"),
+        cumulative_maxbin_stats     = join(top_refine_dir, "cumulative_stats_maxbin.txt"),
+        cumulative_metabat2_stats   = join(top_refine_dir, "cumulative_stats_metabat2.txt"),
+        cumulative_metawrap_stats   = join(top_refine_dir, "cumulative_stats_metawrap.txt"),
     params:
         bin_dir                     = top_binning_dir
     shell:
@@ -514,22 +519,16 @@ rule derep_bins:
 
     """
     input:
-        maxbin_contigs              = join(top_binning_dir, "{name}", "maxbin2_bins.contigs"),
-        maxbin_stats                = join(top_binning_dir, "{name}", "maxbin2_bins.stats"),
-        metabat2_contigs            = join(top_binning_dir, "{name}", "metabat2_bins.contigs"),
-        metabat2_stats              = join(top_binning_dir, "{name}", "metabat2_bins.stats"),
-        metawrap_contigs            = join(top_binning_dir, "{name}", "metawrap_50_5_bins.contigs"),
-        metawrap_stats              = join(top_binning_dir, "{name}", "metawrap_50_5_bins.stats"),
+        bin_breadcrumb              = join(top_binning_dir, "{name}", "{name}_BINNING_COMPLETE"),
     output:
         dereplicated_bins           = directory(join(top_refine_dir, "{name}", "dereplicated_bins")),
+        deprep_bc                   = join(top_refine_dir, "{name}", "{name}_dREP_COMPLETE"),
     singularity: metawrap_container,
     threads: int(cluster["derep_bins"].get("threads", default_threads)),
     params:
         rname                       = "derep_bins",
-        sid                         = "{name}",
-        maxbin_bins                 = join(top_binning_dir, "{name}", "maxbin2_bins"),
-        metabat2_bins               = join(top_binning_dir, "{name}", "metabat2_bins"),
         metawrap_bins               = join(top_binning_dir, "{name}", "metawrap_50_5_bins"),
+        sid                         = "{name}",
         # -l LENGTH: Minimum genome length (default: 50000)
         minimum_genome_length = "1000",
         # -pa[--P_ani] P_ANI: ANI threshold to form primary (MASH) clusters (default: 0.9)
@@ -552,4 +551,5 @@ rule derep_bins:
         -nc {params.min_overlap} \
         -cm {params.coverage_method} \
         {output.dereplicated_bins}
+        touch {output.deprep_bc}
         """

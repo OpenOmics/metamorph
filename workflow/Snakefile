@@ -21,6 +21,7 @@ top_readqc_dir             = join(workpath, config['project']['id'], "metawrap_r
 top_trim_dir               = join(workpath, config['project']['id'], "trimmed_reads")
 top_readqc_dir_rna         = join(workpath, config['project']['id'], "metawrap_read_qc_RNA")
 top_trim_dir_rna           = join(workpath, config['project']['id'], "trimmed_reads_RNA")
+top_refine_dir             = join(workpath, config['project']['id'], "metawrap_bin_refinement")
 
 
 # Read in resource information, containing information about threads, mem, walltimes, etc.
@@ -85,7 +86,11 @@ rule all:
         expand(join(workpath, config['project']['id'], "metawrap_binning", "{name}", "figures", "binning_results.png"), name=samples),
         # bin refinement
         # ~~~~~~~~~~~~~~~
-        expand(join(workpath, config['project']['id'], "metawrap_bin_refine", "{name}", "dereplicated_bins"), name=samples),
+        expand(join(top_refine_dir, "{name}", "{name}_dREP_COMPLETE"), name=samples),
+        join(top_refine_dir, "RefinedBins_summmary.txt"),
+        join(top_refine_dir, "cumulative_stats_maxbin.txt"),
+        join(top_refine_dir, "cumulative_stats_metabat2.txt"),
+        join(top_refine_dir, "cumulative_stats_metawrap.txt"),
         #################
         #  RNA outputs  #
         #################
