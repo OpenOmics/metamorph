@@ -230,7 +230,7 @@ def join_jsons(templates):
         Dictionary containing the contents of all the input JSON files
     """
     # Get absolute PATH to templates in git repo
-    repo_path = os.path.dirname(os.path.abspath(__file__))
+    repo_path = os.path.dirname(os.path.realpath(__file__))
     aggregated = {}
 
     for file in templates:

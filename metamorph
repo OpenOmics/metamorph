@@ -458,7 +458,7 @@ def parsed_arguments(name, description):
     # working directory
     subparser_run.add_argument(
         '--output',
-        type = lambda option: os.path.abspath(os.path.expanduser(option)),
+        type = str,
         required = True,
         help = argparse.SUPPRESS
     )
@@ -633,7 +633,7 @@ def parsed_arguments(name, description):
     # Output Directory (analysis working directory)
     subparser_unlock.add_argument(
         '--output',
-        type = str,
+        type = lambda file: os.path.realpath(permissions(parser, file, os.R_OK)),
         required = True,
         help = argparse.SUPPRESS
     )

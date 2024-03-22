@@ -188,13 +188,13 @@ def setup(sub_args, ifiles, repo_path, output_path):
 
     required = {
         # Base configuration file
-        "base": os.path.join(output_path,'config','config.json'),
+        "base": os.path.join(os.path.dirname(__file__), '..','config','config.json'),
         # Template for project-level information
-        "project": os.path.join(output_path,'config','images.json'),
+        "project": os.path.join(os.path.dirname(__file__), '..','config','images.json'),
         # Check for filesystem resources that need to be mounted to containers.
-        "resources": os.path.join(output_path,'config','resources.json'),
+        "resources": os.path.join(os.path.dirname(__file__), '..','config','resources.json'),
         # Template for tool information
-        "tools": os.path.join(output_path,'config', 'modules.json'),
+        "tools": os.path.join(os.path.dirname(__file__), '..','config', 'modules.json'),
     }
 
     # Create the global or master config 
@@ -688,6 +688,8 @@ def runner(
     if temp not in additional_bind_paths.split(','):
         addpaths.append(temp)
     bindpaths = ','.join(addpaths)
+
+    import ipdb; ipdb.set_trace()
 
     # Set ENV variable 'SINGULARITY_CACHEDIR' 
     # to output directory
