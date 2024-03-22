@@ -689,8 +689,6 @@ def runner(
         addpaths.append(temp)
     bindpaths = ','.join(addpaths)
 
-    import ipdb; ipdb.set_trace()
-
     # Set ENV variable 'SINGULARITY_CACHEDIR' 
     # to output directory
     my_env = {}; my_env.update(os.environ)
