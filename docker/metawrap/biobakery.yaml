@@ -68,7 +68,7 @@ dependencies:
   - h5py=2.10.0
   - harfbuzz=2.4.0
   - hdf5=1.10.5
-  - humann2=2.8.1
+  - humann3=3.0.0
   - icu=64.2
   - idna=2.8
   - ipaddress=1.0.23

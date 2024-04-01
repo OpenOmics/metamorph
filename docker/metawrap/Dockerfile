@@ -5,14 +5,15 @@ RUN ln -sf /usr/share/zoneinfo/America/Costa_Rica /etc/localtime
 RUN apt-get update; apt-get install -y -qq curl build-essential vim dos2unix bash python2.7 cmake zlib1g-dev
 RUN mamba create -y -n metawrap-env
 RUN conda config --add channels defaults; conda config --add channels conda-forge; \
-    conda config --add channels bioconda;conda config --add channels ursky
+    conda config --add channels bioconda; conda config --add channels ursky; \
+    conda config --add channels biobakery
 RUN mamba install -y --only-deps -c ursky -n metawrap-env metawrap-mg==1.3.2
 RUN cd /home; git clone https://github.com/rroutsong/metaWRAP.git; chmod -R 777 metaWRAP
 RUN mamba create -n checkm python=3.9
 RUN mamba install -n checkm -c bioconda numpy matplotlib pysam hmmer prodigal pplacer fastani samtools bowtie2 trnascan-se gunc prokka gtdbtk
 RUN mamba run -n checkm pip3 install checkm-genome drep
-ADD docker/metawrap/biobakery.yaml /install/biobakery.yaml
-RUN mamba env create --file /install/biobakery.yaml
+RUN mamba create -n bb3 python=3.7
+RUN mamba install -n bb3 -c biobakery humann
 RUN mkdir /install; cd /install; wget https://carlowood.github.io/which/which-2.21.tar.gz; tar xvf which-2.21.tar.gz
 RUN cd /install/which-2.21; ./configure; make && make install
 RUN rm /usr/bin/which; ln -s /usr/local/bin/which /usr/bin/which
