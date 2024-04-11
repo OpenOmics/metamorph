@@ -9,10 +9,10 @@ RUN conda config --add channels defaults; conda config --add channels conda-forg
     conda config --add channels biobakery
 RUN mamba install -y --only-deps -c ursky -n metawrap-env metawrap-mg==1.3.2
 RUN cd /home; git clone https://github.com/rroutsong/metaWRAP.git; chmod -R 777 metaWRAP
-RUN mamba create -n checkm python=3.9
-RUN mamba install -n checkm -c bioconda numpy matplotlib pysam hmmer prodigal pplacer fastani samtools bowtie2 trnascan-se gunc prokka gtdbtk
+RUN mamba create -n checkm python=3.8
+RUN mamba install -n checkm -c bioconda numpy matplotlib pysam hmmer prodigal pplacer fastani samtools bowtie2 trnascan-se gunc prokka gtdbtk=2.3.2
 RUN mamba run -n checkm pip3 install checkm-genome drep
-RUN mamba create -n bb3 python=3.7
+RUN mamba create -n bb3 python=3.7 
 RUN mamba install -n bb3 -c biobakery humann
 RUN mkdir /install; cd /install; wget https://carlowood.github.io/which/which-2.21.tar.gz; tar xvf which-2.21.tar.gz
 RUN cd /install/which-2.21; ./configure; make && make install
