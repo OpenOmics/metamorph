@@ -22,6 +22,11 @@
             "mode": "ro"
         }, {
             "name": "GUNC_DB",
+            "to": "/data2/GTDBTK_DB",
+            "from": "/data/OpenOmics/references/metamorph/GTDBtk/release207_v2",
+            "mode": "ro"
+        }, {
+            "name": "GUNC_DB",
             "to": "/data2/GUNC_DB",
             "from": "/data/OpenOmics/references/metamorph/GUNC/gunc_1.0.5db",
             "mode": "ro"
@@ -59,6 +64,31 @@
             "name": "CAT_tax",
             "to": "/data2/CAT_tax",
             "from": "/vf/users/OpenOmics/references/metamorph/CAT_pack_prepare/cat_db/db",
+            "mode": "rw"
+        }, {
+            "name": "humann3_protein_db",
+            "to": "/data2/uniref",
+            "from": "/vf/users/OpenOmics/references/metamorph/uniref",
+            "mode": "rw"
+        }, {
+            "name": "humann3_nuc_db",
+            "to": "/data2/chocophlan",
+            "from": "/vf/users/OpenOmics/references/metamorph/chocophlan",
+            "mode": "rw"
+        }, {
+            "name": "humann3_config",
+            "to": "/opt/conda/envs/bb3/lib/python3.7/site-packages/humann",
+            "from": "/vf/users/OpenOmics/references/metamorph/humann",
+            "mode": "rw"
+        }, {
+            "name": "utility_mapping",
+            "to": "/data2/um",
+            "from": "/vf/users/OpenOmics/references/metamorph/utility_mapping",
+            "mode": "rw"
+        }, {
+            "name": "metaphlan_db",
+            "to": "/data2/metaphlan",
+            "from": "/vf/users/OpenOmics/references/metamorph/metaphlan",
             "mode": "rw"
         }
     ]

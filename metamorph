@@ -43,24 +43,19 @@ EXAMPLES:
     per-sample assembly rna & dna:
         $ metamorph run --input *.R?.fastq.gz --rna rna/*.R?.fastq.gz --output output
 """
-
-# Python standard library
 from __future__ import print_function
-import sys, os, subprocess, re, json, textwrap
 from datetime import timezone, datetime
+import argparse, sys, os, subprocess, json, textwrap
 
-# 3rd party imports from pypi
-import argparse
 
 # Local imports
 from src import version 
-from src.run import init, setup, bind, dryrun, runner
+from src.run import init, setup, bind, dryrun, runner, valid_input
 from src.utils import (
     Colors,
     err,
     exists,
     fatal,
-    permissions,
     check_cache,
     require
 )
@@ -117,7 +112,14 @@ def run(sub_args):
     # snakemake and singularity 
     require(['snakemake', 'singularity'], ['snakemake', 'singularity'])
 
-    # Step 1. Initialize working directory,
+    # Step 1. Parse input sample sheet in down stream
+    # data structures consistent with argparse parser
+    validated, sample_map = valid_input(sub_args.input)
+    delattr(sub_args, 'input')
+    setattr(sub_args, 'input', [row['DNA'] for row in validated])
+    setattr(sub_args, 'rna', [row['RNA'] for row in validated])
+    
+    # Step 2. Initialize working directory,
     # copy over required resources to run 
     # the pipeline
     git_repo = __home__
@@ -133,7 +135,7 @@ def run(sub_args):
         links = fastq_inputs
     )
 
-    # Step 2. Setup pipeline for execution, 
+    # Step 3. Setup pipeline for execution, 
     # dynamically create config.json config
     # file from user inputs and base config
     # templates
@@ -143,7 +145,7 @@ def run(sub_args):
         output_path = sub_args.output
     )
 
-    # Step 3. Resolve docker/singularity bind
+    # Step 4. Resolve docker/singularity bind
     # paths from the config file.
     bindpaths = bind(
         sub_args,
@@ -154,7 +156,7 @@ def run(sub_args):
     # config['coassembly'] = sub_args.coa
     config['coassembly'] = False
 
-    # Step 4. Save config to output directory
+    # Step 5. Save config to output directory
     with open(os.path.join(sub_args.output, 'config.json'), 'w') as fh:
         json.dump(config, fh, indent = 4, sort_keys = True)
 
@@ -184,7 +186,6 @@ def run(sub_args):
 
     mjob = runner(mode = sub_args.mode, 
         outdir = sub_args.output,
-        # additional_bind_paths = all_bind_paths,
         alt_cache = sub_args.singularity_cache,  
         threads = int(sub_args.threads),
         jobname = sub_args.job_name,
@@ -423,7 +424,8 @@ def parsed_arguments(name, description):
           {1}
         """.format(name, __version__, c.bold, c.url, c.end))
 
-    # Supressing help message of required args to overcome no sub-parser named groups
+    # Supressing help message of required 
+    # args to overcome no sub-parser named groups
     subparser_run = subparsers.add_parser('run',
         help = 'Run the {} pipeline with input files.'.format(name),
         usage = argparse.SUPPRESS,
@@ -434,25 +436,13 @@ def parsed_arguments(name, description):
     )
 
     # Required Arguments
-    # Input FastQ files
+    # Input sample sheet
     subparser_run.add_argument(
         '--input',
-        # Check if the file exists and if it is readable
-        type = lambda file: permissions(parser, file, os.R_OK),
+        type = str,
         required = True,
-        nargs = '+',
         help = argparse.SUPPRESS
     )
-
-    subparser_run.add_argument(
-        '--rna',
-        # Check if the file exists and if it is readable
-        type = lambda file: permissions(parser, file, os.R_OK),
-        required = False,
-        nargs = '+',
-        help = argparse.SUPPRESS
-    )
-
 
     # Output Directory, i.e 
     # working directory

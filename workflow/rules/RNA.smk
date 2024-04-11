@@ -3,7 +3,8 @@
 # ~~~~~~~~~~
 from os.path import join
 from itertools import chain
-from scripts.common import str_bool, list_bool
+from functools import partial
+from scripts.common import str_bool, list_bool, get_paired_dna
 
 # ~~~~~~~~~~
 # Constants and paths
@@ -11,14 +12,15 @@ from scripts.common import str_bool, list_bool
 workpath                            = config["project"]["workpath"]
 rna_datapath                        = config["project"].get("rna_datapath", "/dev/null")
 rna_included                        = list_bool(config.get("rna", 'false'))
-# rna_coasm                         = str_bool(config["options"].get("rnacoa", 'False'))
 rna_coasm                           = False
 rna_sample_stems                    = config.get("rna", [])
 rna_compressed                      = True # if accepting uncompressed fastq input
-top_readqc_dir_rna                  = join(workpath, config['project']['id'], "metawrap_read_qc_RNA")
-top_trim_dir_rna                    = join(workpath, config['project']['id'], "trimmed_reads_RNA")
+get_dna                             = partial(get_paired_dna, config)
 metawrap_container                  = config["containers"]["metawrap"]
 pairedness                          = list(range(1, config['project']['nends']+1))
+top_readqc_dir_rna                  = join(workpath, config['project']['id'], "metawrap_read_qc_RNA")
+top_trim_dir_rna                    = join(workpath, config['project']['id'], "trimmed_reads_RNA")
+top_map_dir_rna                     = join(workpath, config['project']['id'], "mapping_RNA")
 
 
 rule concat_rna_reads:
@@ -32,8 +34,8 @@ rule concat_rna_reads:
         big_read2_hash              = join(workpath, "rna", "concatenated_R2.md5"),
     params:
         rname                       = "concat_rna_reads",
-        big_read_r1                 = join(workpath, "dna", "concatenated_R1.fastq"),
-        big_read_r2                 = join(workpath, "dna", "concatenated_R2.fastq"),
+        big_read_r1                 = join(workpath, "rna", "concatenated_R1.fastq"),
+        big_read_r2                 = join(workpath, "rna", "concatenated_R2.fastq"),
         input_dir                   = workpath,
     threads: int(cluster["concat_rna_reads"].get('threads', default_threads)),
     shell: 
@@ -57,10 +59,11 @@ rule concat_rna_reads:
                 cat $fastq >> {params.big_read_r2}
             fi;
         done
-        pigz -9 -p 28 -c {output.big_read_r1} > {output.big_compressed_read_r1}
-        pigz -9 -p 28 -c {output.big_read_r2} > {output.big_compressed_read_r2}
+        pigz -9 -p {threads} -c {output.big_read_r1} > {output.big_compressed_read_r1}
+        pigz -9 -p {threads} -c {output.big_read_r2} > {output.big_compressed_read_r2}
         md5sum {output.big_compressed_read_r1} > {output.big_read1_hash}
         md5sum {output.big_compressed_read_r2} > {output.big_read2_hash}
+        rm {output.big_read_r1} {output.big_read_r2}
         """
 
 
@@ -86,6 +89,7 @@ rule rna_read_qc:
         tmpr1               = lambda _, output, input: join(config['options']['tmp_dir'], 'read_qc', str(basename(str(input.R1))).replace('_R1.', '_1.').replace('.gz', '')),
         tmpr2               = lambda _, output, input: join(config['options']['tmp_dir'], 'read_qc', str(basename(str(input.R2))).replace('_R2.', '_2.').replace('.gz', '')),
     containerized: metawrap_container,
+    threads: int(cluster["rna_read_qc"].get('threads', default_threads)),
     shell:
         """
             # safe temp directory
@@ -124,4 +128,105 @@ rule rna_read_qc:
             ln -s {params.this_qc_dir}/post-QC_report/final_pure_reads_2_fastqc.html {params.this_qc_dir}/{params.sid}_R2_postrim_report.html
             ln -s {params.this_qc_dir}/pre-QC_report/{params.sid}_1_fastqc.html {params.this_qc_dir}/{params.sid}_R1_pretrim_report.html
             ln -s {params.this_qc_dir}/pre-QC_report/{params.sid}_2_fastqc.html {params.this_qc_dir}/{params.sid}_R2_pretrim_report.html
+        """
+
+
+rule rna_humann_classify:
+    input:
+        R1                  = join(top_trim_dir_rna, "{rname}", "{rname}_R1_trimmed.fastq.gz"),
+        R2                  = join(top_trim_dir_rna, "{rname}", "{rname}_R2_trimmed.fastq.gz"),
+    output:
+        hm3_gene_fam        = join(top_map_dir_rna, "{rname}", 'humann3', '{rname}_genefamilies.tsv'),
+        hm3_path_abd        = join(top_map_dir_rna, "{rname}", 'humann3', '{rname}_pathabundance.tsv'),
+        hm3_path_cov        = join(top_map_dir_rna, "{rname}", 'humann3', '{rname}_pathcoverage.tsv'),
+        humann_log          = join(top_map_dir_rna, "{rname}", 'humann3.log'),
+        humann_config       = join(top_map_dir_rna, "{rname}", 'humann3.conf'),
+    params:
+        rname               = "rna_humann_classify",
+        sid                 = "{rname}",
+        tmpread             = join(config['options']['tmp_dir'], 'rna_map', "{rname}_concat.fastq.gz"),
+        tmp_safe_dir        = join(config['options']['tmp_dir'], 'rna_map'),
+        hm3_map_dir         = join(top_map_dir_rna, "{rname}", 'humann3'),
+        uniref_db           = "/data2/uniref",      # from <root>/config/resources.json
+        chocophlan_db       = "/data2/chocophlan",  # from <root>/config/resources.json
+        util_map_db         = "/data2/um",          # from <root>/config/resources.json
+        metaphlan_db        = "/data2/metaphlan",   # from <root>/config/resources.json
+    threads: int(cluster["rna_humann_classify"].get('threads', default_threads)),
+    containerized: metawrap_container,
+    shell:
+        """
+        . /opt/conda/etc/profile.d/conda.sh && conda activate bb3
+        # safe temp directory
+        if [ ! -d "{params.tmp_safe_dir}" ]; then mkdir -p "{params.tmp_safe_dir}"; fi
+        tmp=$(mktemp -d -p "{params.tmp_safe_dir}")
+        trap 'rm -rf "{params.tmp_safe_dir}"' EXIT
+
+        # human configuration
+        humann_config --update database_folders nucleotide {params.chocophlan_db}
+        humann_config --update database_folders protein {params.uniref_db}
+        humann_config --update database_folders utility_mapping {params.util_map_db}
+        humann_config --print > {output.humann_config}
+
+        # metaphlan configuration
+        export DEFAULT_DB_FOLDER={params.metaphlan_db}
+        metaphlan --install --bowtie2db {params.metaphlan_db}
+        
+        # mapping execution
+        cat {input.R1} {input.R2} > {params.tmpread}
+		humann \
+        --threads {threads} \
+        --input {params.tmpread} \
+        --remove-temp-output \
+        --input-format fastq.gz \
+        --metaphlan-options "--bowtie2db {params.metaphlan_db} --nproc {threads}" \
+        --output-basename {params.sid} \
+        --log-level DEBUG \
+        --o-log {output.humann_log} \
+        --output {params.hm3_map_dir}
+        """
+
+
+rule map_to_rna_to_mag:
+    input:
+        dna_input                   = lambda wc: get_dna(wc.rname),
+        R1                          = join(top_trim_dir_rna, "{rname}", "{rname}_R1_trimmed.fastq.gz"),
+        R2                          = join(top_trim_dir_rna, "{rname}", "{rname}_R2_trimmed.fastq.gz"),
+    output:
+        aligned_rna                 = join(top_map_dir_rna, "{rname}", "{rname}.RNA.aligned.sam"),
+        statsfile                   = join(top_map_dir_rna, "{rname}", "{rname}.RNA.statsfile"),
+        scafstats                   = join(top_map_dir_rna, "{rname}", "{rname}.RNA.scafstats"),
+        covstats                    = join(top_map_dir_rna, "{rname}", "{rname}.RNA.covstat"),
+        rpkm                        = join(top_map_dir_rna, "{rname}", "{rname}.RNA.rpkm"),
+        refstats                    = join(top_map_dir_rna, "{rname}", "{rname}.RNA.refstats"),
+    params:
+        rname                       = "map_to_rna_to_mag",
+        sid                         = "{rname}",
+        map_rna_dir                 = join(top_map_dir_rna, "{rname}"),
+        minid                       = "0.90",
+        mag_dir                     = lambda wc, input: input.dna_input[0],
+        mag_idx                     = lambda wc, input: input.dna_input[1],
+    threads: int(cluster["map_to_rna_to_mag"].get('threads', default_threads)),
+    containerized: metawrap_container,
+    shell:
+        """
+        mkdir -p {params.map_rna_dir}
+		bbsplit.sh \
+            -da \
+            -Xmx100g \
+            unpigz=t \
+            threads={threads} \
+            minid={params.minid} \
+            outm={output.aligned_rna} \
+            mappedonly=t \
+            path={params.mag_idx} \
+            ref={params.mag_dir} \
+            sortscafs=f \
+            nzo=f \
+            statsfile={output.statsfile} \
+            scafstats={output.scafstats} \
+            covstats={output.covstats} \
+            rpkm={output.rpkm} \
+            refstats={output.refstats} \
+            in={input.R1} \
+            in2={input.R2}
         """

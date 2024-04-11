@@ -39,6 +39,20 @@ def md5sum(filename, first_block_only = False, blocksize = 65536):
     return hasher.hexdigest()
 
 
+def longest_common_parent_path(data):
+    data = [x if x[-1] == '/' else x + '/' for x in data]
+    substrs = lambda x: {x[i:i+j] for i in range(len(x)) for j in range(len(x) - i + 1)}
+    s = substrs(data[0])
+    for val in data[1:]:
+        s.intersection_update(substrs(val))
+    longest = max(s, key=len)
+    if longest.count('/') <= 3:
+        return None
+    if longest[-1] != '/':
+        longest = '/'.join(longest.split('/')[0:-1])
+    return longest
+
+
 def permissions(parser, path, *args, **kwargs):
     """Checks permissions using os.access() to see the user is authorized to access
     a file/directory. Checks for existence, readability, writability and executability via:

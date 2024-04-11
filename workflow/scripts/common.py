@@ -2,6 +2,23 @@
 # ~~~~~~~~~~
 # Common utility functions used throughout the workflow
 # ~~~~~~~~~~
+from os.path import join
+
+
+def get_paired_dna(config, rna_sid):
+    sample_map = config['sample_map']
+    dna_sid = sample_map[rna_sid]
+    if not list_bool(config.get("rna", 'false')):
+        return []
+    # dna directories
+    top_refine_dir = join(config["project"]["workpath"], config['project']['id'], "metawrap_bin_refine")
+    top_mags_dir = join(config["project"]["workpath"], config['project']['id'], "mags")
+    # construct necessary linked dna artifacts
+    derep_reqs = join(top_refine_dir, dna_sid, "dRep", "dereplicated_genomes")
+    mag_index = join(top_mags_dir, dna_sid, "index")
+    return [derep_reqs, mag_index]
+
+
 def provided(samplelist, condition):
     """
         Determines if optional rules should run. If an empty list is provided to rule all,

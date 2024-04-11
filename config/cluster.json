@@ -13,21 +13,7 @@
         "time": "1-00:00:00",
         "gres": "lscratch:400"
     },
-    "concat_rna_reads": {
-        "threads": 28,
-        "mem": "16G",
-        "partition": "norm",
-        "time": "1-00:00:00",
-        "gres": "lscratch:400"
-    },
     "metawrap_read_qc": {
-        "threads": 16,
-        "mem": "32G",
-        "partition": "norm",
-        "time": "1-00:00:00",
-        "gres": "lscratch:400"
-    },
-    "rna_read_qc": {
         "threads": 16,
         "mem": "32G",
         "partition": "norm",
@@ -76,5 +62,45 @@
         "mem": "64G",
         "partition": "norm",
         "time": "2-00:00:00"
+    },
+    "gtdbk_classify": {
+        "threads": 48,
+        "mem": "64G",
+        "partition": "norm",
+        "time": "2-00:00:00"
+    },
+    "gunc_detection": {
+        "threads": 24,
+        "mem": "64G",
+        "partition": "norm",
+        "time": "2-00:00:00"
+    },
+    "concat_rna_reads": {
+        "threads": 28,
+        "mem": "16G",
+        "partition": "norm",
+        "time": "1-00:00:00",
+        "gres": "lscratch:1000"
+    },
+    "rna_read_qc": {
+        "threads": 16,
+        "mem": "32G",
+        "partition": "norm",
+        "time": "1-00:00:00",
+        "gres": "lscratch:600"
+    },
+    "rna_humann_classify": {
+        "threads": 32,
+        "mem": "64G",
+        "partition": "norm",
+        "time": "10-00:00:00",
+        "gres": "lscratch:600"
+    },
+    "map_to_rna_to_mag": {
+        "threads": 32,
+        "mem": "64G",
+        "partition": "norm",
+        "time": "10-00:00:00",
+        "gres": "lscratch:600"
     }
 }

@@ -17,16 +17,21 @@ rna_included               = list_bool(config.get("rna", 'false'))
 rna_coasm                  = str_bool(config["options"].get("rnacoa", 'False'))
 rna_sample_stems           = config.get("rna", []) if not rna_coasm else ['concatenated']
 samples                    = config["samples"] if not coassemble else ['concatenated']
+
+# DNA directories
 top_assembly_dir           = join(workpath, config['project']['id'], "metawrap_assembly")
 top_readqc_dir             = join(workpath, config['project']['id'], "metawrap_read_qc")
 top_trim_dir               = join(workpath, config['project']['id'], "trimmed_reads")
-top_readqc_dir_rna         = join(workpath, config['project']['id'], "metawrap_read_qc_RNA")
 top_refine_dir             = join(workpath, config['project']['id'], "metawrap_bin_refine")
-top_trim_dir_rna           = join(workpath, config['project']['id'], "trimmed_reads_RNA")
 top_tax_dir                = join(workpath, config['project']['id'], "metawrap_kmer")
 top_binning_dir            = join(workpath, config['project']['id'], "metawrap_binning")
 top_mags_dir               = join(workpath, config['project']['id'], "mags")
 top_mapping_dir            = join(workpath, config['project']['id'], "mapping")
+
+# RNA directories
+top_readqc_dir_rna         = join(workpath, config['project']['id'], "metawrap_read_qc_RNA")
+top_trim_dir_rna           = join(workpath, config['project']['id'], "trimmed_reads_RNA")
+top_map_dir_rna            = join(workpath, config['project']['id'], "mapping_RNA")
 
 
 # Read in resource information, containing information about threads, mem, walltimes, etc.
@@ -42,7 +47,6 @@ if rna_included:
     start_r2_rna = expand(join(workpath, "rna", "{rname}_R2.fastq.gz"), rname=rna_sample_stems)
 else:
     start_r1_rna, start_r2_rna = [], []
-
 
 # Final ouput files of the pipeline
 rule all:
@@ -72,6 +76,8 @@ rule all:
         expand(join(top_tax_dir, "{name}", "kronagram.html"), name=samples),
         expand(join(top_tax_dir, "{name}", "final_assembly.krak2"), name=samples),
         expand(join(top_tax_dir, "{name}", "final_assembly.kraken2"), name=samples),
+        expand(join(top_tax_dir, "{name}", "GTDBTK_classify_wf"), name=samples),
+        expand(join(top_tax_dir, "{name}", "GUNC_detect"), name=samples),
         # assembly binning
         # ~~~~~~~~~~~~~~~
         expand(join(top_binning_dir, "{name}", "maxbin2_bins.contigs"), name=samples),
@@ -107,7 +113,7 @@ rule all:
         # rna read decompress
         # ~~~~~~~~~~~~~~~
         start_r1_rna,
-        start_r1_rna,
+        start_r2_rna,
         # read qc and filtering
         # ~~~~~~~~~~~~~~~
         expand(join(top_readqc_dir_rna, "{rname}", "{rname}_R1_pretrim_report.html"), rname=rna_sample_stems),
@@ -116,6 +122,19 @@ rule all:
         expand(join(top_readqc_dir_rna, "{rname}", "{rname}_R2_postrim_report.html"), rname=rna_sample_stems),
         expand(join(top_trim_dir_rna, "{rname}", "{rname}_R1_trimmed.fastq.gz"), rname=rna_sample_stems),
         expand(join(top_trim_dir_rna, "{rname}", "{rname}_R2_trimmed.fastq.gz"), rname=rna_sample_stems),
+        # rna mapping
+        # ~~~~~~~~~~~~~~~
+        expand(join(top_map_dir_rna, "{rname}", 'humann3', '{rname}_genefamilies.tsv'), rname=rna_sample_stems),
+        expand(join(top_map_dir_rna, "{rname}", 'humann3', '{rname}_pathabundance.tsv'), rname=rna_sample_stems),
+        expand(join(top_map_dir_rna, "{rname}", 'humann3', '{rname}_pathcoverage.tsv'), rname=rna_sample_stems),
+        expand(join(top_map_dir_rna, "{rname}", 'humann3.log'), rname=rna_sample_stems),
+        expand(join(top_map_dir_rna, "{rname}", 'humann3.conf'), rname=rna_sample_stems),
+        expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.aligned.sam"), rname=rna_sample_stems),
+        expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.statsfile"), rname=rna_sample_stems),
+        expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.scafstats"), rname=rna_sample_stems),
+        expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.covstat"), rname=rna_sample_stems),
+        expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.rpkm"), rname=rna_sample_stems),
+        expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.refstats"), rname=rna_sample_stems),
 
 
 # Import rules
