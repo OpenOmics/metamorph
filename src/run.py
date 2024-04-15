@@ -4,9 +4,10 @@
 # Python standard library
 from __future__ import print_function
 from shutil import copytree
-from datetime import datetime
 from pathlib import Path
-import os, re, json, sys, subprocess
+from csv import DictReader, Sniffer
+import os, re, json, sys, subprocess, argparse
+
 
 # Local imports
 from utils import (git_commit_hash,
@@ -14,9 +15,10 @@ from utils import (git_commit_hash,
     fatal,
     which,
     exists,
+    longest_common_parent_path,
     err)
-
 from . import version as __version__
+
 
 FASTQ_INPUT_EXT = ".fastq.gz"
 FASTQ_R1_POSTFIX = f"_R1{FASTQ_INPUT_EXT}"
@@ -170,6 +172,16 @@ def rename(filename):
     return filename
 
 
+def get_sid(filepath):
+    # see regex test pen: https://regex101.com/r/8Y6K9m/1
+    sid_regex = r"^(.*)([\W_]R[1-2])\.(fastq|fq)(.gz)?"
+    filename = os.path.basename(filepath)
+    matches = re.search(sid_regex, filename)
+    if matches:
+        return matches.groups()[0]
+    return
+
+
 def setup(sub_args, ifiles, repo_path, output_path):
     """Setup the pipeline for execution and creates config file from templates
     @param sub_args <parser.parse_args() object>:
@@ -188,13 +200,13 @@ def setup(sub_args, ifiles, repo_path, output_path):
 
     required = {
         # Base configuration file
-        "base": os.path.join(output_path,'config','config.json'),
+        "base": os.path.join(repo_path, 'config' ,'config.json'),
         # Template for project-level information
-        "project": os.path.join(output_path,'config','images.json'),
+        "project": os.path.join(repo_path, 'config','images.json'),
         # Check for filesystem resources that need to be mounted to containers.
-        "resources": os.path.join(output_path,'config','resources.json'),
+        "resources": os.path.join(repo_path, 'config','resources.json'),
         # Template for tool information
-        "tools": os.path.join(output_path,'config', 'modules.json'),
+        "tools": os.path.join(repo_path, 'config', 'modules.json'),
     }
 
     # Create the global or master config 
@@ -225,6 +237,14 @@ def setup(sub_args, ifiles, repo_path, output_path):
             v = str(v)
         config['options'][opt] = v
 
+    # RNA -> DNA mapping
+    sample_map = {}
+    dna_files, rna_files = ifiles['dna'], ifiles['rna']
+    for i in range(len(dna_files)):
+        r_sid = get_sid(rna_files[i])
+        d_sid = get_sid(dna_files[i])
+        sample_map[r_sid] = d_sid 
+    config['sample_map'] = sample_map
 
     return config
 
@@ -323,7 +343,11 @@ def bind(sub_args, config):
 
     if 'options' in config and 'input' in config['options']:
         inrents = list(set([os.path.abspath(os.path.dirname(p)) for p in config['options']['input'] if os.path.exists(os.path.dirname(p)) and os.path.isdir(os.path.dirname(p))]))
-        bindpaths.extend(inrents)
+        common_parent = longest_common_parent_path(inrents)
+        if common_parent:
+            bindpaths.extend([common_parent])
+        else:
+            bindpaths.extend(inrents)
 
     if 'options' in config and 'rna' in config['options']:
         rnarents = list(set([os.path.abspath(os.path.dirname(p)) for p in config['options']['rna'] if os.path.exists(os.path.dirname(p)) and os.path.isdir(os.path.dirname(p))]))
@@ -426,7 +450,7 @@ def add_sample_metadata(input_files, config, group_key='samples'):
     config[group_key] = []
     for file in input_files:
         # Split sample name on file extension
-        sample = re.split('[\S]R[12]', os.path.basename(file))[0]
+        sample = re.split(r'[\S]R[12]', os.path.basename(file))[0]
         if sample not in added:
             # Only add PE sample information once
             added.append(sample)
@@ -540,7 +564,7 @@ def get_nends(ifiles):
         nends = {} # keep count of R1 and R2 for each sample
         for file in ifiles:
             # Split sample name on file extension
-            sample = re.split('\_R[12]\.fastq\.gz', os.path.basename(file))[0]
+            sample = re.split(r'\_R[12]\.fastq\.gz', os.path.basename(file))[0]
             if sample not in nends:
                 nends[sample] = 0
 
@@ -633,10 +657,51 @@ def dryrun(outdir, config='config.json', snakefile=os.path.join('workflow', 'Sna
     return dryrun_output
 
 
+def valid_input(sheet):
+    """
+    Valid sample sheets should contain two columns: "DNA" and "RNA"
+
+             _________________
+             |  DNA  |  RNA  |
+             |---------------| 
+    pair1    |  path |  path |
+    pair2    |  path |  path |
+    """
+    # check file permissions
+    sheet = os.path.abspath(sheet)
+    if not os.path.exists(sheet):
+        raise argparse.ArgumentTypeError(f'Sample sheet path {sheet} does not exist!')
+    if not os.access(sheet, os.R_OK):
+        raise argparse.ArgumentTypeError(f"Path `{sheet}` exists, but cannot read path due to permissions!")
+
+    # check format to make sure it's correct
+    sheet = open(sheet, 'r')
+    dialect = Sniffer().sniff(sheet.read(), [',', "\t"])
+    sheet.seek(0)
+    rdr = DictReader(sheet, delimiter=dialect.delimiter)
+    if 'DNA' not in rdr.fieldnames:
+        raise argparse.ArgumentTypeError("Sample sheet does not contain `DNA` column")
+    if 'RNA' not in rdr.fieldnames:
+        raise argparse.ArgumentTypeError("Sample sheet does not contain `RNA` column")
+    data = [row for row in rdr]
+
+    this_map = {}
+    for row in data:
+        row['RNA'] = os.path.abspath(row['RNA'])
+        row['DNA'] = os.path.abspath(row['DNA'])
+        if not os.path.exists(row['RNA']):
+            raise argparse.ArgumentTypeError(f"Sample sheet path `{row['RNA']}` does not exist")
+        if not os.path.exists(row['DNA']):
+            raise argparse.ArgumentTypeError(f"Sample sheet path `{row['DNA']}` does not exist")
+
+    return data, this_map
+
+
 try:
     __job_name__ = 'metamorph_' + os.getlogin() + ':master'
 except OSError:
     __job_name__ = 'metamorph:master'
+
 
 def runner(
         mode, 
@@ -727,15 +792,15 @@ def runner(
         # replacing Popen subprocess with a direct
         # snakemake API call: https://snakemake.readthedocs.io/en/stable/api_reference/snakemake.html
         masterjob = subprocess.Popen([
-                'snakemake', '-pr', 
-                '--rerun-incomplete',
-                '--rerun-triggers input',
-                '--verbose',
-                '--use-singularity',
-                '--singularity-args', "\\-c \\-B '{}'".format(bindpaths),
-                '--cores', str(threads),
-                '--configfile=config.json'
-            ], cwd = outdir, stderr=subprocess.STDOUT, stdout=logger, env=my_env)
+            'snakemake', '-pr', 
+            '--rerun-incomplete',
+            '--rerun-triggers input',
+            '--verbose',
+            '--use-singularity',
+            '--singularity-args', "\\-c \\-B '{}'".format(bindpaths),
+            '--cores', str(threads),
+            '--configfile=config.json'
+        ], cwd = outdir, stderr=subprocess.STDOUT, stdout=logger, env=my_env)
 
     # Submitting jobs to cluster via SLURM's job scheduler
     elif mode == 'slurm':
