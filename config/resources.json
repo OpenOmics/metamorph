@@ -16,12 +16,7 @@
             "from": "/data/OpenOmics/references/metamorph/BMTAGGER/BMTAGGER_INDEX",
             "mode": "ro"
         }, {
-            "name": "BMTAGGER_INDEX",
-            "to": "/data2/GTDBTK_DB",
-            "from": "/data/OpenOmics/references/metamorph/GTDBtk/release207_v2",
-            "mode": "ro"
-        }, {
-            "name": "GUNC_DB",
+            "name": "GTDBTK_DB",
             "to": "/data2/GTDBTK_DB",
             "from": "/data/OpenOmics/references/metamorph/GTDBtk/release207_v2",
             "mode": "ro"
@@ -46,8 +41,8 @@
             "from": "/data/OpenOmics/references/metamorph/checkm",
             "mode": "rw"
         },  {
-            "name": "CHECKM_CONFIG3.9",
-            "to": "/opt/conda/envs/checkm/lib/python3.9/site-packages/checkm/DATA_CONFIG",
+            "name": "CHECKM_CONFIG3.8",
+            "to": "/opt/conda/envs/checkm/lib/python3.8/site-packages/checkm/DATA_CONFIG",
             "from": "/data/OpenOmics/references/metamorph/checkm/DATA_CONFIG",
             "mode": "rw"
         }, {

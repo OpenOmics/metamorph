@@ -262,16 +262,13 @@ rule metawrap_tax_classification:
         belong to an assembly and follow the contig naming convention of the Assembly module, the taxonomy of each contig is weighted based on 
         its length and coverage [weight=coverage*length]. The classifications of the sequences are then summarized in a format that 
         KronaTools' ktImportText function recognizes, and a final kronagram in html format is made with all the samples.
-
         @Input:
             - clean & trimmed reads (R1 & R2)
             - ensemble genome assembly
-
         @Output:
             - kraken2 kmer classification reports and tabular data outputs
             - krona tabular outputs
             - krona plot (interactive circular pie charts) of classified taxonomies 
-
     """
     input:
         R1                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq"), 
@@ -536,12 +533,17 @@ rule derep_bins:
         export TMPDIR=${{tmp}}
         trap 'rm -rf "${{tmp}}"' EXIT
 
-        # checkm & dRep need py3+, metawrap is py2.7
+        # activate conda environment, initialize checkm
         . /opt/conda/etc/profile.d/conda.sh && conda activate checkm
+        checkm data setRoot /data2/CHECKM_DB
+        export CHECKM_DATA_PATH="/data2/CHECKM_DB"
+        dRep check_dependencies
 
+        # run drep
+        export DREP_BINS=$(ls {params.metawrap_bins}/* | tr '\\n' ' ')
         mkdir -p {params.derep_dir}
         dRep dereplicate -d \
-        -g $(ls {params.metawrap_bins}/* | tr '\\n' ' ') \
+        -g ${{DREP_BINS}} \
         -p {threads} \
         -l {params.minimum_genome_length} \
         -pa {params.ani_primary_threshold} \
@@ -704,15 +706,18 @@ rule gtdbk_classify:
         if [ ! -d "{params.tmp_safe_dir}" ]; then mkdir -p "{params.tmp_safe_dir}"; fi
         tmp=$(mktemp -d -p "{params.tmp_safe_dir}")
         trap 'rm -rf "{params.tmp_safe_dir}"' EXIT
+
         # activate conda env & db path
-        export GTDBTK_DATA_PATH={params.GTDBTK_DB}
         . /opt/conda/etc/profile.d/conda.sh && conda activate checkm
-        echo "--" + $GTDBTK_DATA_PATH + "--"
+        export GTDBTK_DATA_PATH={params.GTDBTK_DB}
+        checkm data setRoot /data2/CHECKM_DB
+        export CHECKM_DATA_PATH="/data2/CHECKM_DB"
         gtdbtk classify_wf \
             --genome_dir {input.dRep_dir} \
             --out_dir {output.gtdbk_dir} \
             --cpus {threads} \
             --tmpdir {params.tmp_safe_dir} \
+            --skip_ani_screen \
             --full_tree \
             --force \
             --extension fa

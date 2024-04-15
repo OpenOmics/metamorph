@@ -65,9 +65,10 @@
     },
     "gtdbk_classify": {
         "threads": 48,
-        "mem": "64G",
-        "partition": "norm",
-        "time": "2-00:00:00"
+        "mem": "1024G",
+        "partition": "largemem",
+        "time": "2-00:00:00",
+        "gres": "lscratch:800"
     },
     "gunc_detection": {
         "threads": 24,
