@@ -450,7 +450,7 @@ def add_sample_metadata(input_files, config, group_key='samples'):
     config[group_key] = []
     for file in input_files:
         # Split sample name on file extension
-        sample = re.split('[\S]R[12]', os.path.basename(file))[0]
+        sample = re.split(r'[\S]R[12]', os.path.basename(file))[0]
         if sample not in added:
             # Only add PE sample information once
             added.append(sample)
@@ -564,7 +564,7 @@ def get_nends(ifiles):
         nends = {} # keep count of R1 and R2 for each sample
         for file in ifiles:
             # Split sample name on file extension
-            sample = re.split('\_R[12]\.fastq\.gz', os.path.basename(file))[0]
+            sample = re.split(r'\_R[12]\.fastq\.gz', os.path.basename(file))[0]
             if sample not in nends:
                 nends[sample] = 0
 
