@@ -38,4 +38,5 @@ RUN chmod a+rx /home/metaWRAP/bin/config-metawrap /home/metaWRAP/bin/mw
 ENV BASH_ENV="/etc/bash.bashrc"
 RUN echo ". /opt/conda/etc/profile.d/conda.sh && conda activate metawrap-env" >> /etc/bash.bashrc
 RUN echo 'export PATH="/home/metaWRAP/bin:/opt/conda/envs/metawrap-env/bin:$PATH"' >> /etc/bash.bashrc
+RUN mamba install -n metawrap-env spades
 ENTRYPOINT ["/bin/bash"]
