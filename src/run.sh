@@ -215,6 +215,7 @@ function submit(){
 #SBATCH --mem=32g
 #SBATCH --time=10-00:00:00
 #SBATCH --parsable
+#SBATCH -p unlimited
 #SBATCH -J "$2"
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --output "$3/logfiles/snakemake.log"

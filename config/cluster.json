@@ -21,10 +21,10 @@
         "gres": "lscratch:400"
     },
     "metawrap_genome_assembly": {
-        "threads": 48,
+        "threads": 128,
         "mem": "128G",
         "partition": "norm",
-        "time": "5-00:00:00"
+        "time": "10-00:00:00"
     },
     "metawrap_tax_classification": {
         "threads": 32,
@@ -47,7 +47,7 @@
     },
     "contig_annotation": {
         "threads": 32,
-        "mem": "32G",
+        "mem": "128G",
         "partition": "norm",
         "time": "2-00:00:00"
     },

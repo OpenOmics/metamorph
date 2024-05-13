@@ -210,7 +210,7 @@ rule metawrap_genome_assembly:
     """
     input:
         R1                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq"),
-        R2                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq"),
+        R2                          = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq"),
     output:
         # megahit outputs
         megahit_assembly            = join(top_assembly_dir, "{name}", "megahit", "final.contigs.fa"),
