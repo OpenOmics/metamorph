@@ -21,8 +21,8 @@
         "gres": "lscratch:400"
     },
     "metawrap_genome_assembly": {
-        "threads": 128,
-        "mem": "128G",
+        "threads": 56,
+        "mem": "240G",
         "partition": "norm",
         "time": "10-00:00:00"
     },

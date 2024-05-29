@@ -1,8 +1,8 @@
 {
     "images": {
-        "metawrap": "docker://rroutsong/metamorph_metawrap:0.0.9"
+        "metawrap": "docker://rroutsong/metamorph_metawrap:0.0.10"
     }, 
     "containers": {
-        "metawrap": "/data/OpenOmics/SIFs/metamorph_metawrap_0.0.9.sif"
+        "metawrap": "/data/OpenOmics/SIFs/metamorph_metawrap_0.0.10.sif"
     }
 }
