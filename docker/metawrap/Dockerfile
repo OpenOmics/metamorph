@@ -8,12 +8,13 @@ RUN conda config --add channels defaults; conda config --add channels conda-forg
     conda config --add channels bioconda; conda config --add channels ursky; \
     conda config --add channels biobakery
 RUN mamba install -y --only-deps -c ursky -n metawrap-env metawrap-mg==1.3.2
+RUN mamba install -y -n metawrap-env -c bioconda spades=3.15.5
 RUN cd /home; git clone https://github.com/rroutsong/metaWRAP.git; chmod -R 777 metaWRAP
 RUN mamba create -n checkm python=3.8
-RUN mamba install -n checkm -c bioconda numpy matplotlib pysam hmmer prodigal pplacer fastani samtools bowtie2 trnascan-se gunc prokka gtdbtk=2.3.2
+RUN mamba install -y -n checkm -c bioconda numpy matplotlib pysam hmmer prodigal pplacer fastani samtools bowtie2 trnascan-se gunc prokka gtdbtk=2.3.2
 RUN mamba run -n checkm pip3 install checkm-genome drep
 RUN mamba create -n bb3 python=3.7 
-RUN mamba install -n bb3 -c biobakery humann
+RUN mamba install -y -n bb3 -c biobakery humann
 RUN mkdir /install; cd /install; wget https://carlowood.github.io/which/which-2.21.tar.gz; tar xvf which-2.21.tar.gz
 RUN cd /install/which-2.21; ./configure; make && make install
 RUN rm /usr/bin/which; ln -s /usr/local/bin/which /usr/bin/which
@@ -38,5 +39,4 @@ RUN chmod a+rx /home/metaWRAP/bin/config-metawrap /home/metaWRAP/bin/mw
 ENV BASH_ENV="/etc/bash.bashrc"
 RUN echo ". /opt/conda/etc/profile.d/conda.sh && conda activate metawrap-env" >> /etc/bash.bashrc
 RUN echo 'export PATH="/home/metaWRAP/bin:/opt/conda/envs/metawrap-env/bin:$PATH"' >> /etc/bash.bashrc
-RUN mamba install -n metawrap-env spades
 ENTRYPOINT ["/bin/bash"]
