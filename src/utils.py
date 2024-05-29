@@ -46,11 +46,9 @@ def longest_common_parent_path(data):
     for val in data[1:]:
         s.intersection_update(substrs(val))
     longest = max(s, key=len)
-    if longest.count('/') <= 3:
+    if longest.count('/') < 3:
         return None
-    if longest[-1] != '/':
-        longest = '/'.join(longest.split('/')[0:-1])
-    return longest
+    return os.path.dirname(longest)
 
 
 def permissions(parser, path, *args, **kwargs):
@@ -121,7 +119,7 @@ def ln(files, outdir):
     for file in files:
         ln = os.path.join(outdir, os.path.basename(file))
         if not exists(ln):
-                os.symlink(os.path.abspath(os.path.realpath(file)), ln)
+            os.symlink(os.path.abspath(file), ln)
 
 
 def which(cmd, path=None):

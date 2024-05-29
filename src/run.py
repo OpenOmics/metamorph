@@ -67,7 +67,7 @@ def init(repo_path, output_path, links=[], required=['workflow', 'resources', 'c
         try:
             os.mkdir(os.path.join(output_path, 'rna'))
         except FileExistsError:
-            pass 
+            pass
         inputs['rna'] = sym_safe(input_data = links[1], target = os.path.join(output_path, 'rna'))
 
     return inputs
@@ -112,7 +112,7 @@ def sym_safe(input_data, target):
         if not exists(renamed):
             # Create a symlink if it does not already exist
             # Follow source symlinks to resolve any binding issues
-            os.symlink(os.path.abspath(os.path.realpath(file)), renamed)
+            os.symlink(os.path.abspath(file), renamed)
 
     return input_fastqs
 
@@ -339,7 +339,7 @@ def bind(sub_args, config):
 
     if 'databases' in config:
         dbs = config.pop('databases')
-        bindpaths.extend([resolve(mount['from'])+':'+resolve(mount['to'])+':'+mount['mode'] for mount in dbs])
+        bindpaths.extend([resolve(mount['from'])+':'+mount['to']+':'+mount['mode'] for mount in dbs])
 
     if 'options' in config and 'input' in config['options']:
         inrents = list(set([os.path.abspath(os.path.dirname(p)) for p in config['options']['input'] if os.path.exists(os.path.dirname(p)) and os.path.isdir(os.path.dirname(p))]))
@@ -351,7 +351,11 @@ def bind(sub_args, config):
 
     if 'options' in config and 'rna' in config['options']:
         rnarents = list(set([os.path.abspath(os.path.dirname(p)) for p in config['options']['rna'] if os.path.exists(os.path.dirname(p)) and os.path.isdir(os.path.dirname(p))]))
-        bindpaths.extend(rnarents)
+        common_parent = longest_common_parent_path(rnarents)
+        if common_parent:
+            bindpaths.extend([common_parent])
+        else:
+            bindpaths.extend(rnarents)
 
     if 'options' in config and 'output' in config['options']:
         if os.path.exists(config['options']['output']) and os.path.isdir(config['options']['output']):
@@ -360,8 +364,8 @@ def bind(sub_args, config):
     if 'tmp_dir' in config:
         bindpaths.append(config['tmp_dir'])
 
-    rawdata_bind_paths = [os.path.abspath(p) for p in config['project']['datapath'].split(',')]
-    working_directory =  os.path.realpath(config['project']['workpath'])
+    # rawdata_bind_paths = [os.path.abspath(p) for p in config['project']['datapath'].split(',')]
+    # working_directory =  os.path.realpath(config['project']['workpath'])
 
     return list(set(bindpaths))
 
@@ -613,7 +617,7 @@ def get_rawdata_bind_paths(input_files):
     bindpaths = []
     for file in input_files:
         # Get directory of input file
-        rawdata_src_path = os.path.dirname(os.path.abspath(os.path.realpath(file)))
+        rawdata_src_path = os.path.dirname(os.path.abspath(file))
         if rawdata_src_path not in bindpaths:
             bindpaths.append(rawdata_src_path)
 
