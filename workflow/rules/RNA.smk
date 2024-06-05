@@ -162,14 +162,10 @@ rule rna_humann_classify:
         trap 'rm -rf "{params.tmp_safe_dir}"' EXIT
 
         # human configuration
-        humann_config --update database_folders nucleotide {params.chocophlan_db}
-        humann_config --update database_folders protein {params.uniref_db}
-        humann_config --update database_folders utility_mapping {params.util_map_db}
         humann_config --print > {output.humann_config}
 
         # metaphlan configuration
         export DEFAULT_DB_FOLDER={params.metaphlan_db}
-        metaphlan --install --bowtie2db {params.metaphlan_db}
         
         # mapping execution
         cat {input.R1} {input.R2} > {params.tmpread}

@@ -52,8 +52,8 @@
         "time": "2-00:00:00"
     },
     "bbtools_index_map": {
-        "threads": 48,
-        "mem": "64G",
+        "threads": 28,
+        "mem": "220G",
         "partition": "norm",
         "time": "2-00:00:00"
     }, 
@@ -94,7 +94,7 @@
         "threads": 32,
         "mem": "64G",
         "partition": "norm",
-        "time": "10-00:00:00",
+        "time": "3-00:00:00",
         "gres": "lscratch:600"
     },
     "map_to_rna_to_mag": {
