@@ -92,10 +92,10 @@
     },
     "rna_humann_classify": {
         "threads": 32,
-        "mem": "64G",
+        "mem": "128G",
         "partition": "norm",
-        "time": "3-00:00:00",
-        "gres": "lscratch:600"
+        "time": "10-00:00:00",
+        "gres": "lscratch:800"
     },
     "map_to_rna_to_mag": {
         "threads": 32,
