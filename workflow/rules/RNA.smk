@@ -168,13 +168,17 @@ rule rna_humann_classify:
         export DEFAULT_DB_FOLDER={params.metaphlan_db}
         
         # mapping execution
+        
+        # old method signature 
+        #   --metaphlan-options "--bowtie2db {params.metaphlan_db} --nproc {threads}"
+
         cat {input.R1} {input.R2} > {params.tmpread}
 		humann \
         --threads {threads} \
         --input {params.tmpread} \
         --remove-temp-output \
         --input-format fastq.gz \
-        --metaphlan-options "--bowtie2db {params.metaphlan_db} --nproc {threads}" \
+        --metaphlan-options "--bowtie2db {params.metaphlan_db}" \
         --output-basename {params.sid} \
         --log-level DEBUG \
         --o-log {output.humann_log} \
