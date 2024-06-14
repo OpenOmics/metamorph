@@ -182,7 +182,7 @@ def get_sid(filepath):
     return
 
 
-def setup(sub_args, ifiles, repo_path, output_path):
+def setup(sub_args, ifiles, repo_path, output_path, rna=True):
     """Setup the pipeline for execution and creates config file from templates
     @param sub_args <parser.parse_args() object>:
         Parsed arguments for run sub-command
@@ -238,13 +238,16 @@ def setup(sub_args, ifiles, repo_path, output_path):
         config['options'][opt] = v
 
     # RNA -> DNA mapping
-    sample_map = {}
-    dna_files, rna_files = ifiles['dna'], ifiles['rna']
-    for i in range(len(dna_files)):
-        r_sid = get_sid(rna_files[i])
-        d_sid = get_sid(dna_files[i])
-        sample_map[r_sid] = d_sid 
-    config['sample_map'] = sample_map
+    if rna:
+        sample_map = {}
+        dna_files, rna_files = ifiles['dna'], ifiles['rna']
+        for i in range(len(dna_files)):
+            r_sid = get_sid(rna_files[i])
+            d_sid = get_sid(dna_files[i])
+            sample_map[r_sid] = d_sid 
+        config['sample_map'] = sample_map
+    else:
+        config['rna'] = False
 
     return config
 
@@ -490,7 +493,7 @@ def add_rawdata_information(sub_args, config, ifiles):
 
     # Finds the set of rawdata directories to bind
     config['project']['datapath'] = ','.join(get_rawdata_bind_paths(input_files = sub_args.input))
-    if sub_args.rna:
+    if getattr(sub_args, 'rna', False):
         config["project"]["rna_datapath"] = ','.join(get_rawdata_bind_paths(input_files = sub_args.rna))
 
     # Add each sample's basename
@@ -679,26 +682,33 @@ def valid_input(sheet):
         raise argparse.ArgumentTypeError(f"Path `{sheet}` exists, but cannot read path due to permissions!")
 
     # check format to make sure it's correct
-    sheet = open(sheet, 'r')
-    dialect = Sniffer().sniff(sheet.read(), [',', "\t"])
-    sheet.seek(0)
-    rdr = DictReader(sheet, delimiter=dialect.delimiter)
+    if sheet.endswith('.tsv') or sheet.endswith('.txt'):
+        delim = '\t'
+    elif sheet.endswith('.csv'):
+        delim = '\t'
+
+    rdr = DictReader(open(sheet, 'r'), delimiter=delim)
+
     if 'DNA' not in rdr.fieldnames:
         raise argparse.ArgumentTypeError("Sample sheet does not contain `DNA` column")
     if 'RNA' not in rdr.fieldnames:
-        raise argparse.ArgumentTypeError("Sample sheet does not contain `RNA` column")
-    data = [row for row in rdr]
+        print("-- Running in DNA only mode --")
+    else:
+        print("-- Running in paired DNA & RNA mode --")
 
-    this_map = {}
+    data = [row for row in rdr]
+    RNA_included = False
     for row in data:
-        row['RNA'] = os.path.abspath(row['RNA'])
         row['DNA'] = os.path.abspath(row['DNA'])
-        if not os.path.exists(row['RNA']):
-            raise argparse.ArgumentTypeError(f"Sample sheet path `{row['RNA']}` does not exist")
         if not os.path.exists(row['DNA']):
             raise argparse.ArgumentTypeError(f"Sample sheet path `{row['DNA']}` does not exist")
-
-    return data, this_map
+        if 'RNA' in row:
+            RNA_included = True
+            row['RNA'] = os.path.abspath(row['RNA'])
+            if not os.path.exists(row['RNA']):
+                raise argparse.ArgumentTypeError(f"Sample sheet path `{row['RNA']}` does not exist")
+            
+    return data, RNA_included
 
 
 try:
