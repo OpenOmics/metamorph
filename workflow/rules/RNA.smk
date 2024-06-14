@@ -25,8 +25,8 @@ top_map_dir_rna                     = join(workpath, config['project']['id'], "m
 
 rule concat_rna_reads:
     input:
-        all_r1_reads                = expand(join(workpath, "rna", "{rname}_R1.fastq.gz"), rname=rna_sample_stems if rna_coasm else []),
-        all_r2_reads                = expand(join(workpath, "rna", "{rname}_R2.fastq.gz"), rname=rna_sample_stems if rna_coasm else []),
+        all_r1_reads                = expand(join(workpath, "rna", "{rname}_R1.fastq.gz"), rname=rna_sample_stems if rna_coasm else []) if rna_included else [],
+        all_r2_reads                = expand(join(workpath, "rna", "{rname}_R2.fastq.gz"), rname=rna_sample_stems if rna_coasm else []) if rna_included else [],
     output:
         big_compressed_read_r1      = join(workpath, "rna", "concatenated_R1.fastq.gz"),
         big_compressed_read_r2      = join(workpath, "rna", "concatenated_R2.fastq.gz"),
@@ -69,8 +69,8 @@ rule concat_rna_reads:
 
 rule rna_read_qc:
     input:
-        R1                  = join(workpath, "rna", "{rname}_R1.fastq.gz"),
-        R2                  = join(workpath, "rna", "{rname}_R2.fastq.gz"),
+        R1                  = join(workpath, "rna", "{rname}_R1.fastq.gz") if rna_included else [],
+        R2                  = join(workpath, "rna", "{rname}_R2.fastq.gz") if rna_included else [],
     output:
         R1_pretrim_report   = join(top_readqc_dir_rna, "{rname}", "{rname}_R1_pretrim_report.html"),
         R2_pretrim_report   = join(top_readqc_dir_rna, "{rname}", "{rname}_R2_pretrim_report.html"),
@@ -188,9 +188,9 @@ rule rna_humann_classify:
 
 rule map_to_rna_to_mag:
     input:
-        dna_input                   = lambda wc: get_dna(wc.rname),
-        R1                          = join(top_trim_dir_rna, "{rname}", "{rname}_R1_trimmed.fastq.gz"),
-        R2                          = join(top_trim_dir_rna, "{rname}", "{rname}_R2_trimmed.fastq.gz"),
+        dna_input                   = lambda wc: get_dna(wc.rname) if rna_included else [],
+        R1                          = join(top_trim_dir_rna, "{rname}", "{rname}_R1_trimmed.fastq.gz") if rna_included else [],
+        R2                          = join(top_trim_dir_rna, "{rname}", "{rname}_R2_trimmed.fastq.gz") if rna_included else [],
     output:
         aligned_rna                 = join(top_map_dir_rna, "{rname}", "{rname}.RNA.aligned.sam"),
         statsfile                   = join(top_map_dir_rna, "{rname}", "{rname}.RNA.statsfile"),
@@ -203,8 +203,8 @@ rule map_to_rna_to_mag:
         sid                         = "{rname}",
         map_rna_dir                 = join(top_map_dir_rna, "{rname}"),
         minid                       = "0.90",
-        mag_dir                     = lambda wc, input: input.dna_input[0],
-        mag_idx                     = lambda wc, input: input.dna_input[1],
+        mag_dir                     = lambda wc, input: input.dna_input[0] if input.dna_input else [],
+        mag_idx                     = lambda wc, input: input.dna_input[1] if input.dna_input else [],
     threads: int(cluster["map_to_rna_to_mag"].get('threads', default_threads)),
     containerized: metawrap_container,
     shell:

@@ -6,10 +6,13 @@ from os.path import join
 
 
 def get_paired_dna(config, rna_sid):
+    if 'sample_map' not in config:
+        return None
+    if not list_bool(config.get("rna", 'false')):
+        return None
     sample_map = config['sample_map']
     dna_sid = sample_map[rna_sid]
-    if not list_bool(config.get("rna", 'false')):
-        return []
+    
     # dna directories
     top_refine_dir = join(config["project"]["workpath"], config['project']['id'], "metawrap_bin_refine")
     top_mags_dir = join(config["project"]["workpath"], config['project']['id'], "mags")
