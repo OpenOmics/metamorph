@@ -370,12 +370,21 @@ rule metawrap_binning:
         bin_mem                     = mem2int(cluster['metawrap_binning'].get("mem", default_memory)),
         mw_trim_linker_R1           = join(top_trim_dir, "{name}", "{name}_1.fastq"),
         mw_trim_linker_R2           = join(top_trim_dir, "{name}", "{name}_2.fastq"),
+        tmp_bin_dir                 = join(config['options']['tmp_dir'], 'bin'),
+        tmp_binref_dir              = join(config['options']['tmp_dir'], 'bin_rf'),
         min_perc_complete           = "50",
         max_perc_contam             = "5",
     singularity: metawrap_container,
     threads: int(cluster["metawrap_binning"].get("threads", default_threads)),
     shell:
         """
+        # safe temp directory
+        if [ ! -d "{params.tmp_bin_dir}" ]; then mkdir -p "{params.tmp_bin_dir}"; fi
+        if [ ! -d "{params.tmp_binref_dir}" ]; then mkdir -p "{params.tmp_binref_dir}"; fi
+        tmp_bin=$(mktemp -d -p "{params.tmp_bin_dir}")
+        tmp_bin_ref=$(mktemp -d -p "{params.tmp_binref_dir}")
+        trap 'rm -rf "{params.tmp_bin_dir}" "{params.tmp_binref_dir}"' EXIT
+
         # set checkm data
         checkm data setRoot /data2/CHECKM_DB
         export CHECKM_DATA_PATH="/data2/CHECKM_DB"
@@ -399,14 +408,17 @@ rule metawrap_binning:
 
         # metawrap bin refinement
         mw bin_refinement \
-        -o {params.bin_dir} \
+        -o {params.tmp_binref_dir} \
+        -m {params.bin_mem} \
         -t {threads} \
         -A {params.bin_dir}/metabat2_bins \
         -B {params.bin_dir}/maxbin2_bins \
         -c {params.min_perc_complete} \
         -x {params.max_perc_contam}
-
+        
+        cp -r {params.tmp_binref_dir}/* {params.bin_dir}
         touch {output.bin_breadcrumb}
+        chmod -R 775 {params.bin_dir}
         """
 
 
@@ -541,6 +553,11 @@ rule derep_bins:
 
         # run drep
         export DREP_BINS=$(ls {params.metawrap_bins}/* | tr '\\n' ' ')
+
+        printf "\ngenome list\n"
+        printf ${{DREP_BINS}} 
+        printf "\n"
+
         mkdir -p {params.derep_dir}
         dRep dereplicate -d \
         -g ${{DREP_BINS}} \

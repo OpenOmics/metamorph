@@ -36,7 +36,8 @@
         "threads": 32,
         "mem": "64G",
         "partition": "norm",
-        "time": "2-00:00:00"
+        "time": "2-00:00:00",
+        "gres": "lscratch:600"
     }, 
     "derep_bins": {
         "threads": 32,
