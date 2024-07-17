@@ -10,17 +10,17 @@ on:
     branches_ignore: []
 
 jobs:
-  Dry_Run_and_Lint:
+  Dry_Run_and_Lint_DNA&RNA:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
     - uses: docker://snakemake/snakemake:latest
-    - name: Dry Run with test data
+    - name: Dry Run 
       run: |
         docker run -v $PWD:/opt2 snakemake/snakemake:latest \
         /opt2/metamorph run --input /opt2/.tests/test_cohort.txt \
         --output /opt2/output --mode local --dry-run
-    - name: View the pipeline config file
+    - name: View the pipeline config file [DNA & RNA modes]
       run: |
         echo "Generated config file for pipeline...." && cat $PWD/output/config.json
     - name: Lint Workflow
@@ -28,3 +28,31 @@ jobs:
       run: |
         docker run -v $PWD:/opt2 snakemake/snakemake:latest snakemake --lint -s /opt2/output/workflow/Snakefile -d /opt2/output || \
         echo 'There may have been a few warnings or errors. Please read through the log to determine if its harmless.'
+  Dry_Run_and_Lint_DNAonly1:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: docker://snakemake/snakemake:latest
+    - name: Dry Run [DNA only mode]
+      run: |
+        docker run -v $PWD:/opt2 snakemake/snakemake:latest \
+        /opt2/metamorph run --input /opt2/.tests/test_cohort_DNAonly.txt \
+        --output /opt2/output --mode local --dry-run
+    - name: View the pipeline config file [DNA only mode]
+      run: |
+        echo "Generated config file for pipeline...." && cat $PWD/output/config.json
+    - name: Lint Workflow
+      continue-on-error: true
+      run: |
+        docker run -v $PWD:/opt2 snakemake/snakemake:latest snakemake --lint -s /opt2/output/workflow/Snakefile -d /opt2/output || \
+        echo 'There may have been a few warnings or errors. Please read through the log to determine if its harmless.'
+  Dry_Run_DNA2:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: docker://snakemake/snakemake:latest
+    - name: Dry Run [DNA only mode w RNA column]
+      run: |
+        docker run -v $PWD:/opt2 snakemake/snakemake:latest \
+        /opt2/metamorph run --input /opt2/.tests/test_cohort_DNAonly_RNAcolexists.txt \
+        --output /opt2/output --mode local --dry-run
