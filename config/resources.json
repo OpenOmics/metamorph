@@ -53,12 +53,12 @@
         }, {
             "name": "CAT_db",
             "to": "/data2/CAT",
-            "from": "/vf/users/OpenOmics/references/metamorph/CAT_pack_prepare/cat_db/db",
+            "from": "/data/OpenOmics/references/metamorph/CAT_pack_prepare/db",
             "mode": "rw"
         }, {
             "name": "CAT_tax",
             "to": "/data2/CAT_tax",
-            "from": "/data/OpenOmics/references/metamorph/CAT_pack_prepare/cat_db/db",
+            "from": "/data/OpenOmics/references/metamorph/CAT_pack_prepare/tax",
             "mode": "rw"
         }, {
             "name": "humann3_protein_db",

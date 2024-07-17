@@ -318,7 +318,7 @@ rule metawrap_binning:
 
         Orchestrates execution of this ensemble of metagenomic binning software:
             - MaxBin2
-            - metaBAT2
+            - metaBAT2cd
             - CONCOCT
 
         Stepwise algorithm for metawrap genome binning:
@@ -579,15 +579,15 @@ rule contig_annotation:
         dRep_dir                    = join(top_refine_dir, "{name}", "dRep", "dereplicated_genomes"),
     output:
         cat_bin2cls_filename        = join(top_refine_dir, "{name}", "contig_annotation", "out.BAT.bin2classification.txt"),
-        cat_bing2cls_official       = join(top_refine_dir, "{name}", "contig_annotation", "out.BAT.bin2classification.official_names.txt"),
-        cat_bing2cls_summary        = join(top_refine_dir, "{name}", "contig_annotation", "out.BAT.bin2classification.summary.txt"),
+        cat_bin2cls_official        = join(top_refine_dir, "{name}", "contig_annotation", "out.BAT.bin2classification.official_names.txt"),
+        cat_bin2cls_summary         = join(top_refine_dir, "{name}", "contig_annotation", "out.BAT.bin2classification.summary.txt"),
     params:
         cat_dir                     = join(top_refine_dir, "{name}", "contig_annotation"),
         dRep_dir                    = join(top_refine_dir, "{name}", "dRep", "dereplicated_genomes"),
         rname                       = "contig_annotation",
         sid                         = "{name}",
         cat_db                      = "/data2/CAT",         # from <root>/config/resources.json
-        tax_db                      = "/data2/NCBI_TAX_DB", # from <root>/config/resourcs.json
+        tax_db                      = "/data2/CAT_tax",     # from <root>/config/resourcs.json
         diamond_exec                = "/usr/bin/diamond",
     threads: int(cluster["contig_annotation"].get("threads", default_threads)),
     singularity: metawrap_container,
@@ -600,16 +600,17 @@ rule contig_annotation:
             -t {params.tax_db} \
             --path_to_diamond {params.diamond_exec} \
             --bin_suffix .fa \
+            -f 0.5 \
             -n {threads} \
             --force
         cd {params.cat_dir} && CAT add_names \
             -i {output.cat_bin2cls_filename} \
-            -o {output.cat_bing2cls_official} \
+            -o {output.cat_bin2cls_official} \
             -t {params.tax_db} \
             --only_official
         cd {params.cat_dir} && CAT summarise \
-            -i {output.cat_bing2cls_official} \
-            -o {output.cat_bing2cls_summary}
+            -i {output.cat_bin2cls_official} \
+            -o {output.cat_bin2cls_summary}
         """
 
     
@@ -703,7 +704,7 @@ rule bbtools_index_map:
 #         """
 
 
-rule gtdbk_classify:
+rule gtdbtk_classify:
     input:
         R1                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq"),
         R2                          = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq"),
