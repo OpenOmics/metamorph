@@ -703,7 +703,6 @@ def valid_input(sheet):
         if not os.path.exists(row['DNA']):
             raise argparse.ArgumentTypeError(f"Sample sheet path `{row['DNA']}` does not exist")
         if 'RNA' in row and not row['RNA'] in ('', None, 'None'):
-            import ipdb; ipdb.set_trace()
             RNA_included = True
             row['RNA'] = os.path.abspath(row['RNA'])
             if not os.path.exists(row['RNA']):
