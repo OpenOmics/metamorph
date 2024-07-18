@@ -18,7 +18,7 @@ RUN mamba install -y -n bb3 -c biobakery humann
 RUN mkdir /install; cd /install; wget https://carlowood.github.io/which/which-2.21.tar.gz; tar xvf which-2.21.tar.gz
 RUN cd /install/which-2.21; ./configure; make && make install
 RUN rm /usr/bin/which; ln -s /usr/local/bin/which /usr/bin/which
-RUN cd /home; git clone https://github.com/dutilh/CAT.git; chmod +x CAT_pack/CAT_pack; ln -s /home/CAT/CAT_pack/CAT_pack /usr/bin/CAT; chmod +x /usr/bin/CAT 
+RUN cd /home; git clone https://github.com/rroutsong/CAT_pack.git; ln -s /home/CAT_pack/CAT_pack/CAT_pack /usr/bin/CAT
 RUN cd /install; wget https://github.com/hyattpd/Prodigal/archive/refs/tags/v2.6.3.tar.gz; tar xvf v2.6.3.tar.gz
 RUN cd /install/Prodigal-2.6.3; make install INSTALLDIR=/usr/bin
 RUN cd /install; wget https://github.com/bbuchfink/diamond/archive/refs/tags/v2.1.9.tar.gz; tar xvf v2.1.9.tar.gz

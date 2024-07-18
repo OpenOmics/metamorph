@@ -318,7 +318,7 @@ rule metawrap_binning:
 
         Orchestrates execution of this ensemble of metagenomic binning software:
             - MaxBin2
-            - metaBAT2
+            - metaBAT2cd
             - CONCOCT
 
         Stepwise algorithm for metawrap genome binning:
@@ -370,12 +370,21 @@ rule metawrap_binning:
         bin_mem                     = mem2int(cluster['metawrap_binning'].get("mem", default_memory)),
         mw_trim_linker_R1           = join(top_trim_dir, "{name}", "{name}_1.fastq"),
         mw_trim_linker_R2           = join(top_trim_dir, "{name}", "{name}_2.fastq"),
+        tmp_bin_dir                 = join(config['options']['tmp_dir'], 'bin'),
+        tmp_binref_dir              = join(config['options']['tmp_dir'], 'bin_rf'),
         min_perc_complete           = "50",
         max_perc_contam             = "5",
     singularity: metawrap_container,
     threads: int(cluster["metawrap_binning"].get("threads", default_threads)),
     shell:
         """
+        # safe temp directory
+        if [ ! -d "{params.tmp_bin_dir}" ]; then mkdir -p "{params.tmp_bin_dir}"; fi
+        if [ ! -d "{params.tmp_binref_dir}" ]; then mkdir -p "{params.tmp_binref_dir}"; fi
+        tmp_bin=$(mktemp -d -p "{params.tmp_bin_dir}")
+        tmp_bin_ref=$(mktemp -d -p "{params.tmp_binref_dir}")
+        trap 'rm -rf "{params.tmp_bin_dir}" "{params.tmp_binref_dir}"' EXIT
+
         # set checkm data
         checkm data setRoot /data2/CHECKM_DB
         export CHECKM_DATA_PATH="/data2/CHECKM_DB"
@@ -399,14 +408,17 @@ rule metawrap_binning:
 
         # metawrap bin refinement
         mw bin_refinement \
-        -o {params.bin_dir} \
+        -o {params.tmp_binref_dir} \
+        -m {params.bin_mem} \
         -t {threads} \
         -A {params.bin_dir}/metabat2_bins \
         -B {params.bin_dir}/maxbin2_bins \
         -c {params.min_perc_complete} \
         -x {params.max_perc_contam}
-
+        
+        cp -r {params.tmp_binref_dir}/* {params.bin_dir}
         touch {output.bin_breadcrumb}
+        chmod -R 775 {params.bin_dir}
         """
 
 
@@ -424,25 +436,24 @@ rule bin_stats:
         named_stats_metabat2        = join(top_refine_dir, "{name}", "named_metabat2_bins.stats"),
         named_stats_metawrap        = join(top_refine_dir, "{name}", "named_metawrap_bins.stats"),
     params:
+        rname                       = "bin_stats",
         sid                         = "{name}",
         this_bin_dir                = join(top_refine_dir, "{name}"),
         # count number of fasta files in the bin folders to get count of bins
-        metabat2_num_bins           = lambda wc, _out, _in: str(len([fn for fn in os.listdir(_in.metabat2_bins) if "unbinned" not in fn.lower()])),
-        maxbin_num_bins             = lambda wc, _out, _in: str(len([fn for fn in os.listdir(_in.maxbin_bins) if "unbinned" not in fn.lower()])),
-        metawrap_num_bins           = lambda wc, _out, _in: str(len([fn for fn in os.listdir(_in.metawrap_bins) if "unbinned" not in fn.lower()])),
+        metabat2_num_bins           = lambda wc, input: str(len([fn for fn in os.listdir(input.metabat2_bins) if "unbinned" not in fn.lower()])),
+        maxbin_num_bins             = lambda wc, input: str(len([fn for fn in os.listdir(input.maxbin_bins) if "unbinned" not in fn.lower()])),
+        metawrap_num_bins           = lambda wc, input: str(len([fn for fn in os.listdir(input.metawrap_bins) if "unbinned" not in fn.lower()])),
     shell:
         """
-        # count cumulative lines starting with `>`
         metabat2_contigs=$(cat {input.metabat2_bins}/*fa | grep -c "^>")
         maxbin_configs=$(cat {input.maxbin_bins}/*fa | grep -c "^>")
         metawrap_contigs=$(cat {input.metawrap_bins}/*fa | grep -c "^>")
         echo "SampleID\tmetabat2_bins\tmaxbin2_bins\tmetaWRAP_50_5_bins\tmetabat2_contigs\tmaxbin2_contigs\tmetaWRAP_50_5_contigs" > {output.this_refine_summary}
-        echo "{params.sid}\t{params.metabat2_num_bins}\t{params.maxbin_num_bins}\t{params.metawrap_num_bins}\t$metabat2_contigs\t$maxbin_configs\t$metawrap_contigs"
-
+        echo "{params.sid}\t{params.metabat2_num_bins}\t{params.maxbin_num_bins}\t{params.metawrap_num_bins}\t$metabat2_contigs\t$maxbin_configs\t$metawrap_contigs" >> {output.this_refine_summary}
         # name contigs with SID
-        cat {input.maxbin_stats} | sed 's/^bin./{name}_bin./g' > {output.named_stats_maxbin2}
-		cat {input.metabat2_stats} | sed 's/^bin./{name}_bin./g' > {output.named_stats_metabat2}
-		cat {input.metawrap_stats} | sed 's/^bin./{name}_bin./g' > {output.named_stats_metawrap}
+        cat {input.maxbin_stats} | sed 's/^bin./{params.sid}_bin./g' > {output.named_stats_maxbin2}
+		cat {input.metabat2_stats} | sed 's/^bin./{params.sid}_bin./g' > {output.named_stats_metabat2}
+		cat {input.metawrap_stats} | sed 's/^bin./{params.sid}_bin./g' > {output.named_stats_metawrap}
         """
 
 
@@ -458,24 +469,24 @@ rule cumulative_bin_stats:
         cumulative_metabat2_stats   = join(top_refine_dir, "cumulative_stats_metabat2.txt"),
         cumulative_metawrap_stats   = join(top_refine_dir, "cumulative_stats_metawrap.txt"),
     params:
-        bin_dir                     = top_binning_dir
+        rname                       = "cumulative_bin_stats",
+        refine_dir                  = top_refine_dir
     shell:
         """
         # generate cumulative binning summary
         echo "SampleID\tmetabat2_bins\tmaxbin2_bins\tmetaWRAP_50_5_bins\tmetabat2_contigs\tmaxbin2_contigs\tmetaWRAP_50_5_contigs" > {output.cumulative_bin_summary}
-        for report in {params.bin_dir}/*/RefinedBins_summmary.txt; do 
+        for report in `ls {params.refine_dir}/*/RefinedBins_summmary.txt`; do 
             tail -n+2 $report >> {output.cumulative_bin_summary}
-            echo "tail -n+2 $report >> {output.cumulative_bin_summary}"
         done
 
         # generate cumulative statistic report for binning
-        for report in {params.bin_dir}/*/named_maxbin2_bins.stats; do
+        for report in `ls {params.refine_dir}/*/named_maxbin2_bins.stats`; do
             cat $report >> {output.cumulative_maxbin_stats}
         done
-        for report in {params.bin_dir}/*/named_maxbin2_bins.stats; do
+        for report in `ls {params.refine_dir}/*/named_maxbin2_bins.stats`; do
             cat $report >> {output.cumulative_metabat2_stats}
         done
-        for report in {params.bin_dir}/*/named_maxbin2_bins.stats; do
+        for report in `ls {params.refine_dir}/*/named_maxbin2_bins.stats`; do
             cat $report >> {output.cumulative_metawrap_stats}
         done
 
@@ -541,6 +552,11 @@ rule derep_bins:
 
         # run drep
         export DREP_BINS=$(ls {params.metawrap_bins}/* | tr '\\n' ' ')
+
+        printf "\ngenome list\n"
+        printf ${{DREP_BINS}} 
+        printf "\n"
+
         mkdir -p {params.derep_dir}
         dRep dereplicate -d \
         -g ${{DREP_BINS}} \
@@ -562,15 +578,15 @@ rule contig_annotation:
         dRep_dir                    = join(top_refine_dir, "{name}", "dRep", "dereplicated_genomes"),
     output:
         cat_bin2cls_filename        = join(top_refine_dir, "{name}", "contig_annotation", "out.BAT.bin2classification.txt"),
-        cat_bing2cls_official       = join(top_refine_dir, "{name}", "contig_annotation", "out.BAT.bin2classification.official_names.txt"),
-        cat_bing2cls_summary        = join(top_refine_dir, "{name}", "contig_annotation", "out.BAT.bin2classification.summary.txt"),
+        cat_bin2cls_official        = join(top_refine_dir, "{name}", "contig_annotation", "out.BAT.bin2classification.official_names.txt"),
+        cat_bin2cls_summary         = join(top_refine_dir, "{name}", "contig_annotation", "out.BAT.bin2classification.summary.txt"),
     params:
         cat_dir                     = join(top_refine_dir, "{name}", "contig_annotation"),
         dRep_dir                    = join(top_refine_dir, "{name}", "dRep", "dereplicated_genomes"),
         rname                       = "contig_annotation",
         sid                         = "{name}",
         cat_db                      = "/data2/CAT",         # from <root>/config/resources.json
-        tax_db                      = "/data2/NCBI_TAX_DB", # from <root>/config/resourcs.json
+        tax_db                      = "/data2/CAT_tax",     # from <root>/config/resourcs.json
         diamond_exec                = "/usr/bin/diamond",
     threads: int(cluster["contig_annotation"].get("threads", default_threads)),
     singularity: metawrap_container,
@@ -583,16 +599,17 @@ rule contig_annotation:
             -t {params.tax_db} \
             --path_to_diamond {params.diamond_exec} \
             --bin_suffix .fa \
+            -f 0.5 \
             -n {threads} \
             --force
         cd {params.cat_dir} && CAT add_names \
             -i {output.cat_bin2cls_filename} \
-            -o {output.cat_bing2cls_official} \
+            -o {output.cat_bin2cls_official} \
             -t {params.tax_db} \
             --only_official
         cd {params.cat_dir} && CAT summarise \
-            -i {output.cat_bing2cls_official} \
-            -o {output.cat_bing2cls_summary}
+            -i {output.cat_bin2cls_official} \
+            -o {output.cat_bin2cls_summary}
         """
 
     
@@ -686,7 +703,7 @@ rule bbtools_index_map:
 #         """
 
 
-rule gtdbk_classify:
+rule gtdbtk_classify:
     input:
         R1                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq"),
         R2                          = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq"),

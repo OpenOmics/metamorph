@@ -240,7 +240,7 @@ snakemake \\
   --jobs 500 \\
   --keep-remote \\
   --stats "$3/logfiles/runtime_statistics.json" \\
-  --restart-times 0 \\
+  --restart-times 1 \\
   --keep-incomplete \\
   --local-cores "14" 2>&1
 # Create summary report

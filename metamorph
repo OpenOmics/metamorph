@@ -57,7 +57,8 @@ from src.utils import (
     exists,
     fatal,
     check_cache,
-    require
+    require,
+    permissions
 )
 
 
@@ -114,10 +115,12 @@ def run(sub_args):
 
     # Step 1. Parse input sample sheet in down stream
     # data structures consistent with argparse parser
-    validated, sample_map = valid_input(sub_args.input)
+    validated, rna_included = valid_input(sub_args.input)
+
     delattr(sub_args, 'input')
     setattr(sub_args, 'input', [row['DNA'] for row in validated])
-    setattr(sub_args, 'rna', [row['RNA'] for row in validated])
+    if rna_included:
+        setattr(sub_args, 'rna', [row['RNA'] for row in validated])
     
     # Step 2. Initialize working directory,
     # copy over required resources to run 
@@ -125,8 +128,8 @@ def run(sub_args):
     git_repo = __home__
   
     fastq_inputs = [sub_args.input]
-    
-    if sub_args.rna:
+
+    if getattr(sub_args, 'rna', False):
         fastq_inputs.append(sub_args.rna)
 
     input_files = init(
@@ -142,7 +145,8 @@ def run(sub_args):
     config = setup(sub_args, 
         ifiles = input_files,
         repo_path = git_repo,
-        output_path = sub_args.output
+        output_path = sub_args.output,
+        rna=rna_included
     )
 
     # Step 4. Resolve docker/singularity bind

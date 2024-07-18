@@ -53,37 +53,37 @@
         }, {
             "name": "CAT_db",
             "to": "/data2/CAT",
-            "from": "/vf/users/OpenOmics/references/metamorph/CAT_pack_prepare/cat_db/db",
+            "from": "/data/OpenOmics/references/metamorph/CAT_pack_prepare/db",
             "mode": "rw"
         }, {
             "name": "CAT_tax",
             "to": "/data2/CAT_tax",
-            "from": "/vf/users/OpenOmics/references/metamorph/CAT_pack_prepare/cat_db/db",
+            "from": "/data/OpenOmics/references/metamorph/CAT_pack_prepare/tax",
             "mode": "rw"
         }, {
             "name": "humann3_protein_db",
             "to": "/data2/uniref",
-            "from": "/vf/users/OpenOmics/references/metamorph/uniref",
+            "from": "/data/OpenOmics/references/metamorph/uniref",
             "mode": "rw"
         }, {
             "name": "humann3_nuc_db",
             "to": "/data2/chocophlan",
-            "from": "/vf/users/OpenOmics/references/metamorph/chocophlan",
+            "from": "/data/OpenOmics/references/metamorph/chocophlan",
             "mode": "rw"
         }, {
             "name": "humann3_config",
             "to": "/opt/conda/envs/bb3/lib/python3.7/site-packages/humann",
-            "from": "/vf/users/OpenOmics/references/metamorph/humann",
+            "from": "/data/OpenOmics/references/metamorph/humann",
             "mode": "rw"
         }, {
             "name": "utility_mapping",
             "to": "/data2/um",
-            "from": "/vf/users/OpenOmics/references/metamorph/utility_mapping",
+            "from": "/data/OpenOmics/references/metamorph/utility_mapping",
             "mode": "rw"
         }, {
             "name": "metaphlan_db",
             "to": "/data2/metaphlan",
-            "from": "/vf/users/OpenOmics/references/metamorph/metaphlan",
+            "from": "/data/OpenOmics/references/metamorph/metaphlan",
             "mode": "rw"
         }
     ]

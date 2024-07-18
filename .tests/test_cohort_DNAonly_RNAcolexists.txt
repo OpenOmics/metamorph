@@ -1,0 +1,5 @@
+DNA	RNA
+/opt2/.tests/WT_S1_R1.fastq.gz	
+/opt2/.tests/WT_S1_R2.fastq.gz	
+/opt2/.tests/WT_S2_R1.fastq.gz	
+/opt2/.tests/WT_S2_R2.fastq.gz	
