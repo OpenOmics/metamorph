@@ -436,25 +436,24 @@ rule bin_stats:
         named_stats_metabat2        = join(top_refine_dir, "{name}", "named_metabat2_bins.stats"),
         named_stats_metawrap        = join(top_refine_dir, "{name}", "named_metawrap_bins.stats"),
     params:
+        rname                       = "bin_stats",
         sid                         = "{name}",
         this_bin_dir                = join(top_refine_dir, "{name}"),
         # count number of fasta files in the bin folders to get count of bins
-        metabat2_num_bins           = lambda wc, _out, _in: str(len([fn for fn in os.listdir(_in.metabat2_bins) if "unbinned" not in fn.lower()])),
-        maxbin_num_bins             = lambda wc, _out, _in: str(len([fn for fn in os.listdir(_in.maxbin_bins) if "unbinned" not in fn.lower()])),
-        metawrap_num_bins           = lambda wc, _out, _in: str(len([fn for fn in os.listdir(_in.metawrap_bins) if "unbinned" not in fn.lower()])),
+        metabat2_num_bins           = lambda wc, input: str(len([fn for fn in os.listdir(input.metabat2_bins) if "unbinned" not in fn.lower()])),
+        maxbin_num_bins             = lambda wc, input: str(len([fn for fn in os.listdir(input.maxbin_bins) if "unbinned" not in fn.lower()])),
+        metawrap_num_bins           = lambda wc, input: str(len([fn for fn in os.listdir(input.metawrap_bins) if "unbinned" not in fn.lower()])),
     shell:
         """
-        # count cumulative lines starting with `>`
         metabat2_contigs=$(cat {input.metabat2_bins}/*fa | grep -c "^>")
         maxbin_configs=$(cat {input.maxbin_bins}/*fa | grep -c "^>")
         metawrap_contigs=$(cat {input.metawrap_bins}/*fa | grep -c "^>")
         echo "SampleID\tmetabat2_bins\tmaxbin2_bins\tmetaWRAP_50_5_bins\tmetabat2_contigs\tmaxbin2_contigs\tmetaWRAP_50_5_contigs" > {output.this_refine_summary}
-        echo "{params.sid}\t{params.metabat2_num_bins}\t{params.maxbin_num_bins}\t{params.metawrap_num_bins}\t$metabat2_contigs\t$maxbin_configs\t$metawrap_contigs"
-
+        echo "{params.sid}\t{params.metabat2_num_bins}\t{params.maxbin_num_bins}\t{params.metawrap_num_bins}\t$metabat2_contigs\t$maxbin_configs\t$metawrap_contigs" >> {output.this_refine_summary}
         # name contigs with SID
-        cat {input.maxbin_stats} | sed 's/^bin./{name}_bin./g' > {output.named_stats_maxbin2}
-		cat {input.metabat2_stats} | sed 's/^bin./{name}_bin./g' > {output.named_stats_metabat2}
-		cat {input.metawrap_stats} | sed 's/^bin./{name}_bin./g' > {output.named_stats_metawrap}
+        cat {input.maxbin_stats} | sed 's/^bin./{params.sid}_bin./g' > {output.named_stats_maxbin2}
+		cat {input.metabat2_stats} | sed 's/^bin./{params.sid}_bin./g' > {output.named_stats_metabat2}
+		cat {input.metawrap_stats} | sed 's/^bin./{params.sid}_bin./g' > {output.named_stats_metawrap}
         """
 
 
@@ -470,24 +469,24 @@ rule cumulative_bin_stats:
         cumulative_metabat2_stats   = join(top_refine_dir, "cumulative_stats_metabat2.txt"),
         cumulative_metawrap_stats   = join(top_refine_dir, "cumulative_stats_metawrap.txt"),
     params:
-        bin_dir                     = top_binning_dir
+        rname                       = "cumulative_bin_stats",
+        refine_dir                  = top_refine_dir
     shell:
         """
         # generate cumulative binning summary
         echo "SampleID\tmetabat2_bins\tmaxbin2_bins\tmetaWRAP_50_5_bins\tmetabat2_contigs\tmaxbin2_contigs\tmetaWRAP_50_5_contigs" > {output.cumulative_bin_summary}
-        for report in {params.bin_dir}/*/RefinedBins_summmary.txt; do 
+        for report in `ls {params.refine_dir}/*/RefinedBins_summmary.txt`; do 
             tail -n+2 $report >> {output.cumulative_bin_summary}
-            echo "tail -n+2 $report >> {output.cumulative_bin_summary}"
         done
 
         # generate cumulative statistic report for binning
-        for report in {params.bin_dir}/*/named_maxbin2_bins.stats; do
+        for report in `ls {params.refine_dir}/*/named_maxbin2_bins.stats`; do
             cat $report >> {output.cumulative_maxbin_stats}
         done
-        for report in {params.bin_dir}/*/named_maxbin2_bins.stats; do
+        for report in `ls {params.refine_dir}/*/named_maxbin2_bins.stats`; do
             cat $report >> {output.cumulative_metabat2_stats}
         done
-        for report in {params.bin_dir}/*/named_maxbin2_bins.stats; do
+        for report in `ls {params.refine_dir}/*/named_maxbin2_bins.stats`; do
             cat $report >> {output.cumulative_metawrap_stats}
         done
 
