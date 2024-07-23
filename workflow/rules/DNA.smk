@@ -32,6 +32,7 @@ top_mapping_dir            = join(workpath, config['project']['id'], "mapping")
 metawrap_container         = config["containers"]["metawrap"]
 pairedness                 = list(range(1, config['project']['nends']+1))
 mem2int                    = lambda x: int(str(x).lower().replace('gb', '').replace('g', ''))
+megahit_only               = not bool(int(config["options"]["assembler_mode"]))
 
 """
     Step-wise pipeline outline:
@@ -147,7 +148,7 @@ rule metawrap_read_qc:
         tmpr1               = lambda _, output, input: join(config['options']['tmp_dir'], 'read_qc', str(basename(str(input.R1))).replace('_R1.', '_1.').replace('.gz', '')),
         tmpr2               = lambda _, output, input: join(config['options']['tmp_dir'], 'read_qc', str(basename(str(input.R2))).replace('_R2.', '_2.').replace('.gz', '')),
     containerized: metawrap_container,
-    threads: int(cluster["metawrap_genome_assembly"].get('threads', default_threads)),
+    threads: int(cluster["metawrap_read_qc"].get('threads', default_threads)),
     shell: 
         """
             # safe temp directory
@@ -214,14 +215,14 @@ rule metawrap_genome_assembly:
     output:
         # megahit outputs
         megahit_assembly            = join(top_assembly_dir, "{name}", "megahit", "final.contigs.fa"),
-        megahit_longcontigs         = join(top_assembly_dir, "{name}", "megahit", "long.contigs.fa"),
+        # megahit_longcontigs         = join(top_assembly_dir, "{name}", "megahit", "long.contigs.fa"),
         megahit_log                 = join(top_assembly_dir, "{name}", "megahit", "log"),
-        # metaspades outsputs
-        metaspades_assembly         = join(top_assembly_dir, "{name}", "metaspades", "contigs.fasta"),
-        metaspades_graph            = join(top_assembly_dir, "{name}", "metaspades", "assembly_graph.fastg"),
-        metaspades_longscaffolds    = join(top_assembly_dir, "{name}", "metaspades", "long_scaffolds.fasta"),
-        metaspades_scaffolds        = join(top_assembly_dir, "{name}", "metaspades", "scaffolds.fasta"),
-        metaspades_cor_reads        = directory(join(top_assembly_dir, "{name}", "metaspades", "corrected")),
+        # metaspades outputs
+        metaspades_assembly         = join(top_assembly_dir, "{name}", "metaspades", "contigs.fasta") if not megahit_only else [],
+        metaspades_graph            = join(top_assembly_dir, "{name}", "metaspades", "assembly_graph.fastg") if not megahit_only else [],
+        metaspades_longscaffolds    = join(top_assembly_dir, "{name}", "metaspades", "long_scaffolds.fasta") if not megahit_only else [],
+        metaspades_scaffolds        = join(top_assembly_dir, "{name}", "metaspades", "scaffolds.fasta") if not megahit_only else [],
+        metaspades_cor_reads        = directory(join(top_assembly_dir, "{name}", "metaspades", "corrected")) if not megahit_only else [],
         # ensemble outputs
         final_assembly              = join(top_assembly_dir, "{name}", "final_assembly.fasta"),
         final_assembly_report       = join(top_assembly_dir, "{name}", "assembly_report.html"),
@@ -234,18 +235,20 @@ rule metawrap_genome_assembly:
         mh_dir                      = join(top_assembly_dir, "{name}", "megahit"),
         assembly_dir                = join(top_assembly_dir, "{name}"),
         contig_min_len              = "1000",
+        megahit_only                = megahit_only,
+        assemblers                  = "--megahit " if megahit_only else "--megahit --metaspades ",
     threads: int(cluster["metawrap_genome_assembly"].get('threads', default_threads)),
     shell:
         """
-            # remove empty directories by snakemake, to prevent metawrap error
-            rm -rf {params.mh_dir:q}
+            if [ -d "{params.assembly_dir}" ]; then rm -rf "{params.assembly_dir}"; fi      
+            mkdir -p "{params.assembly_dir}"
+            if [ -d {params.mh_dir:q} ]; then rm -rf {params.mh_dir:q}; fi
             # link to the file names metawrap expects
             ln -s {input.R1} {output.assembly_R1}
             ln -s {input.R2} {output.assembly_R2}
             # run genome assembler
             mw assembly \
-            --megahit \
-            --metaspades \
+            {params.assemblers} \
             -m {params.memlimit} \
             -t {threads} \
             -l {params.contig_min_len} \
@@ -417,6 +420,14 @@ rule metawrap_binning:
         -x {params.max_perc_contam}
         
         cp -r {params.tmp_binref_dir}/* {params.bin_dir}
+
+        for this_bin in `find {params.bin_dir} -type f -regex ".*/bin.[0-9][0-9]?[0-9]?.fa";
+        do
+            fn = ${$(basename $this_bin)%.*}
+            to = $(dirname $this_bin)/{wildcards.name}_$fn
+            mv $mw_bin $to
+        done
+
         touch {output.bin_breadcrumb}
         chmod -R 775 {params.bin_dir}
         """
