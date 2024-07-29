@@ -420,14 +420,15 @@ rule metawrap_binning:
         -x {params.max_perc_contam}
         
         cp -r {params.tmp_binref_dir}/* {params.bin_dir}
-
-        for this_bin in `find {params.bin_dir} -type f -regex ".*/bin.[0-9][0-9]?[0-9]?.fa";
-        do
-            fn = ${$(basename $this_bin)%.*}
-            to = $(dirname $this_bin)/{wildcards.name}_$fn
-            mv $mw_bin $to
+        bold=$(tput bold)
+        normal=$(tput sgr0)
+        for this_bin in `find {params.bin_dir} -type f -regex ".*/bin.[0-9][0-9]?[0-9]?.fa"`; do
+            fn=$(basename $this_bin)
+            to=$(dirname $this_bin)/{wildcards.name}_$fn
+            echo "relabeling ${{bold}}$fn${{normal}} to ${{bold}}{wildcards.name}_$fn${{normal}}"
+            mv $this_bin $to
         done
-
+        
         touch {output.bin_breadcrumb}
         chmod -R 775 {params.bin_dir}
         """
