@@ -77,8 +77,8 @@ rule all:
         expand(join(top_tax_dir, "{name}", "kronagram.html"), name=samples),
         expand(join(top_tax_dir, "{name}", "final_assembly.krak2"), name=samples),
         expand(join(top_tax_dir, "{name}", "final_assembly.kraken2"), name=samples),
-        expand(join(top_tax_dir, "{name}", "GTDBTK_classify_wf"), name=samples),
-        expand(join(top_tax_dir, "{name}", "GUNC_detect"), name=samples),
+        expand(join(top_tax_dir, "GTDBTK_classify_wf"), name=samples),
+        expand(join(top_tax_dir, "GUNC_detect"), name=samples),
         # assembly binning
         # ~~~~~~~~~~~~~~~
         expand(join(top_binning_dir, "{name}", "maxbin2_bins.contigs"), name=samples),
