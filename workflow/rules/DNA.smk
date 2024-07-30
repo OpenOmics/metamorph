@@ -32,7 +32,7 @@ top_mapping_dir            = join(workpath, config['project']['id'], "mapping")
 metawrap_container         = config["containers"]["metawrap"]
 pairedness                 = list(range(1, config['project']['nends']+1))
 mem2int                    = lambda x: int(str(x).lower().replace('gb', '').replace('g', ''))
-megahit_only               = not bool(int(config["options"]["assembler_mode"]))
+megahit_only               = bool(int(config["options"]["assembler_mode"]))
 
 """
     Step-wise pipeline outline:

@@ -160,7 +160,7 @@ def run(sub_args):
 
     # Step 4b. Setup assembly mode
     #   modes: 0 - megahit + metaspades assembly
-    config["options"]["assembler_mode"] = "0" if sub_args.megahit_only else "1"
+    config["options"]["assembler_mode"] = "1" if sub_args.megahit_only else "0"
 
     # Step 5. Save config to output directory
     with open(os.path.join(sub_args.output, 'config.json'), 'w') as fh:
