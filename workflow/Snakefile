@@ -90,9 +90,9 @@ rule all:
         expand(join(top_binning_dir, "{name}", "figures", "binning_results.png"), name=samples),
         # bin refinement
         # ~~~~~~~~~~~~~~~
-        expand(join(top_refine_dir, "{name}", "dRep", "data_tables", "Widb.csv"), name=samples),
-        expand(join(top_refine_dir, "{name}", "dRep", "figures", "Winning_genomes.pdf"), name=samples),
-        expand(join(top_refine_dir, "{name}", "dRep", "log", "cluster_arguments.json"), name=samples),
+        expand(join(top_refine_dir, "dRep", "data_tables", "Widb.csv"), name=samples),
+        expand(join(top_refine_dir, "dRep", "figures", "Winning_genomes.pdf"), name=samples),
+        expand(join(top_refine_dir, "dRep", "log", "cluster_arguments.json"), name=samples),
         # bin statistics
         # ~~~~~~~~~~~~~~~
         expand(join(top_refine_dir, "{name}", "RefinedBins_summmary.txt"), name=samples),
@@ -105,7 +105,7 @@ rule all:
         join(top_refine_dir, "cumulative_stats_metawrap.txt"),
         # contig annotation
         # ~~~~~~~~~~~~~~~
-        expand(join(top_refine_dir, "{name}", "contig_annotation", "out.BAT.bin2classification.summary.txt"), name=samples),
+        expand(join(top_refine_dir, "contig_annotation", "out.BAT.bin2classification.summary.txt"), name=samples),
         # BBMap mapping to MAGs
         # ~~~~~~~~~~~~~~~
         expand(join(top_mags_dir, "{name}", "index"), name=samples),
