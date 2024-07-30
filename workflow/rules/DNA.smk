@@ -714,7 +714,8 @@ rule gtdbtk_classify:
         dRep_dir                    = join(top_refine_dir, "dRep", "dereplicated_genomes"),
     output:
         gtdbk_dir                   = directory(join(top_tax_dir, "GTDBTK_classify_wf"))
-    threads: int(cluster["gtdbk_classify"].get("threads", default_threads)),
+    threads: 
+        int(cluster["gtdbk_classify"].get("threads", default_threads)),
     params:
         rname                       = "gtdbk_classify",
         tmp_safe_dir                = join(config['options']['tmp_dir'], 'gtdbtk_classify'),
