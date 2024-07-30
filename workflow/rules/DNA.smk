@@ -32,6 +32,7 @@ top_mapping_dir            = join(workpath, config['project']['id'], "mapping")
 metawrap_container         = config["containers"]["metawrap"]
 pairedness                 = list(range(1, config['project']['nends']+1))
 mem2int                    = lambda x: int(str(x).lower().replace('gb', '').replace('g', ''))
+megahit_only               = bool(int(config["options"]["assembler_mode"]))
 
 """
     Step-wise pipeline outline:
@@ -147,7 +148,7 @@ rule metawrap_read_qc:
         tmpr1               = lambda _, output, input: join(config['options']['tmp_dir'], 'read_qc', str(basename(str(input.R1))).replace('_R1.', '_1.').replace('.gz', '')),
         tmpr2               = lambda _, output, input: join(config['options']['tmp_dir'], 'read_qc', str(basename(str(input.R2))).replace('_R2.', '_2.').replace('.gz', '')),
     containerized: metawrap_container,
-    threads: int(cluster["metawrap_genome_assembly"].get('threads', default_threads)),
+    threads: int(cluster["metawrap_read_qc"].get('threads', default_threads)),
     shell: 
         """
             # safe temp directory
@@ -214,14 +215,14 @@ rule metawrap_genome_assembly:
     output:
         # megahit outputs
         megahit_assembly            = join(top_assembly_dir, "{name}", "megahit", "final.contigs.fa"),
-        megahit_longcontigs         = join(top_assembly_dir, "{name}", "megahit", "long.contigs.fa"),
+        # megahit_longcontigs         = join(top_assembly_dir, "{name}", "megahit", "long.contigs.fa"),
         megahit_log                 = join(top_assembly_dir, "{name}", "megahit", "log"),
-        # metaspades outsputs
-        metaspades_assembly         = join(top_assembly_dir, "{name}", "metaspades", "contigs.fasta"),
-        metaspades_graph            = join(top_assembly_dir, "{name}", "metaspades", "assembly_graph.fastg"),
-        metaspades_longscaffolds    = join(top_assembly_dir, "{name}", "metaspades", "long_scaffolds.fasta"),
-        metaspades_scaffolds        = join(top_assembly_dir, "{name}", "metaspades", "scaffolds.fasta"),
-        metaspades_cor_reads        = directory(join(top_assembly_dir, "{name}", "metaspades", "corrected")),
+        # metaspades outputs
+        metaspades_assembly         = join(top_assembly_dir, "{name}", "metaspades", "contigs.fasta") if not megahit_only else [],
+        metaspades_graph            = join(top_assembly_dir, "{name}", "metaspades", "assembly_graph.fastg") if not megahit_only else [],
+        metaspades_longscaffolds    = join(top_assembly_dir, "{name}", "metaspades", "long_scaffolds.fasta") if not megahit_only else [],
+        metaspades_scaffolds        = join(top_assembly_dir, "{name}", "metaspades", "scaffolds.fasta") if not megahit_only else [],
+        metaspades_cor_reads        = directory(join(top_assembly_dir, "{name}", "metaspades", "corrected")) if not megahit_only else [],
         # ensemble outputs
         final_assembly              = join(top_assembly_dir, "{name}", "final_assembly.fasta"),
         final_assembly_report       = join(top_assembly_dir, "{name}", "assembly_report.html"),
@@ -234,18 +235,20 @@ rule metawrap_genome_assembly:
         mh_dir                      = join(top_assembly_dir, "{name}", "megahit"),
         assembly_dir                = join(top_assembly_dir, "{name}"),
         contig_min_len              = "1000",
+        megahit_only                = megahit_only,
+        assemblers                  = "--megahit " if megahit_only else "--megahit --metaspades ",
     threads: int(cluster["metawrap_genome_assembly"].get('threads', default_threads)),
     shell:
         """
-            # remove empty directories by snakemake, to prevent metawrap error
-            rm -rf {params.mh_dir:q}
+            if [ -d "{params.assembly_dir}" ]; then rm -rf "{params.assembly_dir}"; fi      
+            mkdir -p "{params.assembly_dir}"
+            if [ -d {params.mh_dir:q} ]; then rm -rf {params.mh_dir:q}; fi
             # link to the file names metawrap expects
             ln -s {input.R1} {output.assembly_R1}
             ln -s {input.R2} {output.assembly_R2}
             # run genome assembler
             mw assembly \
-            --megahit \
-            --metaspades \
+            {params.assemblers} \
             -m {params.memlimit} \
             -t {threads} \
             -l {params.contig_min_len} \
@@ -417,6 +420,15 @@ rule metawrap_binning:
         -x {params.max_perc_contam}
         
         cp -r {params.tmp_binref_dir}/* {params.bin_dir}
+        bold=$(tput bold)
+        normal=$(tput sgr0)
+        for this_bin in `find {params.bin_dir} -type f -regex ".*/bin.[0-9][0-9]?[0-9]?.fa"`; do
+            fn=$(basename $this_bin)
+            to=$(dirname $this_bin)/{wildcards.name}_$fn
+            echo "relabeling ${{bold}}$fn${{normal}} to ${{bold}}{wildcards.name}_$fn${{normal}}"
+            mv $this_bin $to
+        done
+        
         touch {output.bin_breadcrumb}
         chmod -R 775 {params.bin_dir}
         """
@@ -512,20 +524,21 @@ rule derep_bins:
             directory of consensus ensemble bins (deterministic output)
     """
     input:
-        bin_breadcrumb              = join(top_binning_dir, "{name}", "{name}_BINNING_COMPLETE"),
+        bins                        = expand(join(top_binning_dir, "{name}", "{name}_BINNING_COMPLETE"), name=samples),
     output:
-        derep_genome_info           = join(top_refine_dir, "{name}", "dRep", "data_tables", "Widb.csv"),
-        derep_winning_figure        = join(top_refine_dir, "{name}", "dRep", "figures", "Winning_genomes.pdf"),
-        derep_args                  = join(top_refine_dir, "{name}", "dRep", "log", "cluster_arguments.json"),
-        derep_genome_dir            = directory(join(top_refine_dir, "{name}", "dRep", "dereplicated_genomes")),
+        derep_genome_info           = join(top_refine_dir, "dRep", "data_tables", "Widb.csv"),
+        derep_winning_figure        = join(top_refine_dir, "dRep", "figures", "Winning_genomes.pdf"),
+        derep_args                  = join(top_refine_dir, "dRep", "log", "cluster_arguments.json"),
+        derep_genome_dir            = directory(join(top_refine_dir, "dRep", "dereplicated_genomes")),
+        derep_dir                   = directory(join(top_refine_dir, "dRep")),
     singularity: metawrap_container,
     threads: int(cluster["derep_bins"].get("threads", default_threads)),
     params:
         rname                       = "derep_bins",
-        sid                         = "{name}",
         tmpdir                      = config['options']['tmp_dir'],
-        derep_dir                   = join(top_refine_dir, "{name}", "dRep"),
-        metawrap_bins               = join(top_binning_dir, "{name}", "metawrap_50_5_bins"),
+        bindir                      = join(top_binning_dir),
+        outto                       = join(top_refine_dir, "dRep"),
+        metawrap_dir_name           = "metawrap_50_5_bins",
         # -l LENGTH: Minimum genome length (default: 50000)
         minimum_genome_length       = "1000",
         # -pa[--P_ani] P_ANI: ANI threshold to form primary (MASH) clusters (default: 0.9)
@@ -551,13 +564,8 @@ rule derep_bins:
         dRep check_dependencies
 
         # run drep
-        export DREP_BINS=$(ls {params.metawrap_bins}/* | tr '\\n' ' ')
-
-        printf "\ngenome list\n"
-        printf ${{DREP_BINS}} 
-        printf "\n"
-
-        mkdir -p {params.derep_dir}
+        DREP_BINS=$(ls {params.bindir}/*/{params.metawrap_dir_name}/*.fa | tr '\\n' ' ')
+        mkdir -p {params.outto}
         dRep dereplicate -d \
         -g ${{DREP_BINS}} \
         -p {threads} \
@@ -566,25 +574,23 @@ rule derep_bins:
         -sa {params.ani_secondary_threshold} \
         -nc {params.min_overlap} \
         -cm {params.coverage_method} \
-        {params.derep_dir}
+        {params.outto}
         """
 
 
 rule contig_annotation:
     input:
-        derep_genome_info           = join(top_refine_dir, "{name}", "dRep", "data_tables", "Widb.csv"),
-        derep_winning_figure        = join(top_refine_dir, "{name}", "dRep", "figures", "Winning_genomes.pdf"),
-        derep_args                  = join(top_refine_dir, "{name}", "dRep", "log", "cluster_arguments.json"),
-        dRep_dir                    = join(top_refine_dir, "{name}", "dRep", "dereplicated_genomes"),
+        derep_genome_info           = join(top_refine_dir, "dRep", "data_tables", "Widb.csv"),
+        derep_winning_figure        = join(top_refine_dir, "dRep", "figures", "Winning_genomes.pdf"),
+        derep_args                  = join(top_refine_dir, "dRep", "log", "cluster_arguments.json"),
+        dRep_dir                    = join(top_refine_dir, "dRep", "dereplicated_genomes"),
     output:
-        cat_bin2cls_filename        = join(top_refine_dir, "{name}", "contig_annotation", "out.BAT.bin2classification.txt"),
-        cat_bin2cls_official        = join(top_refine_dir, "{name}", "contig_annotation", "out.BAT.bin2classification.official_names.txt"),
-        cat_bin2cls_summary         = join(top_refine_dir, "{name}", "contig_annotation", "out.BAT.bin2classification.summary.txt"),
+        cat_bin2cls_filename        = join(top_refine_dir, "contig_annotation", "out.BAT.bin2classification.txt"),
+        cat_bin2cls_official        = join(top_refine_dir, "contig_annotation", "out.BAT.bin2classification.official_names.txt"),
+        cat_bin2cls_summary         = join(top_refine_dir, "contig_annotation", "out.BAT.bin2classification.summary.txt"),
     params:
-        cat_dir                     = join(top_refine_dir, "{name}", "contig_annotation"),
-        dRep_dir                    = join(top_refine_dir, "{name}", "dRep", "dereplicated_genomes"),
+        cat_dir                     = join(top_refine_dir, "contig_annotation"),
         rname                       = "contig_annotation",
-        sid                         = "{name}",
         cat_db                      = "/data2/CAT",         # from <root>/config/resources.json
         tax_db                      = "/data2/CAT_tax",     # from <root>/config/resourcs.json
         diamond_exec                = "/usr/bin/diamond",
@@ -594,7 +600,7 @@ rule contig_annotation:
         """
         if [ ! -d "{params.cat_dir}" ]; then mkdir -p "{params.cat_dir}"; fi
         cd {params.cat_dir} && CAT bins \
-            -b {params.dRep_dir} \
+            -b {input.dRep_dir} \
             -d {params.cat_db} \
             -t {params.tax_db} \
             --path_to_diamond {params.diamond_exec} \
@@ -615,13 +621,13 @@ rule contig_annotation:
     
 rule bbtools_index_map:
     input:
-        derep_genome_info           = join(top_refine_dir, "{name}", "dRep", "data_tables", "Widb.csv"),
-        derep_winning_figure        = join(top_refine_dir, "{name}", "dRep", "figures", "Winning_genomes.pdf"),
-        derep_args                  = join(top_refine_dir, "{name}", "dRep", "log", "cluster_arguments.json"),
-        dRep_dir                    = join(top_refine_dir, "{name}", "dRep", "dereplicated_genomes"),
-        cat_bin2cls_filename        = join(top_refine_dir, "{name}", "contig_annotation", "out.BAT.bin2classification.txt"),
-        cat_bing2cls_official       = join(top_refine_dir, "{name}", "contig_annotation", "out.BAT.bin2classification.official_names.txt"),
-        cat_bing2cls_summary        = join(top_refine_dir, "{name}", "contig_annotation", "out.BAT.bin2classification.summary.txt"),
+        derep_genome_info           = join(top_refine_dir, "dRep", "data_tables", "Widb.csv"),
+        derep_winning_figure        = join(top_refine_dir, "dRep", "figures", "Winning_genomes.pdf"),
+        derep_args                  = join(top_refine_dir, "dRep", "log", "cluster_arguments.json"),
+        dRep_dir                    = join(top_refine_dir, "dRep", "dereplicated_genomes"),
+        cat_bin2cls_filename        = join(top_refine_dir, "contig_annotation", "out.BAT.bin2classification.txt"),
+        cat_bing2cls_official       = join(top_refine_dir, "contig_annotation", "out.BAT.bin2classification.official_names.txt"),
+        cat_bing2cls_summary        = join(top_refine_dir, "contig_annotation", "out.BAT.bin2classification.summary.txt"),
         R1                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq"),
         R2                          = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq"),
     output:
@@ -705,15 +711,13 @@ rule bbtools_index_map:
 
 rule gtdbtk_classify:
     input:
-        R1                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq"),
-        R2                          = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq"),
-        dRep_dir                    = join(top_refine_dir, "{name}", "dRep", "dereplicated_genomes"),
+        dRep_dir                    = join(top_refine_dir, "dRep", "dereplicated_genomes"),
     output:
-        gtdbk_dir                   = directory(join(top_tax_dir, "{name}", "GTDBTK_classify_wf"))
-    threads: int(cluster["gtdbk_classify"].get("threads", default_threads)),
+        gtdbk_dir                   = directory(join(top_tax_dir, "GTDBTK_classify_wf"))
+    threads: 
+        int(cluster["gtdbk_classify"].get("threads", default_threads)),
     params:
         rname                       = "gtdbk_classify",
-        sid                         = "{name}",
         tmp_safe_dir                = join(config['options']['tmp_dir'], 'gtdbtk_classify'),
         GTDBTK_DB                   = "/data2/GTDBTK_DB",
     singularity: metawrap_container,
@@ -743,15 +747,14 @@ rule gtdbtk_classify:
 
 rule gunc_detection:
     input:
-        derep_genome_info           = join(top_refine_dir, "{name}", "dRep", "data_tables", "Widb.csv"),
-        derep_winning_figure        = join(top_refine_dir, "{name}", "dRep", "figures", "Winning_genomes.pdf"),
-        derep_args                  = join(top_refine_dir, "{name}", "dRep", "log", "cluster_arguments.json"),
-        drep_genomes                = join(top_refine_dir, "{name}", "dRep", "dereplicated_genomes"),
+        derep_genome_info           = join(top_refine_dir, "dRep", "data_tables", "Widb.csv"),
+        derep_winning_figure        = join(top_refine_dir, "dRep", "figures", "Winning_genomes.pdf"),
+        derep_args                  = join(top_refine_dir, "dRep", "log", "cluster_arguments.json"),
+        drep_genomes                = join(top_refine_dir, "dRep", "dereplicated_genomes"),
     output:
-        GUNC_detect_out             = directory(join(top_tax_dir, "{name}", "GUNC_detect"))
+        GUNC_detect_out             = directory(join(top_tax_dir,"GUNC_detect"))
     params:
         rname                       = "gunc_detection",
-        sid                         = "{name}",
         gunc_db                     = "/data2/GUNC_DB/gunc_db_progenomes2.1.dmnd", # from <root>/config/resourcs.json
         tmp_safe_dir                = join(config['options']['tmp_dir'], 'gunc_detect'),
     singularity: metawrap_container,

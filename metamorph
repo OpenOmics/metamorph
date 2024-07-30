@@ -155,10 +155,12 @@ def run(sub_args):
         sub_args,
         config = config
     )
-
     config['bindpaths'] = bindpaths
-    # config['coassembly'] = sub_args.coa
     config['coassembly'] = False
+
+    # Step 4b. Setup assembly mode
+    #   modes: 0 - megahit + metaspades assembly
+    config["options"]["assembler_mode"] = "1" if sub_args.megahit_only else "0"
 
     # Step 5. Save config to output directory
     with open(os.path.join(sub_args.output, 'config.json'), 'w') as fh:
@@ -481,21 +483,6 @@ def parsed_arguments(name, description):
         help = argparse.SUPPRESS
     )
 
-    # a supported job scheduler, etc.
-    # subparser_run.add_argument(
-    #     '-C', '--coa',
-    #     action="store_true",
-    #     required = False,
-    #     help = argparse.SUPPRESS
-    # )
-
-    # subparser_run.add_argument(
-    #     '-R', '--rnacoa',
-    #     action="store_true",
-    #     required = False,
-    #     help = argparse.SUPPRESS
-    # )
-
     # Name of master job
     subparser_run.add_argument(
         '--job-name',
@@ -558,6 +545,17 @@ def parsed_arguments(name, description):
     # This is only applicable for 
     # local rules or when running 
     # in local mode.
+    subparser_run.add_argument(
+        '--megahit-only',
+        dest = 'megahit_only',
+        action = 'store_true',
+        required = False,
+        default = False,
+        help = argparse.SUPPRESS
+    )
+
+    # Selection of the assemblers used.
+    # Using 
     subparser_run.add_argument(
         '--threads',
         type = int,
