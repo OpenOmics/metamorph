@@ -746,15 +746,14 @@ rule gtdbtk_classify:
 
 rule gunc_detection:
     input:
-        derep_genome_info           = join(top_refine_dir, "{name}", "dRep", "data_tables", "Widb.csv"),
-        derep_winning_figure        = join(top_refine_dir, "{name}", "dRep", "figures", "Winning_genomes.pdf"),
-        derep_args                  = join(top_refine_dir, "{name}", "dRep", "log", "cluster_arguments.json"),
-        drep_genomes                = join(top_refine_dir, "{name}", "dRep", "dereplicated_genomes"),
+        derep_genome_info           = join(top_refine_dir, "dRep", "data_tables", "Widb.csv"),
+        derep_winning_figure        = join(top_refine_dir, "dRep", "figures", "Winning_genomes.pdf"),
+        derep_args                  = join(top_refine_dir, "dRep", "log", "cluster_arguments.json"),
+        drep_genomes                = join(top_refine_dir, "dRep", "dereplicated_genomes"),
     output:
-        GUNC_detect_out             = directory(join(top_tax_dir, "{name}", "GUNC_detect"))
+        GUNC_detect_out             = directory(join(top_tax_dir,"GUNC_detect"))
     params:
         rname                       = "gunc_detection",
-        sid                         = "{name}",
         gunc_db                     = "/data2/GUNC_DB/gunc_db_progenomes2.1.dmnd", # from <root>/config/resourcs.json
         tmp_safe_dir                = join(config['options']['tmp_dir'], 'gunc_detect'),
     singularity: metawrap_container,
