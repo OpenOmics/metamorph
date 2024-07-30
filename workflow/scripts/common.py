@@ -18,7 +18,7 @@ def get_paired_dna(config, rna_sid):
     top_mags_dir = join(config["project"]["workpath"], config['project']['id'], "mags")
     # construct necessary linked dna artifacts
     derep_reqs = join(top_refine_dir, "dRep", "dereplicated_genomes")
-    mag_index = join(top_mags_dir, "index")
+    mag_index = join(top_mags_dir, dna_sid, "index")
     return [derep_reqs, mag_index]
 
 
