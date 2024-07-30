@@ -621,13 +621,13 @@ rule contig_annotation:
     
 rule bbtools_index_map:
     input:
-        derep_genome_info           = join(top_refine_dir, "{name}", "dRep", "data_tables", "Widb.csv"),
-        derep_winning_figure        = join(top_refine_dir, "{name}", "dRep", "figures", "Winning_genomes.pdf"),
-        derep_args                  = join(top_refine_dir, "{name}", "dRep", "log", "cluster_arguments.json"),
-        dRep_dir                    = join(top_refine_dir, "{name}", "dRep", "dereplicated_genomes"),
-        cat_bin2cls_filename        = join(top_refine_dir, "{name}", "contig_annotation", "out.BAT.bin2classification.txt"),
-        cat_bing2cls_official       = join(top_refine_dir, "{name}", "contig_annotation", "out.BAT.bin2classification.official_names.txt"),
-        cat_bing2cls_summary        = join(top_refine_dir, "{name}", "contig_annotation", "out.BAT.bin2classification.summary.txt"),
+        derep_genome_info           = join(top_refine_dir, "dRep", "data_tables", "Widb.csv"),
+        derep_winning_figure        = join(top_refine_dir, "dRep", "figures", "Winning_genomes.pdf"),
+        derep_args                  = join(top_refine_dir, "dRep", "log", "cluster_arguments.json"),
+        dRep_dir                    = join(top_refine_dir, "dRep", "dereplicated_genomes"),
+        cat_bin2cls_filename        = join(top_refine_dir, "contig_annotation", "out.BAT.bin2classification.txt"),
+        cat_bing2cls_official       = join(top_refine_dir, "contig_annotation", "out.BAT.bin2classification.official_names.txt"),
+        cat_bing2cls_summary        = join(top_refine_dir, "contig_annotation", "out.BAT.bin2classification.summary.txt"),
         R1                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq"),
         R2                          = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq"),
     output:
