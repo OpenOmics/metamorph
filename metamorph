@@ -29,20 +29,26 @@ USAGE:
   $ metamorph <command> [OPTIONS]
 
 EXAMPLES:
-    co-assembly dna-only:
-        $ metamorph run --coa --input *.R?.fastq.gz --output output
-        $ metamorph run -C --input *.R?.fastq.gz --output output
+    dna-only:
+        $ metamorph run --input <sample_sheet> --output <output_dir>
+            sample sheet:
+                         ________
+                         |  DNA  |
+                         | -------
+                pair1    |  path |
+                pair2    |  path |
+                         --------
 
-    per-sample assembly dna-only:
-        $ metamorph run --input *.R?.fastq.gz --output output
-
-    co-assembly rna & dna:
-        $ metamorph run --coa --input *.R?.fastq.gz --rna rna/*.R?.fastq.gz --output output
-        $ metamorph run -C --input *.R?.fastq.gz --rna rna/*.R?.fastq.gz  --output output
-
-    per-sample assembly rna & dna:
-        $ metamorph run --input *.R?.fastq.gz --rna rna/*.R?.fastq.gz --output output
-"""
+    rna & dna:
+        $ metamorph run --input <sample_sheet> --output <output_dir>
+            sample sheet: 
+                             ________________
+                            |  DNA  |  RNA  |
+                            |---------------| 
+                    pair1   |  path |  path |
+                    pair2   |  path |  path |
+                             ---------------
+"""         
 from __future__ import print_function
 from datetime import timezone, datetime
 import argparse, sys, os, subprocess, json, textwrap
@@ -149,7 +155,6 @@ def run(sub_args):
         config = config
     )
     config['bindpaths'] = bindpaths
-    config['coassembly'] = False
 
     # Step 4b. Setup assembly mode
     #   modes: 0 - megahit + metaspades assembly
@@ -386,7 +391,7 @@ def parsed_arguments(name, description):
         module load singularity snakemake
 
         # Step 2A.) Dry-run the pipeline
-        ./{0} run --input .tests/*.R?.fastq.gz \\
+        ./{0} run --input <sample_sheet> \\
                         --output /data/$USER/output \\
                         --mode slurm \\
                         --dry-run
@@ -395,30 +400,36 @@ def parsed_arguments(name, description):
         # The slurm mode will submit jobs to 
         # the cluster. It is recommended running 
         # the pipeline in this mode.
-        ./{0} run --input .tests/*.R?.fastq.gz \\
+        ./{0} run --input <sample_sheet>  \\
                         --output /data/$USER/output \\
                         --mode slurm
                                 
         # Step 3B.) Run the {0} pipeline in co-assembly fashion
         # with slurm
-        ./{0} run --coa --input .tests/*.R?.fastq.gz \\
+        ./{0} run --input .tests/*.R?.fastq.gz \\
                         --output /data/$USER/output \\
                         --mode slurm
 
         {2}{3}EXAMPLES:{4}
-            co-assembly dna-only:
-                $ metamorph run --coa --input *.R?.fastq.gz --output output
-                $ metamorph run -C --input *.R?.fastq.gz --output output
+                dna-only:
+                    $ metamorph run --input <sample_sheet> --output <output_dir>
+                        sample sheet:
+                                    ________
+                                    |  DNA  |
+                                    | -------
+                            pair1    |  path |
+                            pair2    |  path |
+                                    --------
 
-            per-sample assembly dna-only:
-                $ metamorph run --input *.R?.fastq.gz --output output
-
-            co-assembly rna & dna:
-                $ metamorph run --coa --input *.R?.fastq.gz --rna rna/*.R?.fastq.gz --output output
-                $ metamorph run -C --input *.R?.fastq.gz --rna rna/*.R?.fastq.gz  --output output
-
-            per-sample assembly rna & dna:
-                $ metamorph run --input *.R?.fastq.gz --rna rna/*.R?.fastq.gz --output output
+                rna & dna:
+                    $ metamorph run --input <sample_sheet> --output <output_dir>
+                        sample sheet: 
+                                        ________________
+                                        |  DNA  |  RNA  |
+                                        |---------------| 
+                                pair1   |  path |  path |
+                                pair2   |  path |  path |
+                                        ---------------
                                  
 
         {2}{3}VERSION:{4}
