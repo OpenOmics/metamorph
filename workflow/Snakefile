@@ -13,11 +13,9 @@ rna_datapath               = config["project"].get("rna_datapath", [])
 workpath                   = config["project"]["workpath"]
 tmpdir                     = config["options"]["tmp_dir"]
 megahit_only               = bool(int(config["options"]["assembler_mode"]))
-coassemble                 = config['coassembly'] is True
 rna_included               = list_bool(config.get("rna", 'false'))
-rna_coasm                  = str_bool(config["options"].get("rnacoa", 'False'))
-rna_sample_stems           = config.get("rna", []) if not rna_coasm else ['concatenated']
-samples                    = config["samples"] if not coassemble else ['concatenated']
+rna_sample_stems           = config.get("rna", [])
+samples                    = config["samples"]
 
 # DNA directories
 top_assembly_dir           = join(workpath, config['project']['id'], "metawrap_assembly")

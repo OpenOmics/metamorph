@@ -6,6 +6,7 @@ from __future__ import print_function
 from shutil import copytree
 import os, sys, hashlib
 import subprocess, json
+from csv import DictReader
 
 
 def md5sum(filename, first_block_only = False, blocksize = 65536):
@@ -368,6 +369,62 @@ def hashed(l):
     h = h.hexdigest()
 
     return h
+
+
+def valid_input(sheet):
+    from argparse import ArgumentTypeError
+    """
+    Valid sample sheets should contain two columns: "DNA" and "RNA"
+
+             _________________
+             |  DNA  |  RNA  |
+             |---------------| 
+    pair1    |  path |  path |
+    pair2    |  path |  path |
+    """
+    # check file permissions
+    sheet = os.path.abspath(sheet)
+    if not os.path.exists(sheet):
+        raise ArgumentTypeError(f'Sample sheet path {sheet} does not exist!')
+    if not os.access(sheet, os.R_OK):
+        raise ArgumentTypeError(f"Path `{sheet}` exists, but cannot read path due to permissions!")
+
+    # check format to make sure it's correct
+    if sheet.endswith('.tsv') or sheet.endswith('.txt'):
+        delim = '\t'
+    elif sheet.endswith('.csv'):
+        delim = '\t'
+
+    rdr = DictReader(open(sheet, 'r'), delimiter=delim)
+
+    if 'DNA' not in rdr.fieldnames:
+        raise ArgumentTypeError("Sample sheet does not contain `DNA` column")
+    if 'RNA' not in rdr.fieldnames:
+        print("-- Running in DNA only mode --")
+    else:
+        print("-- Running in paired DNA & RNA mode --")
+
+    data = [row for row in rdr]
+    RNA_included = False
+    for row in data:
+        row['DNA'] = os.path.abspath(row['DNA'])
+        if not os.path.exists(row['DNA']):
+            raise ArgumentTypeError(f"Sample sheet path `{row['DNA']}` does not exist")
+        if 'RNA' in row and not row['RNA'] in ('', None, 'None'):
+            RNA_included = True
+            row['RNA'] = os.path.abspath(row['RNA'])
+            if not os.path.exists(row['RNA']):
+                raise ArgumentTypeError(f"Sample sheet path `{row['RNA']}` does not exist")
+            
+    return data, RNA_included
+
+
+def valid_trigger(trigger_given):
+    from argparse import ArgumentTypeError
+    snk_triggers = ('mtime', 'code', 'input', 'params', 'software-env')
+    if not trigger_given in snk_triggers:
+        raise ArgumentTypeError('Invalid trigger selected please only use one of: ' + ', '.join(snk_triggers))
+    return trigger_given
 
 
 if __name__ == '__main__':

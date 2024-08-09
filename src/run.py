@@ -5,7 +5,7 @@
 from __future__ import print_function
 from shutil import copytree
 from pathlib import Path
-from csv import DictReader, Sniffer
+
 import os, re, json, sys, subprocess, argparse
 
 
@@ -664,53 +664,6 @@ def dryrun(outdir, config='config.json', snakefile=os.path.join('workflow', 'Sna
     return dryrun_output
 
 
-def valid_input(sheet):
-    """
-    Valid sample sheets should contain two columns: "DNA" and "RNA"
-
-             _________________
-             |  DNA  |  RNA  |
-             |---------------| 
-    pair1    |  path |  path |
-    pair2    |  path |  path |
-    """
-    # check file permissions
-    sheet = os.path.abspath(sheet)
-    if not os.path.exists(sheet):
-        raise argparse.ArgumentTypeError(f'Sample sheet path {sheet} does not exist!')
-    if not os.access(sheet, os.R_OK):
-        raise argparse.ArgumentTypeError(f"Path `{sheet}` exists, but cannot read path due to permissions!")
-
-    # check format to make sure it's correct
-    if sheet.endswith('.tsv') or sheet.endswith('.txt'):
-        delim = '\t'
-    elif sheet.endswith('.csv'):
-        delim = '\t'
-
-    rdr = DictReader(open(sheet, 'r'), delimiter=delim)
-
-    if 'DNA' not in rdr.fieldnames:
-        raise argparse.ArgumentTypeError("Sample sheet does not contain `DNA` column")
-    if 'RNA' not in rdr.fieldnames:
-        print("-- Running in DNA only mode --")
-    else:
-        print("-- Running in paired DNA & RNA mode --")
-
-    data = [row for row in rdr]
-    RNA_included = False
-    for row in data:
-        row['DNA'] = os.path.abspath(row['DNA'])
-        if not os.path.exists(row['DNA']):
-            raise argparse.ArgumentTypeError(f"Sample sheet path `{row['DNA']}` does not exist")
-        if 'RNA' in row and not row['RNA'] in ('', None, 'None'):
-            RNA_included = True
-            row['RNA'] = os.path.abspath(row['RNA'])
-            if not os.path.exists(row['RNA']):
-                raise argparse.ArgumentTypeError(f"Sample sheet path `{row['RNA']}` does not exist")
-            
-    return data, RNA_included
-
-
 try:
     __job_name__ = 'metamorph_' + os.getlogin() + ':master'
 except OSError:
@@ -726,6 +679,7 @@ def runner(
         threads=2,  
         jobname=__job_name__,
         submission_script='run.sh',
+        triggers=None,
         tmp_dir = '/lscratch/$SLURM_JOB_ID/'
     ):
     """Runs the pipeline via selected executor: local or slurm.
@@ -833,11 +787,14 @@ def runner(
         #   --cluster "${CLUSTER_OPTS}" --keep-going --restart-times 3 -j 500 \
         #   --rerun-incomplete --stats "$3"/logfiles/runtime_statistics.json \
         #   --keep-remote --local-cores 30 2>&1 | tee -a "$3"/logfiles/master.log
-        masterjob = subprocess.Popen([
-                str(submission_script), mode,
-                '-j', jobname, '-b', str(bindpaths),
-                '-o', str(outdir), '-c', str(cache),
-                '-t', "'{}'".format(tmp_dir)
-            ], cwd = outdir, stderr=subprocess.STDOUT, stdout=logger, env=my_env)
+        cmd = [
+            str(submission_script), mode,
+            '-j', jobname, '-b', str(bindpaths),
+            '-o', str(outdir), '-c', str(cache),
+            '-t', "'{}'".format(tmp_dir),
+        ]
+        if triggers:
+            cmd.extend(['-r', ','.join(triggers)])
+        masterjob = subprocess.Popen(cmd, cwd = outdir, stderr=subprocess.STDOUT, stdout=logger, env=my_env)
 
     return masterjob

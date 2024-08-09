@@ -17,7 +17,7 @@ default_memory             = cluster["__default__"]['mem']
 # directories
 workpath                   = config["project"]["workpath"]
 datapath                   = config["project"]["datapath"]
-samples                    = config["samples"] if not coassemble else ['concatenated']
+samples                    = config["samples"]
 top_log_dir                = join(workpath, "logfiles")
 top_readqc_dir             = join(workpath, config['project']['id'], "metawrap_read_qc")
 top_trim_dir               = join(workpath, config['project']['id'], "trimmed_reads")
@@ -36,7 +36,6 @@ megahit_only               = bool(int(config["options"]["assembler_mode"]))
 
 """
     Step-wise pipeline outline:
-        0. concat or no concat
         1. read qc
         2. assembly
         3. binning
@@ -46,52 +45,6 @@ megahit_only               = bool(int(config["options"]["assembler_mode"]))
         7. index depreplicated genomes
         8. align DNA to assembly
 """
-
-rule concat_reads:
-    input:
-        all_r1_reads                = expand(join(workpath, "dna", "{sid}_R1.fastq.gz"), sid=config['samples'] if config['coassembly'] else []),
-        all_r2_reads                = expand(join(workpath, "dna", "{sid}_R2.fastq.gz"), sid=config['samples'] if config['coassembly'] else []),
-    output:
-        big_compressed_read_r1      = join(workpath, "dna", "concatenated_R1.fastq.gz"),
-        big_compressed_read_r2      = join(workpath, "dna", "concatenated_R2.fastq.gz"),
-        big_read1_hash              = join(workpath, "dna", "concatenated_R1.md5"),
-        big_read2_hash              = join(workpath, "dna", "concatenated_R2.md5"),
-    params:
-        big_read_r1                 = join(workpath, "dna", "concatenated_R1.fastq"),
-        big_read_r2                 = join(workpath, "dna", "concatenated_R2.fastq"),
-        rname                       = "concat_reads",
-        input_dir                   = join(workpath, "dna"),
-    threads: int(cluster["concat_reads"].get('threads', default_threads)),
-    shell: 
-        """
-        shopt -s extglob
-        # concat r1
-        for fastq in {params.input_dir}/*R1*f?(ast)q*; do
-            ext=$(echo "${{fastq: -2}}" | tr '[:upper:]' '[:lower:]')
-            if [[ "$ext" == "gz" ]]; then
-                zcat $fastq >> {params.big_read_r1}
-            else
-                cat $fastq >> {params.big_read_r1}
-            fi;
-        done
-
-        # concat r2
-        for fastq in {params.input_dir}/*R2*f?(ast)q*; do 
-            ext=$(echo "${{fastq: -2}}" | tr '[:upper:]' '[:lower:]')
-            if [[ "$ext" == "gz" ]]; then
-                zcat $fastq > {params.big_read_r2}
-            else
-                cat $fastq > {params.big_read_r2}
-            fi;
-        done
-        shopt -u extglob
-
-        pigz -9 -p 28 -c {params.big_read_r1} > {output.big_compressed_read_r1}
-        pigz -9 -p 28 -c {params.big_read_r2} > {output.big_compressed_read_r2}
-        md5sum {output.big_compressed_read_r1} > {output.big_read1_hash}
-        md5sum {output.big_compressed_read_r2} > {output.big_read2_hash}
-        rm {params.big_read_r1} {params.big_read_r2}
-        """
 
 
 rule metawrap_read_qc:

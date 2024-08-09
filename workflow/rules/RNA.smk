@@ -12,7 +12,6 @@ from scripts.common import str_bool, list_bool, get_paired_dna
 workpath                            = config["project"]["workpath"]
 rna_datapath                        = config["project"].get("rna_datapath", "/dev/null")
 rna_included                        = list_bool(config.get("rna", 'false'))
-rna_coasm                           = False
 rna_sample_stems                    = config.get("rna", [])
 rna_compressed                      = True # if accepting uncompressed fastq input
 get_dna                             = partial(get_paired_dna, config)
@@ -21,50 +20,6 @@ pairedness                          = list(range(1, config['project']['nends']+1
 top_readqc_dir_rna                  = join(workpath, config['project']['id'], "metawrap_read_qc_RNA")
 top_trim_dir_rna                    = join(workpath, config['project']['id'], "trimmed_reads_RNA")
 top_map_dir_rna                     = join(workpath, config['project']['id'], "mapping_RNA")
-
-
-rule concat_rna_reads:
-    input:
-        all_r1_reads                = expand(join(workpath, "rna", "{rname}_R1.fastq.gz"), rname=rna_sample_stems if rna_coasm else []) if rna_included else [],
-        all_r2_reads                = expand(join(workpath, "rna", "{rname}_R2.fastq.gz"), rname=rna_sample_stems if rna_coasm else []) if rna_included else [],
-    output:
-        big_compressed_read_r1      = join(workpath, "rna", "concatenated_R1.fastq.gz"),
-        big_compressed_read_r2      = join(workpath, "rna", "concatenated_R2.fastq.gz"),
-        big_read1_hash              = join(workpath, "rna", "concatenated_R1.md5"),
-        big_read2_hash              = join(workpath, "rna", "concatenated_R2.md5"),
-    params:
-        rname                       = "concat_rna_reads",
-        big_read_r1                 = join(workpath, "rna", "concatenated_R1.fastq"),
-        big_read_r2                 = join(workpath, "rna", "concatenated_R2.fastq"),
-        input_dir                   = workpath,
-    threads: int(cluster["concat_rna_reads"].get('threads', default_threads)),
-    shell: 
-        """
-        # concat r1
-        for fastq in {params.input_dir}/*R1*fastq; do
-            ext=$(echo "${{fastq: -2}}" | tr '[:upper:]' '[:lower:]')
-            if [[ "$ext" == "gz" ]]; then
-                zcat $fastq >> {params.big_read_r1}
-            else
-                cat $fastq >> {params.big_read_r1}
-            fi;
-        done
-
-        # concat r2
-        for fastq in {params.input_dir}/*R2*fastq; do 
-            ext=$(echo "${{fastq: -2}}" | tr '[:upper:]' '[:lower:]')
-            if [[ "$ext" == "gz" ]]; then
-                zcat $fastq > {params.big_read_r2}
-            else
-                cat $fastq >> {params.big_read_r2}
-            fi;
-        done
-        pigz -9 -p {threads} -c {output.big_read_r1} > {output.big_compressed_read_r1}
-        pigz -9 -p {threads} -c {output.big_read_r2} > {output.big_compressed_read_r2}
-        md5sum {output.big_compressed_read_r1} > {output.big_read1_hash}
-        md5sum {output.big_compressed_read_r2} > {output.big_read2_hash}
-        rm {output.big_read_r1} {output.big_read_r2}
-        """
 
 
 rule rna_read_qc:

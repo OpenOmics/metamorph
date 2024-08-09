@@ -8,7 +8,8 @@ USAGE:
           -o OUTDIR \\
           -j MASTER_JOB_NAME \\
           -b SINGULARITY_BIND_PATHS \\
-          -t TMP_DIR
+          -t TMP_DIR \\
+          -r RERUN_TRIGGERS
 SYNOPSIS:
   This script creates/submits the pipeline's master job  to  the 
 cluster. The master job acts as the pipeline's main controller or 
@@ -61,7 +62,12 @@ Required Arguments:
                                  this location. On Biowulf, it should be 
                                  set to '/lscratch/\$SLURM_JOBID/'. On FRCE,
                                  this value should be set to the following: 
-                                 '/scratch/cluster_scratch/\$USER/'.     
+                                 '/scratch/cluster_scratch/\$USER/'.
+ -r, --triggers [Type: Str]      Snakemake rerun triggers. See 
+                                 description of flag '--rerun-triggers', at
+                                 https://snakemake.readthedocs.io/en/stable/executing/cli.html#all-options
+                                 for more details.
+                                 Default: code params software_env input mtime
 OPTIONS:
   -c,  --cache  [Type: Path]   Path to singularity cache. If not provided, 
                                 the path will default to the current working
@@ -97,6 +103,7 @@ function parser() {
       -t  | --tmp-dir) provided "$key" "${2:-}"; Arguments["t"]="$2"; shift; shift;;
       -o  | --outdir)  provided "$key" "${2:-}"; Arguments["o"]="$2"; shift; shift;;
       -c  | --cache)  provided "$key" "${2:-}"; Arguments["c"]="$2"; shift; shift;;
+      -r  | --triggers) provided "$key" "${2:-}"; Arguments["r"]="$2"; shift; shift;;
       -*  | --*) err "Error: Failed to parse unsupported argument: '${key}'."; usage && exit 1;;
       *) err "Error: Failed to parse unrecognized argument: '${key}'. Do any of your inputs have spaces?"; usage && exit 1;;
     esac
@@ -159,6 +166,7 @@ function submit(){
   # INPUT $4 = Singularity Bind paths
   # INPUT $5 = Singularity cache directory
   # INPUT $6 = Temporary directory for output files
+  # INPUT $7 = rerun trigger values
 
   # Check if singularity and snakemake are in $PATH
   # If not, try to module load singularity as a last resort
@@ -191,6 +199,11 @@ function submit(){
           # --printshellcmds --keep-going --rerun-incomplete 
           # --keep-remote --restart-times 3 -j 500 --use-singularity 
           # --singularity-args -B {}.format({bindpaths}) --local-cores 24
+          triggers="${7:-'{code,params,software_env,input,mtime}'}"
+          if [[ ! ${triggers:0:1} == "{" ]] ; then triggers="{$triggers"; fi
+          if [[ ! ${triggers:0-1} == "}" ]] ; then triggers+='}'; fi
+          rerun="--rerun-triggers $triggers"
+          
           SLURM_DIR="$3/logfiles/slurmfiles"
           CLUSTER_OPTS="sbatch --gres {cluster.gres} --cpus-per-task {cluster.threads} -p {cluster.partition} -t {cluster.time} --mem {cluster.mem} --job-name={params.rname} -e $SLURM_DIR/slurm-%j_{params.rname}.out -o $SLURM_DIR/slurm-%j_{params.rname}.out"
           # Check if NOT running on Biowulf
@@ -228,6 +241,7 @@ snakemake \\
   -s "$3/workflow/Snakefile" \\
   -d "$3" \\
   --use-singularity \\
+  $rerun \\
   --singularity-args "\\-c \\-B '$4'" \\
   --use-envmodules \\
   --verbose \\
@@ -279,9 +293,9 @@ function main(){
 
   # Parses remaining user provided command-line arguments
   parser "${@:2}" # Remove first item of list
+
   outdir="$(abspath "$(dirname  "${Arguments[o]}")")"
   Arguments[o]="${Arguments[o]%/}" # clean outdir path (remove trailing '/')
-
   # Setting defaults for non-required arguments
   # If singularity cache not provided, default to ${outdir}/.singularity
   cache="${Arguments[o]}/.singularity"
@@ -294,7 +308,11 @@ function main(){
 
   # Run pipeline and submit jobs to cluster using the defined executor
   mkdir -p "${Arguments[o]}/logfiles/"
-  job_id=$(submit "${Arguments[e]}" "${Arguments[j]}" "${Arguments[o]}" "${Arguments[b]}" "${Arguments[c]}" "${Arguments[t]}")
+  if [[ ! -v Arguments[r] ]] ; then
+    job_id=$(submit "${Arguments[e]}" "${Arguments[j]}" "${Arguments[o]}" "${Arguments[b]}" "${Arguments[c]}" "${Arguments[t]}")
+  else
+    job_id=$(submit "${Arguments[e]}" "${Arguments[j]}" "${Arguments[o]}" "${Arguments[b]}" "${Arguments[c]}" "${Arguments[t]}" "${Arguments[r]}")
+  fi
   echo -e "[$(date)] Pipeline submitted to cluster.\nMaster Job ID: $job_id"
   echo "${job_id}" > "${Arguments[o]}/logfiles/mjobid.log"
 
