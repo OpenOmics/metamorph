@@ -29,20 +29,26 @@ USAGE:
   $ metamorph <command> [OPTIONS]
 
 EXAMPLES:
-    co-assembly dna-only:
-        $ metamorph run --coa --input *.R?.fastq.gz --output output
-        $ metamorph run -C --input *.R?.fastq.gz --output output
+    dna-only:
+        $ metamorph run --input <sample_sheet> --output <output_dir>
+            sample sheet:
+                         ________
+                         |  DNA  |
+                         | -------
+                pair1    |  path |
+                pair2    |  path |
+                         --------
 
-    per-sample assembly dna-only:
-        $ metamorph run --input *.R?.fastq.gz --output output
-
-    co-assembly rna & dna:
-        $ metamorph run --coa --input *.R?.fastq.gz --rna rna/*.R?.fastq.gz --output output
-        $ metamorph run -C --input *.R?.fastq.gz --rna rna/*.R?.fastq.gz  --output output
-
-    per-sample assembly rna & dna:
-        $ metamorph run --input *.R?.fastq.gz --rna rna/*.R?.fastq.gz --output output
-"""
+    rna & dna:
+        $ metamorph run --input <sample_sheet> --output <output_dir>
+            sample sheet: 
+                             ________________
+                            |  DNA  |  RNA  |
+                            |---------------| 
+                    pair1   |  path |  path |
+                    pair2   |  path |  path |
+                             ---------------
+"""         
 from __future__ import print_function
 from datetime import timezone, datetime
 import argparse, sys, os, subprocess, json, textwrap
@@ -50,16 +56,9 @@ import argparse, sys, os, subprocess, json, textwrap
 
 # Local imports
 from src import version 
-from src.run import init, setup, bind, dryrun, runner, valid_input
-from src.utils import (
-    Colors,
-    err,
-    exists,
-    fatal,
-    check_cache,
-    require,
-    permissions
-)
+from src.run import init, setup, bind, dryrun, runner
+from src.utils import Colors, err, exists, fatal, check_cache, require, \
+                      permissions, valid_trigger, valid_input
 
 
 # Pipeline Metadata
@@ -156,7 +155,6 @@ def run(sub_args):
         config = config
     )
     config['bindpaths'] = bindpaths
-    config['coassembly'] = False
 
     # Step 4b. Setup assembly mode
     #   modes: 0 - megahit + metaspades assembly
@@ -190,6 +188,7 @@ def run(sub_args):
     if 'databases' in config:
         bindpaths.extend([mount['from']+':'+mount['to']+':'+mount['mode'] for mount in config['databases']])
 
+    triggers = sub_args.triggers if sub_args.triggers else None
     mjob = runner(mode = sub_args.mode, 
         outdir = sub_args.output,
         alt_cache = sub_args.singularity_cache,  
@@ -199,6 +198,7 @@ def run(sub_args):
         logger = logfh,
         additional_bind_paths = ",".join(bindpaths),
         tmp_dir = sub_args.tmp_dir,
+        triggers = triggers
     )
     
     # Step 6. Wait for subprocess to complete,
@@ -391,7 +391,7 @@ def parsed_arguments(name, description):
         module load singularity snakemake
 
         # Step 2A.) Dry-run the pipeline
-        ./{0} run --input .tests/*.R?.fastq.gz \\
+        ./{0} run --input <sample_sheet> \\
                         --output /data/$USER/output \\
                         --mode slurm \\
                         --dry-run
@@ -400,30 +400,36 @@ def parsed_arguments(name, description):
         # The slurm mode will submit jobs to 
         # the cluster. It is recommended running 
         # the pipeline in this mode.
-        ./{0} run --input .tests/*.R?.fastq.gz \\
+        ./{0} run --input <sample_sheet>  \\
                         --output /data/$USER/output \\
                         --mode slurm
                                 
         # Step 3B.) Run the {0} pipeline in co-assembly fashion
         # with slurm
-        ./{0} run --coa --input .tests/*.R?.fastq.gz \\
+        ./{0} run --input .tests/*.R?.fastq.gz \\
                         --output /data/$USER/output \\
                         --mode slurm
 
         {2}{3}EXAMPLES:{4}
-            co-assembly dna-only:
-                $ metamorph run --coa --input *.R?.fastq.gz --output output
-                $ metamorph run -C --input *.R?.fastq.gz --output output
+                dna-only:
+                    $ metamorph run --input <sample_sheet> --output <output_dir>
+                        sample sheet:
+                                    ________
+                                    |  DNA  |
+                                    | -------
+                            pair1    |  path |
+                            pair2    |  path |
+                                    --------
 
-            per-sample assembly dna-only:
-                $ metamorph run --input *.R?.fastq.gz --output output
-
-            co-assembly rna & dna:
-                $ metamorph run --coa --input *.R?.fastq.gz --rna rna/*.R?.fastq.gz --output output
-                $ metamorph run -C --input *.R?.fastq.gz --rna rna/*.R?.fastq.gz  --output output
-
-            per-sample assembly rna & dna:
-                $ metamorph run --input *.R?.fastq.gz --rna rna/*.R?.fastq.gz --output output
+                rna & dna:
+                    $ metamorph run --input <sample_sheet> --output <output_dir>
+                        sample sheet: 
+                                        ________________
+                                        |  DNA  |  RNA  |
+                                        |---------------| 
+                                pair1   |  path |  path |
+                                pair2   |  path |  path |
+                                        ---------------
                                  
 
         {2}{3}VERSION:{4}
@@ -466,9 +472,6 @@ def parsed_arguments(name, description):
         action='help', 
         help=argparse.SUPPRESS
     )
-    
-    # Analysis options
-    # ... add here
 
     # Orchestration Options
     # Execution Method, run locally 
@@ -489,6 +492,16 @@ def parsed_arguments(name, description):
         type = str,
         required = False,
         default = 'pl:{}'.format(name),
+        help = argparse.SUPPRESS
+    )
+
+    # Snakemake rerun triggers
+    subparser_run.add_argument(
+        '-t', '--triggers',
+        type = valid_trigger,
+        required = False,
+        default = None,
+        nargs="*",
         help = argparse.SUPPRESS
     )
 
@@ -744,7 +757,6 @@ def parsed_arguments(name, description):
 
 
 def main():
-
     # Sanity check for usage
     if len(sys.argv) == 1:
         # Nothing was provided
