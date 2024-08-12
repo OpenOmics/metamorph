@@ -393,7 +393,7 @@ def valid_input(sheet):
     if sheet.endswith('.tsv') or sheet.endswith('.txt'):
         delim = '\t'
     elif sheet.endswith('.csv'):
-        delim = '\t'
+        delim = ','
 
     rdr = DictReader(open(sheet, 'r'), delimiter=delim)
 
