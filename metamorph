@@ -757,7 +757,6 @@ def parsed_arguments(name, description):
 
 
 def main():
-
     # Sanity check for usage
     if len(sys.argv) == 1:
         # Nothing was provided

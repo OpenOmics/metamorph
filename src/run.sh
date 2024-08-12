@@ -103,7 +103,7 @@ function parser() {
       -t  | --tmp-dir) provided "$key" "${2:-}"; Arguments["t"]="$2"; shift; shift;;
       -o  | --outdir)  provided "$key" "${2:-}"; Arguments["o"]="$2"; shift; shift;;
       -c  | --cache)  provided "$key" "${2:-}"; Arguments["c"]="$2"; shift; shift;;
-      -r  | --triggers) provided "$key" "${2:-}"; Arguments["r"]="$2"; shift; shift;;
+      -r  | --triggers) provided "$key" "${2:-}"; Arguments["r"]="${2/,/' '}"; shift; shift;;
       -*  | --*) err "Error: Failed to parse unsupported argument: '${key}'."; usage && exit 1;;
       *) err "Error: Failed to parse unrecognized argument: '${key}'. Do any of your inputs have spaces?"; usage && exit 1;;
     esac
@@ -199,9 +199,7 @@ function submit(){
           # --printshellcmds --keep-going --rerun-incomplete 
           # --keep-remote --restart-times 3 -j 500 --use-singularity 
           # --singularity-args -B {}.format({bindpaths}) --local-cores 24
-          triggers="${7:-'{code,params,software_env,input,mtime}'}"
-          if [[ ! ${triggers:0:1} == "{" ]] ; then triggers="{$triggers"; fi
-          if [[ ! ${triggers:0-1} == "}" ]] ; then triggers+='}'; fi
+          triggers="${7:-'code params software_env input mtime'}"
           rerun="--rerun-triggers $triggers"
           
           SLURM_DIR="$3/logfiles/slurmfiles"
