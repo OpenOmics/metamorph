@@ -199,7 +199,7 @@ function submit(){
           # --printshellcmds --keep-going --rerun-incomplete 
           # --keep-remote --restart-times 3 -j 500 --use-singularity 
           # --singularity-args -B {}.format({bindpaths}) --local-cores 24
-          triggers="${7:-'code params software_env input mtime'}"
+          triggers="${7:-"code params software-env input mtime"}"
           rerun="--rerun-triggers $triggers"
           
           SLURM_DIR="$3/logfiles/slurmfiles"
