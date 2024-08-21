@@ -468,6 +468,7 @@ rule cumulative_bin_stats:
         fi
         """
 
+
 rule prep_genome_info:
     input:
         expand(join(top_refine_dir, "{name}", "named_metawrap_bins.stats"), name=samples),
@@ -482,7 +483,11 @@ rule prep_genome_info:
                 reader = csv.DictReader(this_csv, delimiter="\t")
                 for row in reader:
                     row['genome'] = row['genome'] + '.fa'
-                    combined_info.append(row)
+                    combined_info.append(dict(
+                        genome=row['genome'], 
+                        completeness=row['completeness'], 
+                        contamination=row['contamination']
+                    ))
         
         with open(output[0], 'w') as genome_info_out:
             wrt = DictWriter(genome_info_out, list(row.keys()), delimter="\t")
@@ -549,11 +554,11 @@ rule derep_bins:
         export CHECKM_DATA_PATH="/data2/CHECKM_DB"
         dRep check_dependencies
 
-        # create checkm completeness and contamination info file
-
-
         # run drep
         DREP_BINS=$(ls {params.bindir}/*/{params.metawrap_dir_name}/*.fa | tr '\\n' ' ')
+        NUM_BINS=$(ls 2>/dev/null -Ubad1 -- {params.bindir}/*/{params.metawrap_dir_name}/*.fa | wc -l)
+        NUM_CHUNK=$(( echo $NUM_BINS/3 ))
+        NUM_CHUNK=$(echo $NUM_CHUNK | awk '{print int($1+0.5)}')
         mkdir -p {params.outto}
         dRep dereplicate -d \
         -g ${{DREP_BINS}} \
@@ -566,7 +571,9 @@ rule derep_bins:
         --genomeInfo {input.ginfo} \
         --S_algorithm {params.second_cluster_algo} \
         -comp {params.completeness} \
-        -con {params.} \
+        --multiround_primary_clustering \
+        --primary_chunksize $NUM_CHUNK \
+        --run_tertiary_clustering \
         {params.outto}
         """
 
