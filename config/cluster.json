@@ -40,7 +40,7 @@
         "gres": "lscratch:600"
     }, 
     "derep_bins": {
-        "threads": 32,
+        "threads": 56,
         "mem": "64G",
         "partition": "norm",
         "time": "2-00:00:00",
