@@ -449,15 +449,16 @@ rule cumulative_bin_stats:
         done
 
         # generate cumulative statistic report for binning
-        echo "genome\tcompleteness\tcontamination\tGC\tlineage\tN50\tsize\tbinner" > {output.cumulative_metabat2_stats}
+        FNs="genome\tcompleteness\tcontamination\tGC\tlineage\tN50\tsize\tbinner"
+        echo $FNs > {output.cumulative_metabat2_stats}
         for report in `ls {params.refine_dir}/*/named_maxbin2_bins.stats`; do
             tail -n+2 $report  >> {output.cumulative_maxbin_stats}
         done
-        echo "genome\tcompleteness\tcontamination\tGC\tlineage\tN50\tsize\tbinner" > {output.cumulative_metabat2_stats}
+        echo $FNs > {output.cumulative_metabat2_stats}
         for report in `ls {params.refine_dir}/*/named_maxbin2_bins.stats`; do
             tail -n+2 $report  >> {output.cumulative_metabat2_stats}
         done
-        echo "genome\tcompleteness\tcontamination\tGC\tlineage\tN50\tsize\tbinner" > {output.cumulative_metawrap_stats}
+        echo $FNs > {output.cumulative_metawrap_stats}
         for report in `ls {params.refine_dir}/*/named_maxbin2_bins.stats`; do
             tail -n+2 $report >> {output.cumulative_metawrap_stats}
         done
