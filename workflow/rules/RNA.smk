@@ -108,7 +108,7 @@ rule rna_humann_classify:
         chocophlan_db       = "/data2/chocophlan",  # from <root>/config/resources.json
         util_map_db         = "/data2/um",          # from <root>/config/resources.json
         metaphlan_db        = "/data2/metaphlan",   # from <root>/config/resources.json
-        deep_mode           = "\\\n        --bypass-translated-search" if humann_deep_mode else "",
+        deep_mode           = "\\\n        --bypass-translated-search" if not config["options"]["shallow_profile"] else "",
     threads: int(cluster["rna_humann_classify"].get('threads', default_threads)),
     containerized: metawrap_container,
     shell:

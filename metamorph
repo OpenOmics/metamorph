@@ -161,7 +161,7 @@ def run(sub_args):
     config["options"]["assembler_mode"] = "1" if sub_args.megahit_only else "0"
 
     # Step 4c. Setup humann3 execution mode
-    config["options"]["deep_profile"] = "1" if sub_args.deep_profile else "0"
+    config["options"]["shallow_profile"] = "1" if sub_args.shallow_profile else "0"
 
     # Step 5. Save config to output directory
     with open(os.path.join(sub_args.output, 'config.json'), 'w') as fh:
@@ -397,10 +397,10 @@ def parsed_arguments(name, description):
                                 Default (in prority order):
                                     params, mtime, code, software-env, input
                                            
-          --deep-profile
-                                Turn on the translated blast search of unaligned
-                                reads in humann3. This will increase run time 
-                                significantly. Turns on the protein search for
+          --shallow-profile
+                                Turn off the translated blast search of unaligned
+                                reads in humann3. This will decrease run time 
+                                significantly. Turns off the protein search for
                                 unaligned reads for humann3 taxanomic profiling.
           
         
@@ -595,8 +595,8 @@ def parsed_arguments(name, description):
     # Set humann3 to run translated protein
     # search of unaligned reads
     subparser_run.add_argument(
-        '--deep-profile',
-        dest = 'deep_profile',
+        '--shallow-profile',
+        dest = 'shallow_profile',
         action = 'store_true',
         required = False,
         default = False,
