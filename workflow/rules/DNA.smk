@@ -559,7 +559,7 @@ rule derep_bins:
         DREP_BINS=$(ls {params.bindir}/*/{params.metawrap_dir_name}/*.fa | tr '\\n' ' ')
         NUM_BINS=$(ls 2>/dev/null -Ubad1 -- {params.bindir}/*/{params.metawrap_dir_name}/*.fa | wc -l)
         NUM_CHUNK=$(( echo $NUM_BINS/3 ))
-        NUM_CHUNK=$(echo $NUM_CHUNK | awk '{print int($1+0.5)}')
+        NUM_CHUNK=$(echo $NUM_CHUNK | awk '{{print int($1+0.5)}}')
         mkdir -p {params.outto}
         dRep dereplicate -d \
         -g ${{DREP_BINS}} \
