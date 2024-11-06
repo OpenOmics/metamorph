@@ -63,7 +63,7 @@
         }, {
             "name": "humann3_protein_db",
             "to": "/data2/uniref",
-            "from": "/data/OpenOmics/references/metamorph/uniref",
+            "from": "/data/OpenOmics/references/metamorph/uniref/uniref90_filtered",
             "mode": "rw"
         }, {
             "name": "humann3_nuc_db",
