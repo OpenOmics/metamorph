@@ -730,3 +730,56 @@ rule gunc_detection:
             --detailed_output \
             --db_file {params.gunc_db}
         """
+
+
+rule dna_humann_classify:
+    input:
+        R1                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq"),
+        R2                          = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq"),
+    output:
+        hm3_gene_fam                = join(top_mapping_dir, "{name}", 'humann3', '{name}_genefamilies.tsv'),
+        hm3_path_abd                = join(top_mapping_dir, "{name}", 'humann3', '{name}_pathabundance.tsv'),
+        hm3_path_cov                = join(top_mapping_dir, "{name}", 'humann3', '{name}_pathcoverage.tsv'),
+        hm3_path_bugs               = join(top_mapping_dir, "{name}", 'humann3', '{name}_metaphlan_profile.tsv'),
+        humann_log                  = join(top_mapping_dir, "{name}", 'humann3.log'),
+        humann_config               = join(top_mapping_dir, "{name}", 'humann3.conf'),
+    params:
+        rname                       = "dna_humann_classify",
+        sid                         = "{name}",
+        tmpread                     = join(config['options']['tmp_dir'], 'dna_map', "{name}_concat.fastq.gz"),
+        tmp_safe_dir                = join(config['options']['tmp_dir'], 'dna_map'),
+        hm3_map_dir                 = join(top_mapping_dir, "{name}", 'humann3'),
+        uniref_db                   = "/data2/uniref",      # from <root>/config/resources.json
+        chocophlan_db               = "/data2/chocophlan",  # from <root>/config/resources.json
+        util_map_db                 = "/data2/um",          # from <root>/config/resources.json
+        metaphlan_db                = "/data2/metaphlan",   # from <root>/config/resources.json
+    threads: int(cluster["dna_humann_classify"].get('threads', default_threads)),
+    containerized: metawrap_container,
+    shell:
+        """
+        . /opt/conda/etc/profile.d/conda.sh && conda activate bb3
+        # safe temp directory
+        if [ ! -d "{params.tmp_safe_dir}" ]; then mkdir -p "{params.tmp_safe_dir}"; fi
+        tmp=$(mktemp -d -p "{params.tmp_safe_dir}")
+        trap 'rm -rf "{params.tmp_safe_dir}"' EXIT
+
+        # human configuration
+        humann_config --print > {output.humann_config}
+
+        # metaphlan configuration
+        export DEFAULT_DB_FOLDER={params.metaphlan_db}
+
+        cat {input.R1} {input.R2} > {params.tmpread}
+		humann \
+        --threads {threads} \
+        --input {params.tmpread} \
+        --input-format fastq \
+        --metaphlan-options "-t rel_ab --bowtie2db {params.metaphlan_db} --nproc {threads}" \
+        --output-basename {params.sid} \
+        --log-level DEBUG \
+        --o-log {output.humann_log} \
+        --bypass-prescreen \
+        --memory-use maximum \
+        --verbose \
+        --output {params.hm3_map_dir} 
+        """
