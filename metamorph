@@ -160,6 +160,9 @@ def run(sub_args):
     #   modes: 0 - megahit + metaspades assembly
     config["options"]["assembler_mode"] = "1" if sub_args.megahit_only else "0"
 
+    # Step 4c. Setup humann3 execution mode
+    config["options"]["shallow_profile"] = "1" if sub_args.shallow_profile else "0"
+
     # Step 5. Save config to output directory
     with open(os.path.join(sub_args.output, 'config.json'), 'w') as fh:
         json.dump(config, fh, indent = 4, sort_keys = True)
@@ -279,8 +282,8 @@ def parsed_arguments(name, description):
           $ {2} run [--help] \\
                 [--dry-run] [--job-name JOB_NAME] [--mode {{slurm,local}}] \\
                 [--sif-cache SIF_CACHE] [--singularity-cache SINGULARITY_CACHE] \\
-                [--silent] [--threads THREADS] [--tmp-dir TMP_DIR] \\
-                --input INPUT [INPUT ...] \\
+                [--silent] [--threads THREADS] [--megahit-only] [--deep-profile] \\
+                [--tmp-dir TMP_DIR] --input INPUT [INPUT ...] \\
                 --output OUTPUT
 
         Optional arguments are shown in square brackets above.
@@ -403,6 +406,31 @@ def parsed_arguments(name, description):
                                 recommended setting this vaule to the maximum number 
                                 of CPUs available on the host machine, default: 2.
                                   Example: --threads: 16
+                                           
+          --megahit-only
+                                Use only the megahit assembler for bin assembly.
+                                Turns off the metaspades assembler
+                                Example: --megahit-only
+                                           
+          -t(--triggers) TRIGGER [TRIGGER ...]
+                                Manual control of the snakemake rerun triggers.
+                                Trigger values must be one or more of:
+                                    - mtime
+                                    - code
+                                    - software-env
+                                    - input
+                                    - params
+                                See https://snakemake.readthedocs.io/en/stable/executing/cli.html
+                                for more details about snakemake rerun triggers.
+                                Default (in prority order):
+                                    params, mtime, code, software-env, input
+                                           
+          --shallow-profile
+                                Turn off the translated blast search of unaligned
+                                reads in humann3. This will decrease run time 
+                                significantly. Turns off the protein search for
+                                unaligned reads for humann3 taxanomic profiling.
+          
         
         {3}{4}Misc Options:{5}
           -h, --help            Show usage information, help message, and exit.
@@ -582,11 +610,8 @@ def parsed_arguments(name, description):
         help = argparse.SUPPRESS
     )
 
-    # Number of threads for the 
-    # pipeline's main proceess
-    # This is only applicable for 
-    # local rules or when running 
-    # in local mode.
+    # Selection of the assemblers used.
+    # Either megahit only or metaspades & megahit
     subparser_run.add_argument(
         '--megahit-only',
         dest = 'megahit_only',
@@ -596,8 +621,22 @@ def parsed_arguments(name, description):
         help = argparse.SUPPRESS
     )
 
-    # Selection of the assemblers used.
-    # Using 
+    # Set humann3 to run translated protein
+    # search of unaligned reads
+    subparser_run.add_argument(
+        '--shallow-profile',
+        dest = 'shallow_profile',
+        action = 'store_true',
+        required = False,
+        default = False,
+        help = argparse.SUPPRESS
+    )
+
+    # Number of threads for the 
+    # pipeline's main proceess
+    # This is only applicable for 
+    # local rules or when running 
+    # in local mode.
     subparser_run.add_argument(
         '--threads',
         type = int,

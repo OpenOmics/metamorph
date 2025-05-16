@@ -12,7 +12,7 @@ RUN mamba install -y -n metawrap-env -c bioconda spades=3.15.5
 RUN cd /home; git clone https://github.com/rroutsong/metaWRAP.git; chmod -R 777 metaWRAP
 RUN mamba create -n checkm python=3.8
 RUN mamba install -y -n checkm -c bioconda numpy matplotlib pysam hmmer prodigal pplacer fastani samtools bowtie2 trnascan-se gunc prokka gtdbtk=2.3.2
-RUN mamba run -n checkm pip3 install checkm-genome drep
+RUN mamba run -n checkm pip3 install checkm-genome git+https://github.com/OpenOmics/drep.git
 RUN mamba create -n bb3 python=3.7 
 RUN mamba install -y -n bb3 -c biobakery humann
 RUN mkdir /install; cd /install; wget https://carlowood.github.io/which/which-2.21.tar.gz; tar xvf which-2.21.tar.gz

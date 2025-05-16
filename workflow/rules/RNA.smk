@@ -20,6 +20,8 @@ pairedness                          = list(range(1, config['project']['nends']+1
 top_readqc_dir_rna                  = join(workpath, config['project']['id'], "metawrap_read_qc_RNA")
 top_trim_dir_rna                    = join(workpath, config['project']['id'], "trimmed_reads_RNA")
 top_map_dir_rna                     = join(workpath, config['project']['id'], "mapping_RNA")
+humann_deep_mode                    = True if "deep_profile" in config["options"] and \
+                                      bool(int(config["options"]["deep_profile"])) else False
 
 
 rule rna_read_qc:
@@ -106,6 +108,7 @@ rule rna_humann_classify:
         chocophlan_db       = "/data2/chocophlan",  # from <root>/config/resources.json
         util_map_db         = "/data2/um",          # from <root>/config/resources.json
         metaphlan_db        = "/data2/metaphlan",   # from <root>/config/resources.json
+        deep_mode           = "\\\n        --bypass-translated-search" if not config["options"]["shallow_profile"] else "",
     threads: int(cluster["rna_humann_classify"].get('threads', default_threads)),
     containerized: metawrap_container,
     shell:
@@ -116,10 +119,8 @@ rule rna_humann_classify:
         tmp=$(mktemp -d -p "{params.tmp_safe_dir}")
         trap 'rm -rf "{params.tmp_safe_dir}"' EXIT
 
-        # human configuration
+        # human/metaphlan configuration
         humann_config --print > {output.humann_config}
-
-        # metaphlan configuration
         export DEFAULT_DB_FOLDER={params.metaphlan_db}
 
         cat {input.R1} {input.R2} > {params.tmpread}
@@ -127,7 +128,7 @@ rule rna_humann_classify:
         --threads {threads} \
         --input {params.tmpread} \
         --remove-temp-output \
-        --input-format fastq.gz \
+        --input-format fastq.gz {params.deep_mode} \
         --metaphlan-options "--bowtie2db {params.metaphlan_db} --nproc {threads}" \
         --output-basename {params.sid} \
         --log-level DEBUG \

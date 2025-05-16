@@ -415,10 +415,14 @@ rule bin_stats:
         metawrap_contigs=$(cat {input.metawrap_bins}/*fa | grep -c "^>")
         echo "SampleID\tmetabat2_bins\tmaxbin2_bins\tmetaWRAP_50_5_bins\tmetabat2_contigs\tmaxbin2_contigs\tmetaWRAP_50_5_contigs" > {output.this_refine_summary}
         echo "{params.sid}\t{params.metabat2_num_bins}\t{params.maxbin_num_bins}\t{params.metawrap_num_bins}\t$metabat2_contigs\t$maxbin_configs\t$metawrap_contigs" >> {output.this_refine_summary}
+        
         # name contigs with SID
         cat {input.maxbin_stats} | sed 's/^bin./{params.sid}_bin./g' > {output.named_stats_maxbin2}
-		cat {input.metabat2_stats} | sed 's/^bin./{params.sid}_bin./g' > {output.named_stats_metabat2}
-		cat {input.metawrap_stats} | sed 's/^bin./{params.sid}_bin./g' > {output.named_stats_metawrap}
+        sed -i '1 s/^.*$/genome\tcompleteness\tcontamination\tGC\tlineage\tN50\tsize\tbinner/' {output.named_stats_maxbin2}
+        cat {input.metabat2_stats} | sed 's/^bin./{params.sid}_bin./g' > {output.named_stats_metabat2}
+        sed -i '1 s/^.*$/genome\tcompleteness\tcontamination\tGC\tlineage\tN50\tsize\tbinner/' {output.named_stats_metabat2}
+        cat {input.metawrap_stats} | sed 's/^bin./{params.sid}_bin./g' > {output.named_stats_metawrap}
+        sed -i '1 s/^.*$/genome\tcompleteness\tcontamination\tGC\tlineage\tN50\tsize\tbinner/' {output.named_stats_metawrap}
         """
 
 
@@ -445,14 +449,18 @@ rule cumulative_bin_stats:
         done
 
         # generate cumulative statistic report for binning
+        FNs="genome\tcompleteness\tcontamination\tGC\tlineage\tN50\tsize\tbinner"
+        echo $FNs > {output.cumulative_metabat2_stats}
         for report in `ls {params.refine_dir}/*/named_maxbin2_bins.stats`; do
-            cat $report >> {output.cumulative_maxbin_stats}
+            tail -n+2 $report  >> {output.cumulative_maxbin_stats}
         done
+        echo $FNs > {output.cumulative_metabat2_stats}
         for report in `ls {params.refine_dir}/*/named_maxbin2_bins.stats`; do
-            cat $report >> {output.cumulative_metabat2_stats}
+            tail -n+2 $report  >> {output.cumulative_metabat2_stats}
         done
+        echo $FNs > {output.cumulative_metawrap_stats}
         for report in `ls {params.refine_dir}/*/named_maxbin2_bins.stats`; do
-            cat $report >> {output.cumulative_metawrap_stats}
+            tail -n+2 $report >> {output.cumulative_metawrap_stats}
         done
 
         if $(wc -l < {output.cumulative_bin_summary}) -le 1; then
@@ -462,6 +470,32 @@ rule cumulative_bin_stats:
         """
 
 
+rule prep_genome_info:
+    input:
+        expand(join(top_refine_dir, "{name}", "named_metawrap_bins.stats"), name=samples),
+    output:
+        join(top_refine_dir, "genomeInfo.csv")
+    localrule: True
+    run:
+        from csv import DictReader, DictWriter
+        combined_info = []
+        for sample_info in input:
+            with open(sample_info, 'r') as this_csv:
+                reader = csv.DictReader(this_csv, delimiter="\t")
+                for row in reader:
+                    row['genome'] = row['genome'] + '.fa'
+                    combined_info.append(dict(
+                        genome=row['genome'], 
+                        completeness=row['completeness'], 
+                        contamination=row['contamination']
+                    ))
+        
+        with open(output[0], 'w') as genome_info_out:
+            wrt = DictWriter(genome_info_out, list(row.keys()), delimter="\t")
+            wrt.writeheader()
+            wrt.writerows(combined_info)
+
+
 rule derep_bins:
     """
         dRep is a step which further refines draft-quality genomes (bins) by using a 
@@ -469,15 +503,16 @@ rule derep_bins:
         of average nucleotide identity.
 
         @Input:
-            maxbin2 ssembly bins, contigs, stat summaries
-            metabat2 ssembly bins, contigs, stat summaries
-            metawrap ssembly bins, contigs, stat summaries
+            maxbin2 assembly bins, contigs, stat summaries
+            metabat2 assembly bins, contigs, stat summaries
+            metawrap assembly bins, contigs, stat summaries
 
         @Output:
             directory of consensus ensemble bins (deterministic output)
     """
     input:
         bins                        = expand(join(top_binning_dir, "{name}", "{name}_BINNING_COMPLETE"), name=samples),
+        ginfo                       = join(top_refine_dir, "genomeInfo.csv"),
     output:
         derep_genome_info           = join(top_refine_dir, "dRep", "data_tables", "Widb.csv"),
         derep_winning_figure        = join(top_refine_dir, "dRep", "figures", "Winning_genomes.pdf"),
@@ -493,15 +528,19 @@ rule derep_bins:
         outto                       = join(top_refine_dir, "dRep"),
         metawrap_dir_name           = "metawrap_50_5_bins",
         # -l LENGTH: Minimum genome length (default: 50000)
-        minimum_genome_length       = "1000",
+        minimum_genome_length       = "10000",
         # -pa[--P_ani] P_ANI: ANI threshold to form primary (MASH) clusters (default: 0.9)
         ani_primary_threshold       = "0.9",
         # -sa[--S_ani] S_ANI: ANI threshold to form secondary clusters (default: 0.95)
         ani_secondary_threshold     = "0.95",
         # -nc[--cov_thresh] COV_THRESH: Minmum level of overlap between genomes when doing secondary comparisons (default: 0.1)
-        min_overlap                 = "0.1",
+        min_overlap                 = "0.3",
         # -cm[--coverage_method] {total,larger}  {total,larger}: Method to calculate coverage of an alignment
-        coverage_method             = 'larger'
+        coverage_method             = 'larger',
+        # -comp COMPLETENESS, --completeness COMPLETENESS: Minimum genome completeness (default: 75)
+        completeness                = "50",
+        # --S_algorithm {fastANI,ANImf,ANIn,goANI,gANI}: Algorithm for secondary clustering comaprisons:
+        second_cluster_algo         = "fastANI"
     shell:
         """
         # tmp directory creation and destruction
@@ -510,7 +549,7 @@ rule derep_bins:
         export TMPDIR=${{tmp}}
         trap 'rm -rf "${{tmp}}"' EXIT
 
-        # activate conda environment, initialize checkm
+        # activate conda environment, initialize checkm, check deps
         . /opt/conda/etc/profile.d/conda.sh && conda activate checkm
         checkm data setRoot /data2/CHECKM_DB
         export CHECKM_DATA_PATH="/data2/CHECKM_DB"
@@ -518,6 +557,9 @@ rule derep_bins:
 
         # run drep
         DREP_BINS=$(ls {params.bindir}/*/{params.metawrap_dir_name}/*.fa | tr '\\n' ' ')
+        NUM_BINS=$(ls 2>/dev/null -Ubad1 -- {params.bindir}/*/{params.metawrap_dir_name}/*.fa | wc -l)
+        NUM_CHUNK=$(( echo $NUM_BINS/3 ))
+        NUM_CHUNK=$(echo $NUM_CHUNK | awk '{{print int($1+0.5)}}')
         mkdir -p {params.outto}
         dRep dereplicate -d \
         -g ${{DREP_BINS}} \
@@ -527,6 +569,12 @@ rule derep_bins:
         -sa {params.ani_secondary_threshold} \
         -nc {params.min_overlap} \
         -cm {params.coverage_method} \
+        --genomeInfo {input.ginfo} \
+        --S_algorithm {params.second_cluster_algo} \
+        -comp {params.completeness} \
+        --multiround_primary_clustering \
+        --primary_chunksize $NUM_CHUNK \
+        --run_tertiary_clustering \
         {params.outto}
         """
 
