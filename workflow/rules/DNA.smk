@@ -26,14 +26,14 @@ top_tax_dir                = join(workpath, config['project']['id'], "metawrap_k
 top_binning_dir            = join(workpath, config['project']['id'], "metawrap_binning")
 top_refine_dir             = join(workpath, config['project']['id'], "metawrap_bin_refine")
 top_mags_dir               = join(workpath, config['project']['id'], "mags")
-top_mapping_dir            = join(workpath, config['project']['id'], "mapping")
+top_mapping_dir            = join(workpath, config['project']['id'], "humann3_dna")
 
 # workflow flags
 metawrap_container         = config["containers"]["metawrap"]
+bowtie2_samtools_container = config["images"]["bowtie2_samtools"]
 pairedness                 = list(range(1, config['project']['nends']+1))
 mem2int                    = lambda x: int(str(x).lower().replace('gb', '').replace('g', ''))
 megahit_only               = bool(int(config["options"]["assembler_mode"]))
-
 """
     Step-wise pipeline outline:
         1. read qc
@@ -46,32 +46,28 @@ megahit_only               = bool(int(config["options"]["assembler_mode"]))
         8. align DNA to assembly
 """
 
-
-rule metawrap_read_qc:
+rule metawrap_read_qc_skipBmtagger:
     """
     The metaWRAP::Read_qc module is meant to pre-process raw Illumina sequencing reads in preparation for assembly and alignment. 
     The raw reads are trimmed based on adapted content and PHRED scored with the default setting of Trim-galore, ensuring that only high-quality 
-    sequences are left. Then reads are then aligned to the host genome (e.g. human) with bmtagger, and any host reads are removed from the 
-    metagenomic data to remove host contamination. Read pairs where only one read was aligned to the host genome are also removed. 
-    Finally, FASTQC is used to generate quality reports of the raw and final read sets in order to assess read quality improvement. 
+    sequences are left. Finally, FASTQC is used to generate quality reports of the raw and final read sets in order to assess read quality improvement. 
     The users have control over which of the above features they wish to use.
 
-    Quality-control step accomplishes three tasks:
+    Quality-control step accomplishes two tasks:
         - Trims adapter sequences from input read pairs (.fastq.gz)
         - Quality filters from input read pairs
-        - Removes human contamination from input read pairs
+
 
     @Container requirements
         - [MetaWrap](https://github.com/bxlab/metaWRAP) orchestrates execution of 
             these tools in a psuedo-pipeline:
             - [FastQC](https://github.com/s-andrews/FastQC)
-            - [bmtagger](ftp://ftp.ncbi.nlm.nih.gov/pub/agarwala/bmtagger/)
             - [Trim-Galore](https://github.com/FelixKrueger/TrimGalore)
             - [Cutadapt](https://github.com/marcelm/cutadapt)
     
     @Environment specifications
         - minimum 16gb memory
-        - will load bmtagger index in memory (8gb)
+
 
     @Input:
         - Raw fastq reads (R1 & R2 per-sample) from the instrument
@@ -125,9 +121,8 @@ rule metawrap_read_qc:
                 ln -s {input.R2} {params.tmpr2}
             fi;
 
-            # read quality control, host removal
-            # TODO: add support for mouse reads (mm10 genome prefix, "-x mm10")
-            mw read_qc -1 {params.tmpr1} -2 {params.tmpr2} -t {threads} -o {params.this_qc_dir}
+            # read quality control
+            mw read_qc -1 {params.tmpr1} -2 {params.tmpr2} -t {threads} -o {params.this_qc_dir} --skip-bmtagger
 
             # collate fastq outputs to facilitate workflow, compress
             ln -s {params.this_qc_dir}/final_pure_reads_1.fastq {params.trim_out}/{params.sid}_R1_trimmed.fastq
@@ -141,6 +136,173 @@ rule metawrap_read_qc:
             ln -s {params.this_qc_dir}/post-QC_report/final_pure_reads_2_fastqc.html {params.this_qc_dir}/{params.sid}_R2_postrim_report.html
             ln -s {params.this_qc_dir}/pre-QC_report/{params.sid}_1_fastqc.html {params.this_qc_dir}/{params.sid}_R1_pretrim_report.html
             ln -s {params.this_qc_dir}/pre-QC_report/{params.sid}_2_fastqc.html {params.this_qc_dir}/{params.sid}_R2_pretrim_report.html
+        """
+
+rule bowtie2_dehost:
+    """
+        This module utilizes bowtie2 to map trimmed reads to hg38, and select the untrimmed reads from the bam file as clean read.
+    """
+    input:
+        R1                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq.gz"),
+        R2                          = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq.gz"),
+    output:
+        R1_dehost                   = join(top_trim_dir, "{name}", "{name}_R1_dehost.fastq.gz"),
+        R2_dehost                   = join(top_trim_dir, "{name}", "{name}_R2_dehost.fastq.gz"),
+
+    params:
+        rname                       = "bowtie2_dehost",
+        sid                         = "{name}",
+        tmp_safe_dir                = join(config['options']['tmp_dir'], 'read_qc', "{name}"),
+        bowtie2sam                  = join(config['options']['tmp_dir'], 'read_qc', "{name}", "{name}.mapped_and_unmapped.sam"),
+        bowtie2bam                  = join(config['options']['tmp_dir'], 'read_qc', "{name}", "{name}.mapped_and_unmapped.bam"),
+        bowtie2bamUnmapped          = join(config['options']['tmp_dir'], 'read_qc', "{name}", "{name}.unmapped.bam"),
+        bowtie2bamUnmappedSorted    = join(config['options']['tmp_dir'], 'read_qc', "{name}", "{name}.unmappedSorted.bam"),
+        hg38_bowtie2_idx_prefix     = "/data2/bowtie2/hg38",
+    containerized: bowtie2_samtools_container,
+    threads: int(cluster["bowtie2_dehost"].get('threads', default_threads)),
+    shell: 
+        """
+            # safe temp directory
+            if [ ! -d "{params.tmp_safe_dir}" ]; then mkdir -p "{params.tmp_safe_dir}"; fi
+            tmp=$(mktemp -d -p "{params.tmp_safe_dir}")
+            trap 'rm -rf "{params.tmp_safe_dir}"' EXIT
+
+            #run bowtie to map reads to hg38
+            bowtie2 -p {threads} -x {params.hg38_bowtie2_idx_prefix} \
+            -1 {input.R1} \
+            -2 {input.R2} \
+            -S {params.bowtie2sam}    
+
+            # run samtools to convert sam to bam
+            samtools view -@ {threads} -bS {params.bowtie2sam} > {params.bowtie2bam}
+
+            # run samtools to filter out the reads that none of the pair mapped to hg38
+            samtools view -@ {threads} -b -f 12 -F 256 {params.bowtie2bam} > {params.bowtie2bamUnmapped}
+
+            # split paired-end reads into separated fastq files .._R1 .._R2
+            ## sort bam file by read name ( -n ) to have paired reads next to each other
+            samtools sort -@ {threads} -n {params.bowtie2bamUnmapped} -o {params.bowtie2bamUnmappedSorted}
+            ## Convert to fastq
+            samtools fastq -@ {threads} {params.bowtie2bamUnmappedSorted} \
+            -1 {output.R1_dehost} \
+            -2 {output.R2_dehost} \
+            -0 /dev/null -s /dev/null -n
+        """
+
+rule dna_humann_classify:
+    input:
+        R1                  = join(top_trim_dir, "{name}", "{name}_R1_dehost.fastq.gz"),
+        R2                  = join(top_trim_dir, "{name}", "{name}_R2_dehost.fastq.gz"),
+    output:
+        hm3_gene_fam        = join(top_mapping_dir, '{name}_genefamilies.tsv'),
+        hm3_path_abd        = join(top_mapping_dir, '{name}_pathabundance.tsv'),
+        hm3_path_cov        = join(top_mapping_dir, '{name}_pathcoverage.tsv'),
+        mpl4_bugs_list      = join(top_mapping_dir, '{name}_bugs_list.tsv'),
+        humann_log          = join(top_mapping_dir, '{name}_humann3.log'),
+        humann_config       = join(top_mapping_dir, '{name}_humann3.conf'),
+    params:
+        rname               = "dna_humann_classify",
+        sid                 = "{name}",
+        tmp_safe_dir        = join(config['options']['tmp_dir'], 'dna_map'),
+        tmpread             = join(config['options']['tmp_dir'], 'dna_map', "{name}_concat.fastq.gz"),
+        hm3_map_dir         = top_mapping_dir,
+        uniref_db           = "/data2/uniref",      # from <root>/config/resources.json
+        chocophlan_db       = "/data2/chocophlan",  # from <root>/config/resources.json
+        util_map_db         = "/data2/um",          # from <root>/config/resources.json
+        metaphlan_db        = "/data2/metaphlan",   # from <root>/config/resources.json
+        deep_mode           = "\\\n        --bypass-translated-search" if not config["options"]["shallow_profile"] else "",
+    threads: int(cluster["dna_humann_classify"].get('threads', default_threads)),
+    containerized: metawrap_container,
+    shell:
+        """
+        . /opt/conda/etc/profile.d/conda.sh && conda activate bb3
+        # safe temp directory
+        if [ ! -d "{params.tmp_safe_dir}" ]; then mkdir -p "{params.tmp_safe_dir}"; fi
+        tmp=$(mktemp -d -p "{params.tmp_safe_dir}")
+        trap 'rm -rf "{params.tmp_safe_dir}"' EXIT
+
+        # human/metaphlan configuration
+        humann_config --print > {output.humann_config}
+        export DEFAULT_DB_FOLDER={params.metaphlan_db}
+
+        cat {input.R1} {input.R2} > {params.tmpread}
+        humann \
+        --threads {threads} \
+        --input {params.tmpread} \
+        --input-format fastq.gz {params.deep_mode} \
+        --metaphlan-options "--bowtie2db {params.metaphlan_db} --nproc {threads} --offline" \
+        --output-basename {params.sid} \
+        --log-level DEBUG \
+        --o-log {output.humann_log} \
+        --output {params.hm3_map_dir}
+
+        mv {params.hm3_map_dir}/{params.sid}_humann_temp/{params.sid}_metaphlan_bugs_list.tsv {output.mpl4_bugs_list}
+        rm -r {params.hm3_map_dir}/{params.sid}_humann_temp
+        """
+
+
+rule dna_humann_summarize:
+    """
+        This step merges all per-sample tables as a single table for each type of input:
+		1. Merges the buglist files generated from metaphlan4 to a single table with merge_metaphlan_tables.py
+        2.  
+            a) calculate CPM for path abundance.tsv (with humann_renorm_table)
+            b) separate the CPM table to one stratified and one unstratified table (with humann_split_stratified_table)
+            c) merge per-sample stratified CPM tables as a single table with (humann_join_tables)
+            d) do the same thing for the unstratified per-sample cpm tables
+	"""
+    input:
+        bugs_list           = expand(join(top_mapping_dir, '{name}_bugs_list.tsv'), name=samples),
+        path_abd            = expand(join(top_mapping_dir, '{name}_pathabundance.tsv'), name=samples),
+  
+    output:
+        mer_bugs_list       = join(top_mapping_dir, 'merged_bugs_list.tsv'),
+        mer_path_abd_str    = join(top_mapping_dir, 'merged_pathabundance.cpm.stratified.tsv'),
+        mer_path_abd_unstr  = join(top_mapping_dir, 'merged_pathabundance.cpm.unstratified.tsv'),
+    params:
+        rname               = "dna_humann_summarize",
+        hm3_map_dir         = top_mapping_dir,
+        stratified_dir      = join(top_mapping_dir,'stratified'),
+        unstratified_dir    = join(top_mapping_dir,'unstratified'),
+    containerized: metawrap_container,
+    threads: int(cluster["dna_humann_summarize"].get('threads', default_threads)),
+    shell:
+        """
+        . /opt/conda/etc/profile.d/conda.sh && conda activate bb3
+
+        # merge bugs list
+        merge_metaphlan_tables.py {input.bugs_list} > {output.mer_bugs_list}
+
+        # STEP 1: convert RPK to CPM
+        for file in {input.path_abd}; do 
+            humann_renorm_table \
+            --input ${{file}} \
+            --output ${{file%.*}}-cpm.tsv \
+            --units cpm --update-snames; 
+        done
+        # STEP 2
+        # split stratified table
+        for file in {params.hm3_map_dir}/*pathabundance-cpm.tsv; do 
+            humann_split_stratified_table \
+            --input ${{file}} \
+            --output {params.hm3_map_dir}; 
+        done
+
+
+        # STEP 3: place the cpm tables into the dirs they belong to
+        mkdir -p {params.stratified_dir}
+        mkdir -p {params.unstratified_dir}
+        mv {params.hm3_map_dir}/*_pathabundance-cpm_stratified.tsv {params.stratified_dir}
+        mv {params.hm3_map_dir}/*_pathabundance-cpm_unstratified.tsv {params.unstratified_dir}
+
+        # STEP 4:join all the tables of the same type
+        humann_join_tables \
+        --input {params.stratified_dir} \
+        --output {output.mer_path_abd_str}
+        humann_join_tables \
+        --input {params.unstratified_dir} \
+        --output {output.mer_path_abd_unstr}
+
         """
 
 

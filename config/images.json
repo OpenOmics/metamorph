@@ -1,8 +1,10 @@
 {
     "images": {
-        "metawrap": "docker://rroutsong/metamorph_metawrap:0.0.11"
+        "metawrap": "docker://rroutsong/metamorph_metawrap:0.0.11",
+        "bowtie2_samtools":"docker://rroutsong/bowtie2-2.5:0.0.1"
     }, 
     "containers": {
-        "metawrap": "/data/OpenOmics/SIFs/metamorph_metawrap_0.0.11.sif"
+        "metawrap": "/data/OpenOmics/SIFs/metamorph_metawrap_0.0.11.sif",
+	"star": "/data/OpenOmics/SIFs/ccbr_arriba_2.0.0_v0.0.1.sif"
     }
 }

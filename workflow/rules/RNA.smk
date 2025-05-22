@@ -4,27 +4,31 @@
 from os.path import join
 from itertools import chain
 from functools import partial
-from scripts.common import str_bool, list_bool, get_paired_dna
+from scripts.common import str_bool, list_bool, get_paired_dna, get_dna_sid
 
 # ~~~~~~~~~~
 # Constants and paths
 # ~~~~~~~~~~
 workpath                            = config["project"]["workpath"]
+top_mapping_dir                     = join(workpath, config['project']['id'], "humann3_dna")
 rna_datapath                        = config["project"].get("rna_datapath", "/dev/null")
 rna_included                        = list_bool(config.get("rna", 'false'))
 rna_sample_stems                    = config.get("rna", [])
 rna_compressed                      = True # if accepting uncompressed fastq input
 get_dna                             = partial(get_paired_dna, config)
+get_dna_bugs                        = partial(get_dna_sid, config)
 metawrap_container                  = config["containers"]["metawrap"]
 pairedness                          = list(range(1, config['project']['nends']+1))
 top_readqc_dir_rna                  = join(workpath, config['project']['id'], "metawrap_read_qc_RNA")
 top_trim_dir_rna                    = join(workpath, config['project']['id'], "trimmed_reads_RNA")
 top_map_dir_rna                     = join(workpath, config['project']['id'], "mapping_RNA")
+humann3_dir_rna                     = join(workpath, config['project']['id'], "humann3_rna")
 humann_deep_mode                    = True if "deep_profile" in config["options"] and \
                                       bool(int(config["options"]["deep_profile"])) else False
+# containers
+star_container = config["containers"]["star"]
 
-
-rule rna_read_qc:
+rule rna_read_qc_skipBmtagger:
     input:
         R1                  = join(workpath, "rna", "{rname}_R1.fastq.gz") if rna_included else [],
         R2                  = join(workpath, "rna", "{rname}_R2.fastq.gz") if rna_included else [],
@@ -70,9 +74,8 @@ rule rna_read_qc:
                 ln -s {input.R2} {params.tmpr2}
             fi;
 
-            # read quality control, host removal
-            # TODO: add support for mouse reads (mm10 genome prefix, "-x mm10")
-            mw read_qc -1 {params.tmpr1} -2 {params.tmpr2} -t {threads} -o {params.this_qc_dir}
+            # read quality control
+            mw read_qc -1 {params.tmpr1} -2 {params.tmpr2} -t {threads} -o {params.this_qc_dir} --skip-bmtagger
 
             # collate fastq outputs to facilitate workflow, compress
             ln -s {params.this_qc_dir}/final_pure_reads_1.fastq {params.trim_out}/{params.sid}_R1_trimmed.fastq
@@ -87,23 +90,83 @@ rule rna_read_qc:
             ln -s {params.this_qc_dir}/pre-QC_report/{params.sid}_2_fastqc.html {params.this_qc_dir}/{params.sid}_R2_pretrim_report.html
         """
 
+rule rna_dehost:
+    """
+        This module utilizes STAR to map trimmed reads to hg38 transcriptome, and select the untrimmed reads from the bam file as clean read.
+    """
+    input:
+        R1                          = join(top_trim_dir_rna, "{rname}", "{rname}_R1_trimmed.fastq.gz"),
+        R2                          = join(top_trim_dir_rna, "{rname}", "{rname}_R2_trimmed.fastq.gz"),
+    output:
+        R1_dehost                   = join(top_trim_dir_rna, "{rname}", "{rname}_R1_dehost.fastq.gz"),
+        R2_dehost                   = join(top_trim_dir_rna, "{rname}", "{rname}_R2_dehost.fastq.gz"),
+
+    params:
+        rname                       = "rna_dehost",
+        sid                         = "{rname}",
+        tmp_safe_dir                = join(config['options']['tmp_dir'], 'star_dehost', "{rname}"),
+        tmp_safe_dir_star           = join(config['options']['tmp_dir'], 'star_dehost', "{rname}", "STAR"),
+        hg38_star_idx               = "/data2/star",
+        hg38_gtf                    = join("/data2/gtf","gencode.v30.annotation.gtf")
+    containerized: star_container,
+    threads: int(cluster["rna_dehost"].get('threads', default_threads)),
+    shell: 
+        """
+            # safe temp directory
+            if [ ! -d "{params.tmp_safe_dir}" ]; then mkdir -p "{params.tmp_safe_dir}"; fi
+            tmp=$(mktemp -d -p "{params.tmp_safe_dir}")
+            trap 'rm -rf "{params.tmp_safe_dir}"' EXIT
+
+            # run star to map reads to hg38
+            ## Optimal readlength for sjdbOverhang = max(ReadLength) - 1 [Default: 100]
+            readlength=$(
+                        zcat {input.R1} | \
+                        awk -v maxlen=100 'NR%4==2 {{if (length($1) > maxlen+0) maxlen=length($1)}}; \
+                        END {{print maxlen-1}}'
+                    )
+
+            STAR \
+            --runThreadN {threads} \
+            --sjdbOverhang ${{readlength}} \
+            --twopassMode Basic \
+            --genomeDir {params.hg38_star_idx} \
+            --sjdbGTFfile {params.hg38_gtf} \
+            --readFilesIn {input.R1} {input.R2} \
+            --readFilesCommand zcat \
+            --outTmpDir {params.tmp_safe_dir_star} \
+            --outFileNamePrefix {params.tmp_safe_dir_star}_ \
+            --outReadsUnmapped Fastx 
+            
+            # The unmapped reads will be named {params.tmp_safe_dir}_Unmapped.out.mate1 and {params.tmp_safe_dir}_Unmapped.out.mate2. Their hearder lines need to be changed
+            # read 1
+            sed 's/0:N:  /1:N:/' {params.tmp_safe_dir_star}_Unmapped.out.mate1 > {params.tmp_safe_dir_star}_Unmapped.out.correctHeaderLine.mate1
+            # read 2
+            sed 's/1:N:  /2:N:/' {params.tmp_safe_dir_star}_Unmapped.out.mate2 > {params.tmp_safe_dir_star}_Unmapped.out.correctHeaderLine.mate2
+
+            # compress them
+            gzip -9 -c {params.tmp_safe_dir_star}_Unmapped.out.correctHeaderLine.mate1 > {output.R1_dehost}
+            gzip -9 -c {params.tmp_safe_dir_star}_Unmapped.out.correctHeaderLine.mate2 > {output.R2_dehost}
+
+        """
+
 
 rule rna_humann_classify:
     input:
-        R1                  = join(top_trim_dir_rna, "{rname}", "{rname}_R1_trimmed.fastq.gz"),
-        R2                  = join(top_trim_dir_rna, "{rname}", "{rname}_R2_trimmed.fastq.gz"),
+        R1                  = join(top_trim_dir_rna, "{rname}", "{rname}_R1_dehost.fastq.gz"),
+        R2                  = join(top_trim_dir_rna, "{rname}", "{rname}_R2_dehost.fastq.gz"),
+        DNA_bug_list        = lambda wildcards: join(top_mapping_dir, f"{get_dna_bugs(wildcards.rname)}_bugs_list.tsv")
     output:
-        hm3_gene_fam        = join(top_map_dir_rna, "{rname}", 'humann3', '{rname}_genefamilies.tsv'),
-        hm3_path_abd        = join(top_map_dir_rna, "{rname}", 'humann3', '{rname}_pathabundance.tsv'),
-        hm3_path_cov        = join(top_map_dir_rna, "{rname}", 'humann3', '{rname}_pathcoverage.tsv'),
-        humann_log          = join(top_map_dir_rna, "{rname}", 'humann3.log'),
-        humann_config       = join(top_map_dir_rna, "{rname}", 'humann3.conf'),
+        hm3_gene_fam        = join(humann3_dir_rna, '{rname}_genefamilies.tsv'),
+        hm3_path_abd        = join(humann3_dir_rna, '{rname}_pathabundance.tsv'),
+        hm3_path_cov        = join(humann3_dir_rna, '{rname}_pathcoverage.tsv'),
+        humann_log          = join(humann3_dir_rna, '{rname}_humann3.log'),
+        humann_config       = join(humann3_dir_rna, '{rname}_humann3.conf'),
     params:
         rname               = "rna_humann_classify",
         sid                 = "{rname}",
         tmpread             = join(config['options']['tmp_dir'], 'rna_map', "{rname}_concat.fastq.gz"),
         tmp_safe_dir        = join(config['options']['tmp_dir'], 'rna_map'),
-        hm3_map_dir         = join(top_map_dir_rna, "{rname}", 'humann3'),
+        hm3_map_dir         = humann3_dir_rna,
         uniref_db           = "/data2/uniref",      # from <root>/config/resources.json
         chocophlan_db       = "/data2/chocophlan",  # from <root>/config/resources.json
         util_map_db         = "/data2/um",          # from <root>/config/resources.json
@@ -124,18 +187,78 @@ rule rna_humann_classify:
         export DEFAULT_DB_FOLDER={params.metaphlan_db}
 
         cat {input.R1} {input.R2} > {params.tmpread}
+        
 		humann \
         --threads {threads} \
         --input {params.tmpread} \
         --remove-temp-output \
         --input-format fastq.gz {params.deep_mode} \
-        --metaphlan-options "--bowtie2db {params.metaphlan_db} --nproc {threads}" \
+        --taxonomic-profile {input.DNA_bug_list} \
         --output-basename {params.sid} \
         --log-level DEBUG \
         --o-log {output.humann_log} \
         --output {params.hm3_map_dir}
         """
 
+rule rna_humann_summarize:
+    """
+        This step merges all per-sample tables as a single table for each type of input:
+        1. Merges the buglist files generated from metaphlan4 to a single table with merge_metaphlan_tables.py
+        2.  
+            a) calculate CPM for path abundance.tsv (with humann_renorm_table)
+            b) separate the CPM table to one stratified and one unstratified table (with humann_split_stratified_table)
+            c) merge per-sample stratified CPM tables as a single table with (humann_join_tables)
+            d) do the same thing for the unstratified per-sample cpm tables
+    """
+
+    input:
+        path_abd            = expand(join(humann3_dir_rna, '{rname}_pathabundance.tsv'), rname=rna_sample_stems),
+  
+    output:
+        mer_path_abd_str    = join(humann3_dir_rna, 'merged_pathabundance.cpm.stratified.rna.tsv'),
+        mer_path_abd_unstr  = join(humann3_dir_rna, 'merged_pathabundance.cpm.unstratified.rna.tsv'),
+    params:
+        rname               = "rna_humann_summarize",
+        hm3_map_dir         = humann3_dir_rna,
+        stratified_dir      = join(humann3_dir_rna,'stratified'),
+        unstratified_dir    = join(humann3_dir_rna,'unstratified'),
+    containerized: metawrap_container,
+    threads: int(cluster["rna_humann_summarize"].get('threads', default_threads)),
+    shell:
+        """
+        . /opt/conda/etc/profile.d/conda.sh && conda activate bb3
+
+        # STEP 1: convert RPK to CPM
+        for file in {input.path_abd}; do 
+            humann_renorm_table \
+            --input ${{file}} \
+            --output ${{file%.*}}-cpm.tsv \
+            --units cpm --update-snames; 
+        done
+        # STEP 2
+        # split stratified table
+        for file in {params.hm3_map_dir}/*pathabundance-cpm.tsv; do 
+            humann_split_stratified_table \
+            --input ${{file}} \
+            --output {params.hm3_map_dir}; 
+        done
+
+
+        # STEP 3: place the cpm tables into the dirs they belong to
+        mkdir -p {params.stratified_dir}
+        mkdir -p {params.unstratified_dir}
+        mv {params.hm3_map_dir}/*_pathabundance-cpm_stratified.tsv {params.stratified_dir}
+        mv {params.hm3_map_dir}/*_pathabundance-cpm_unstratified.tsv {params.unstratified_dir}
+
+        # STEP 4:join all the tables of the same type
+        humann_join_tables \
+        --input {params.stratified_dir} \
+        --output {output.mer_path_abd_str}
+        humann_join_tables \
+        --input {params.unstratified_dir} \
+        --output {output.mer_path_abd_unstr}
+
+        """
 
 rule map_to_rna_to_mag:
     input:

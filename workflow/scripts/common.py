@@ -4,6 +4,13 @@
 # ~~~~~~~~~~
 from os.path import join
 
+def get_dna_sid(config, rna_sid):
+    if 'sample_map' not in config:
+        return None
+    if not list_bool(config.get("rna", 'false')):
+        return None
+    sample_map = config['sample_map']
+    return sample_map[rna_sid]
 
 def get_paired_dna(config, rna_sid):
     if 'sample_map' not in config:

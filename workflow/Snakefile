@@ -25,13 +25,13 @@ top_refine_dir             = join(workpath, config['project']['id'], "metawrap_b
 top_tax_dir                = join(workpath, config['project']['id'], "metawrap_kmer")
 top_binning_dir            = join(workpath, config['project']['id'], "metawrap_binning")
 top_mags_dir               = join(workpath, config['project']['id'], "mags")
-top_mapping_dir            = join(workpath, config['project']['id'], "mapping")
+top_mapping_dir            = join(workpath, config['project']['id'], "humann3_dna")
 
 # RNA directories
 top_readqc_dir_rna         = join(workpath, config['project']['id'], "metawrap_read_qc_RNA")
 top_trim_dir_rna           = join(workpath, config['project']['id'], "trimmed_reads_RNA")
 top_map_dir_rna            = join(workpath, config['project']['id'], "mapping_RNA")
-
+humann3_dir_rna            = join(workpath, config['project']['id'], "humann3_rna")
 
 # Read in resource information, containing information about threads, mem, walltimes, etc.
 # TODO: Add handler for when the mode is set to local.
@@ -65,56 +65,17 @@ rule all:
         expand(join(top_readqc_dir, "{name}", "{name}_R2_postrim_report.html"), name=samples),
         expand(join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq.gz"), name=samples),
         expand(join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq.gz"), name=samples),
-        # genome assembly
-        # ~~~~~~~~~~~~~~~
-        expand(join(top_assembly_dir, "{name}", "final_assembly.fasta"), name=samples),
-        expand(join(top_assembly_dir, "{name}", "assembly_report.html"), name=samples),
-        # taxonomic classification
-        # ~~~~~~~~~~~~~~~
-        expand(join(top_tax_dir, "{name}", "final_assembly.krona"), name=samples),
-        expand(join(top_tax_dir, "{name}", "kronagram.html"), name=samples),
-        expand(join(top_tax_dir, "{name}", "final_assembly.krak2"), name=samples),
-        expand(join(top_tax_dir, "{name}", "final_assembly.kraken2"), name=samples),
-        expand(join(top_tax_dir, "GTDBTK_classify_wf"), name=samples),
-        expand(join(top_tax_dir, "GUNC_detect"), name=samples),
-        # assembly binning
-        # ~~~~~~~~~~~~~~~
-        expand(join(top_binning_dir, "{name}", "maxbin2_bins.contigs"), name=samples),
-        expand(join(top_binning_dir, "{name}", "maxbin2_bins.stats"), name=samples),
-        expand(join(top_binning_dir, "{name}", "metabat2_bins.contigs"), name=samples),
-        expand(join(top_binning_dir, "{name}", "metabat2_bins.stats"), name=samples),
-        expand(join(top_binning_dir, "{name}", "metawrap_50_5_bins.contigs"), name=samples),
-        expand(join(top_binning_dir, "{name}", "metawrap_50_5_bins.stats"), name=samples),
-        expand(join(top_binning_dir, "{name}", "figures", "binning_results.png"), name=samples),
-        # bin refinement
-        # ~~~~~~~~~~~~~~~
-        expand(join(top_refine_dir, "dRep", "data_tables", "Widb.csv"), name=samples),
-        expand(join(top_refine_dir, "dRep", "figures", "Winning_genomes.pdf"), name=samples),
-        expand(join(top_refine_dir, "dRep", "log", "cluster_arguments.json"), name=samples),
-        # bin statistics
-        # ~~~~~~~~~~~~~~~
-        expand(join(top_refine_dir, "{name}", "RefinedBins_summmary.txt"), name=samples),
-        expand(join(top_refine_dir, "{name}", "named_maxbin2_bins.stats"), name=samples),
-        expand(join(top_refine_dir, "{name}", "named_metabat2_bins.stats"), name=samples),
-        expand(join(top_refine_dir, "{name}", "named_metawrap_bins.stats"), name=samples),
-        join(top_refine_dir, "RefinedBins_summmary.txt"),
-        join(top_refine_dir, "cumulative_stats_maxbin.txt"),
-        join(top_refine_dir, "cumulative_stats_metabat2.txt"),
-        join(top_refine_dir, "cumulative_stats_metawrap.txt"),
-        # contig annotation
-        # ~~~~~~~~~~~~~~~
-        expand(join(top_refine_dir, "contig_annotation", "out.BAT.bin2classification.summary.txt"), name=samples),
-        # BBMap mapping to MAGs
-        # ~~~~~~~~~~~~~~~
-        expand(join(top_mags_dir, "{name}", "index"), name=samples),
-        expand(join(top_mags_dir, "{name}", "DNA", "{name}.statsfile"), name=samples),
-        expand(join(top_mags_dir, "{name}", "DNA", "{name}.scafstats"), name=samples),
-        expand(join(top_mags_dir, "{name}", "DNA", "{name}.covstat"), name=samples),
-        expand(join(top_mags_dir, "{name}", "DNA", "{name}.rpkm"), name=samples),
-        expand(join(top_mags_dir, "{name}", "DNA", "{name}.refstats"), name=samples),
-        # Bowtie2 mapping to MAGs
-        # ~~~~~~~~~~~~~~~
-        # expand(join(top_mapping_dir, "{name}", ".mags_mapped"), name=samples),
+        expand(join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq.gz"), name=samples),
+        expand(join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq.gz"), name=samples),
+        expand(join(top_trim_dir, "{name}", "{name}_R1_dehost.fastq.gz"), name=samples),
+        expand(join(top_trim_dir, "{name}", "{name}_R2_dehost.fastq.gz"), name=samples),            
+    	expand(join(top_mapping_dir, '{name}_genefamilies.tsv'), name=samples),
+    	expand(join(top_mapping_dir, '{name}_pathabundance.tsv'), name=samples),
+    	expand(join(top_mapping_dir, '{name}_pathcoverage.tsv'), name=samples),
+        expand(join(top_mapping_dir, '{name}_bugs_list.tsv'),name=samples),
+        join(top_mapping_dir, 'merged_bugs_list.tsv'),
+        join(top_mapping_dir, 'merged_pathabundance.cpm.stratified.tsv'),
+        join(top_mapping_dir, 'merged_pathabundance.cpm.unstratified.tsv'),
 
         #################
         #  RNA outputs  #
@@ -125,26 +86,21 @@ rule all:
         start_r2_rna,
         # read qc and filtering
         # ~~~~~~~~~~~~~~~
-        expand(join(top_readqc_dir_rna, "{rname}", "{rname}_R1_pretrim_report.html"), rname=rna_sample_stems),
-        expand(join(top_readqc_dir_rna, "{rname}", "{rname}_R2_pretrim_report.html"), rname=rna_sample_stems),
-        expand(join(top_readqc_dir_rna, "{rname}", "{rname}_R1_postrim_report.html"), rname=rna_sample_stems),
-        expand(join(top_readqc_dir_rna, "{rname}", "{rname}_R2_postrim_report.html"), rname=rna_sample_stems),
-        expand(join(top_trim_dir_rna, "{rname}", "{rname}_R1_trimmed.fastq.gz"), rname=rna_sample_stems),
-        expand(join(top_trim_dir_rna, "{rname}", "{rname}_R2_trimmed.fastq.gz"), rname=rna_sample_stems),
-        # rna mapping
-        # ~~~~~~~~~~~~~~~
-        expand(join(top_map_dir_rna, "{rname}", 'humann3', '{rname}_genefamilies.tsv'), rname=rna_sample_stems),
-        expand(join(top_map_dir_rna, "{rname}", 'humann3', '{rname}_pathabundance.tsv'), rname=rna_sample_stems),
-        expand(join(top_map_dir_rna, "{rname}", 'humann3', '{rname}_pathcoverage.tsv'), rname=rna_sample_stems),
-        expand(join(top_map_dir_rna, "{rname}", 'humann3.log'), rname=rna_sample_stems),
-        expand(join(top_map_dir_rna, "{rname}", 'humann3.conf'), rname=rna_sample_stems),
-        expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.aligned.sam"), rname=rna_sample_stems),
-        expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.statsfile"), rname=rna_sample_stems),
-        expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.scafstats"), rname=rna_sample_stems),
-        expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.covstat"), rname=rna_sample_stems),
-        expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.rpkm"), rname=rna_sample_stems),
-        expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.refstats"), rname=rna_sample_stems),
-
+        expand(join(top_readqc_dir_rna, "{name}", "{name}_R1_pretrim_report.html"), name=rna_sample_stems),
+        expand(join(top_readqc_dir_rna, "{name}", "{name}_R2_pretrim_report.html"), name=rna_sample_stems),
+        expand(join(top_readqc_dir_rna, "{name}", "{name}_R1_postrim_report.html"), name=rna_sample_stems),
+        expand(join(top_readqc_dir_rna, "{name}", "{name}_R2_postrim_report.html"), name=rna_sample_stems),
+        expand(join(top_trim_dir_rna, "{name}", "{name}_R1_trimmed.fastq"), name=rna_sample_stems),
+        expand(join(top_trim_dir_rna, "{name}", "{name}_R2_trimmed.fastq"), name=rna_sample_stems),
+        expand(join(top_trim_dir_rna, "{name}", "{name}_R1_trimmed.fastq.gz"), name=rna_sample_stems),
+        expand(join(top_trim_dir_rna, "{name}", "{name}_R2_trimmed.fastq.gz"), name=rna_sample_stems),
+        expand(join(top_trim_dir_rna, "{name}", "{name}_R1_dehost.fastq.gz"), name=rna_sample_stems),
+        expand(join(top_trim_dir_rna, "{name}", "{name}_R2_dehost.fastq.gz"), name=rna_sample_stems),
+        expand(join(humann3_dir_rna, '{name}_genefamilies.tsv'), name=rna_sample_stems),
+        expand(join(humann3_dir_rna, '{name}_pathabundance.tsv'), name=rna_sample_stems),
+        expand(join(humann3_dir_rna, '{name}_pathcoverage.tsv'), name=rna_sample_stems),
+        join(humann3_dir_rna, 'merged_pathabundance.cpm.stratified.rna.tsv'),
+        join(humann3_dir_rna, 'merged_pathabundance.cpm.unstratified.rna.tsv'),
 
 # Import rules
 include: join("rules", "DNA.smk")
