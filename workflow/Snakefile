@@ -110,7 +110,7 @@ rule_all_inputs.append(join(top_refine_dir, "cumulative_stats_metawrap.txt"))
 
 # contig annotation
 # ~~~~~~~~~~~~~~~
-rule_all_inputs.extend(expand(join(top_refine_dir, "contig_annotation", "out.BAT.bin2classification.summary.txt"), name=samples),
+rule_all_inputs.extend(expand(join(top_refine_dir, "contig_annotation", "out.BAT.bin2classification.summary.txt"), name=samples))
 
 # BBMap mapping to MAGs
 # ~~~~~~~~~~~~~~~
