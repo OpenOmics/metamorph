@@ -117,7 +117,7 @@ Each of the following arguments are optional, and do not need to be provided.
 > Default (in prority order):
 >   params, mtime, code, software-env, input
 >
-> ***Example:*** `--silent`
+> ***Example:*** `--triggers mtime,code`
 
 ---  
   `--silent`            
