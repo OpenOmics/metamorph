@@ -103,6 +103,23 @@ Each of the following arguments are optional, and do not need to be provided.
 > ***Example:*** `--dry-run`
 
 ---  
+  `-t(--triggers)`            
+> **Manual control of the snakemake rerun triggers..**  
+>  Trigger values must be one or more of:
+>     - mtime
+>     - code
+>     - software-env
+>     - input
+>     - params
+> 
+> See https://snakemake.readthedocs.io/en/stable/executing/cli.html
+>   for more details about snakemake rerun triggers.
+> Default (in prority order):
+>   params, mtime, code, software-env, input
+>
+> ***Example:*** `--silent`
+
+---  
   `--silent`            
 > **Silence standard output.**  
 > *type: boolean flag*
