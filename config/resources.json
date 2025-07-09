@@ -105,6 +105,11 @@
             "to": "/data2/gtf",
             "from": "/data/CCBR_Pipeliner/db/PipeDB/Indices/GTFs/hg38",
             "mode": "rw"
-        }
+        },{
+ 	    "name": "mpa_nwk",
+            "to": "/data2/mpa_nwk_tree",
+            "from": "/data/OpenOmics/references/metamorph/metaphlan_diversity_calculation",
+            "mode": "rw"
+	  }
     ]
 }

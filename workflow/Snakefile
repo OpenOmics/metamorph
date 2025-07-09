@@ -69,14 +69,20 @@ rule all:
         expand(join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq.gz"), name=samples),
         expand(join(top_trim_dir, "{name}", "{name}_R1_dehost.fastq.gz"), name=samples),
         expand(join(top_trim_dir, "{name}", "{name}_R2_dehost.fastq.gz"), name=samples),            
-    	expand(join(top_mapping_dir, '{name}_genefamilies.tsv'), name=samples),
-    	expand(join(top_mapping_dir, '{name}_pathabundance.tsv'), name=samples),
-    	expand(join(top_mapping_dir, '{name}_pathcoverage.tsv'), name=samples),
+        expand(join(top_mapping_dir, '{name}_genefamilies.tsv'), name=samples),
+        expand(join(top_mapping_dir, '{name}_pathabundance.tsv'), name=samples),
+        expand(join(top_mapping_dir, '{name}_pathcoverage.tsv'), name=samples),
         expand(join(top_mapping_dir, '{name}_bugs_list.tsv'),name=samples),
         join(top_mapping_dir, 'merged_bugs_list.tsv'),
         join(top_mapping_dir, 'merged_pathabundance.cpm.stratified.tsv'),
         join(top_mapping_dir, 'merged_pathabundance.cpm.unstratified.tsv'),
-
+        join(top_mapping_dir, 'diversity_analysis','merged_bugs_list_shannon.tsv'),
+        join(top_mapping_dir, 'diversity_analysis','merged_bugs_list_richness.tsv'),
+        join(top_mapping_dir, 'diversity_analysis','merged_bugs_list_jaccard.tsv'),
+        join(top_mapping_dir, 'diversity_analysis','merged_bugs_list_weighted-unifrac.tsv'),
+        join(top_mapping_dir, 'diversity_analysis','merged_bugs_list_unweighted-unifrac.tsv'),
+        expand(join(top_trim_dir, "{name}", "{name}_R1_dehost.fastq"), name=samples),
+        expand(join(top_trim_dir, "{name}", "{name}_R2_dehost.fastq"), name=samples),
         #################
         #  RNA outputs  #
         #################

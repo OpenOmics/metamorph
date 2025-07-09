@@ -133,6 +133,20 @@
         "time": "0-04:00:00",
         "gres": "lscratch:64"
     },
+    "dna_humann_diversity_calculation": {
+        "threads": 1,
+        "mem": "32G",
+        "partition": "norm",
+        "time": "0-04:00:00",
+        "gres": "lscratch:64"
+    },	
+    "dna_decompress_dehost_reads": {
+        "threads": 1,
+        "mem": "32G",
+        "partition": "norm",
+        "time": "0-04:00:00",
+        "gres": "lscratch:64"
+    },  
     "map_to_rna_to_mag": {
         "threads": 32,
         "mem": "64G",

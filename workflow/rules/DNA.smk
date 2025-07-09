@@ -31,6 +31,7 @@ top_mapping_dir            = join(workpath, config['project']['id'], "humann3_dn
 # workflow flags
 metawrap_container         = config["containers"]["metawrap"]
 bowtie2_samtools_container = config["images"]["bowtie2_samtools"]
+metaphlan_utils_container  = config["containers"]["metaphlan_utils"]
 pairedness                 = list(range(1, config['project']['nends']+1))
 mem2int                    = lambda x: int(str(x).lower().replace('gb', '').replace('g', ''))
 megahit_only               = bool(int(config["options"]["assembler_mode"]))
@@ -240,17 +241,53 @@ rule dna_humann_classify:
         rm -r {params.hm3_map_dir}/{params.sid}_humann_temp
         """
 
+rule dna_humann_diversity_calculation:
+    """
+        This step calculates the following diversity metrics from the merged buglist:
+               1. observed species
+               2. Shannon index
+               3. Jaccard distance
+               4. Bray-curtis distance
+               5. Weighted and unweighted unifrac distance
+        """
+    input:
+        bugs_list           = join(top_mapping_dir, 'merged_bugs_list.tsv'),
+
+    output:
+        shannon             = join(top_mapping_dir, 'diversity_analysis','merged_bugs_list_shannon.tsv'),
+        richness            = join(top_mapping_dir, 'diversity_analysis','merged_bugs_list_richness.tsv'),
+        jaccard             = join(top_mapping_dir, 'diversity_analysis','merged_bugs_list_jaccard.tsv'),
+        wunif               = join(top_mapping_dir, 'diversity_analysis','merged_bugs_list_weighted-unifrac.tsv'),
+        unwunif             = join(top_mapping_dir, 'diversity_analysis','merged_bugs_list_unweighted-unifrac.tsv'),
+
+    params:
+        rname               = "dna_humann_diversity",
+        div_dir             = join("metagenome_results/humann3_dna", "diversity_analysis"),
+        wunif_log           = join("metagenome_results/humann3_dna", "diversity_analysis", "merged_bugs_list_weighted-unifrac.log"),
+        unwunif_log         = join("metagenome_results/humann3_dna", "diversity_analysis", "merged_bugs_list_unweighted-unifrac.log"),
+        tree                = "/data2/mpa_nwk_tree/mpa_vJan21_CHOCOPhlAnSGB_202103.nwk",
+
+    containerized: metaphlan_utils_container,
+    threads: int(cluster["dna_humann_diversity_calculation"].get('threads', default_threads)),
+    shell:
+        """
+        calculate_diversity.R -f {input.bugs_list} -o {params.div_dir} -d beta -m jaccard -s t__
+     	calculate_diversity.R -f {input.bugs_list} -o {params.div_dir} -d alpha -m richness -s t__
+    	calculate_diversity.R -f {input.bugs_list} -o {params.div_dir} -d alpha -m shannon -s t__
+    	calculate_diversity.R -f {input.bugs_list} -o {params.div_dir} -t {params.tree} -m weighted-unifrac -s t__ > {params.wunif_log}
+    	calculate_diversity.R -f {input.bugs_list} -o {params.div_dir} -t {params.tree} -m unweighted-unifrac -s t__ > {params.unwunif_log}
+    """
 
 rule dna_humann_summarize:
     """
         This step merges all per-sample tables as a single table for each type of input:
-		1. Merges the buglist files generated from metaphlan4 to a single table with merge_metaphlan_tables.py
+     	1. Merges the buglist files generated from metaphlan4 to a single table with merge_metaphlan_tables.py
         2.  
             a) calculate CPM for path abundance.tsv (with humann_renorm_table)
             b) separate the CPM table to one stratified and one unstratified table (with humann_split_stratified_table)
             c) merge per-sample stratified CPM tables as a single table with (humann_join_tables)
             d) do the same thing for the unstratified per-sample cpm tables
-	"""
+    """
     input:
         bugs_list           = expand(join(top_mapping_dir, '{name}_bugs_list.tsv'), name=samples),
         path_abd            = expand(join(top_mapping_dir, '{name}_pathabundance.tsv'), name=samples),
@@ -305,6 +342,25 @@ rule dna_humann_summarize:
 
         """
 
+rule dna_decompress_dehost_reads:
+    """ 
+       All steps in the assembly option involves using the decompressed dehost reads, so this step decompressed teh dehost reads to make them ready to use.
+    """
+    input:
+        R1                  = join(top_trim_dir, "{name}", "{name}_R1_dehost.fastq.gz"),
+        R2                  = join(top_trim_dir, "{name}", "{name}_R2_dehost.fastq.gz"),    
+    output:
+        R1                  = join(top_trim_dir, "{name}", "{name}_R1_dehost.fastq"),
+        R2                  = join(top_trim_dir, "{name}", "{name}_R2_dehost.fastq"), 
+    params:
+        rname               = "dna_decompress_dehost_reads",
+        sid                 = "{name}",
+    threads: int(cluster["dna_decompress_dehost_reads"].get('threads', default_threads)),
+    shell:
+        """
+        zcat {input.R1} > {output.R1}
+        zcat {input.R2} > {output.R2}
+        """
 
 rule metawrap_genome_assembly:
     """
@@ -317,7 +373,7 @@ rule metawrap_genome_assembly:
         Finally, short scaffolds are discarded (<1000bp), and an assembly report is generated with QUAST.
 
         @Input:
-            Clean trimmed fastq reads (R1 & R2 per sample)
+            Dehosted reads generated from bowtie2_dehost (R1 & R2 per sample)
 
         @Output:
             Megahit assembled contigs and reports
@@ -325,8 +381,8 @@ rule metawrap_genome_assembly:
             Ensemble assembled contigs and reports
     """
     input:
-        R1                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq"),
-        R2                          = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq"),
+        R1                  = join(top_trim_dir, "{name}", "{name}_R1_dehost.fastq"),
+        R2                  = join(top_trim_dir, "{name}", "{name}_R2_dehost.fastq"),    
     output:
         # megahit outputs
         megahit_assembly            = join(top_assembly_dir, "{name}", "megahit", "final.contigs.fa"),
@@ -372,50 +428,6 @@ rule metawrap_genome_assembly:
             -o {params.assembly_dir}
         """
 
-
-rule metawrap_tax_classification:
-    """
-        The metaWRAP::Taxonomic Classification module takes in any number of fastq or fasta files, classifies the contained sequences 
-        with KRAKEN, and reports the taxonomy distribution in a kronagram using KronaTools. If the sequences passed to the module 
-        belong to an assembly and follow the contig naming convention of the Assembly module, the taxonomy of each contig is weighted based on 
-        its length and coverage [weight=coverage*length]. The classifications of the sequences are then summarized in a format that 
-        KronaTools' ktImportText function recognizes, and a final kronagram in html format is made with all the samples.
-        @Input:
-            - clean & trimmed reads (R1 & R2)
-            - ensemble genome assembly
-        @Output:
-            - kraken2 kmer classification reports and tabular data outputs
-            - krona tabular outputs
-            - krona plot (interactive circular pie charts) of classified taxonomies 
-    """
-    input:
-        R1                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq"), 
-        R2                          = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq"),
-        final_assembly              = join(top_assembly_dir, "{name}", "final_assembly.fasta"),
-    output:
-        krak2_asm                   = join(top_tax_dir, "{name}", "final_assembly.krak2"),
-        kraken2_asm                 = join(top_tax_dir, "{name}", "final_assembly.kraken2"),
-        krona_asm                   = join(top_tax_dir, "{name}", "final_assembly.krona"),
-        kronagram                   = join(top_tax_dir, "{name}", "kronagram.html"),
-    params:
-        reads                       = lambda _, output, input: ' '.join([input.R1, input.R2]),
-        tax_dir                     = join(top_tax_dir, "{name}"),
-        rname                       = "metawrap_tax_classification",
-        tax_subsample               = str(int(1e6)),
-    singularity: metawrap_container,
-    threads: int(cluster["metawrap_tax_classification"].get("threads", default_threads)),
-    shell:
-        """
-            mkdir -p """+top_tax_dir+"""
-            mw kraken2 \
-            -t {threads} \
-            -s {params.tax_subsample} \
-            -o {params.tax_dir} \
-            {input.final_assembly} \
-            {params.reads}
-        """
-
-
 rule metawrap_binning:
     """
         The metaWRAP::Binning module is meant to be a convenient wrapper around three metagenomic binning software: MaxBin2, metaBAT2, and CONCOCT.
@@ -456,7 +468,7 @@ rule metawrap_binning:
                 b. Outputs are formatted and collected for better viewing.
 
         @Input:
-            Clean trimmed fastq.gz reads (R1 & R2 per sample)
+            Dehosted reads generated from bowtie2_dehost (R1 & R2 per sample)
 
         @Output:
             Megahit assembled draft-genomes (bins) and reports
@@ -465,8 +477,8 @@ rule metawrap_binning:
 
     """
     input:
-        R1                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq"),
-        R2                          = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq"),
+        R1                          = join(top_trim_dir, "{name}", "{name}_R1_dehost.fastq"),
+        R2                          = join(top_trim_dir, "{name}", "{name}_R2_dehost.fastq"),   
         assembly                    = join(top_assembly_dir, "{name}", "final_assembly.fasta"),
     output:
         maxbin_bins                 = directory(join(top_binning_dir, "{name}", "maxbin2_bins")),
@@ -791,8 +803,8 @@ rule bbtools_index_map:
         cat_bin2cls_filename        = join(top_refine_dir, "contig_annotation", "out.BAT.bin2classification.txt"),
         cat_bing2cls_official       = join(top_refine_dir, "contig_annotation", "out.BAT.bin2classification.official_names.txt"),
         cat_bing2cls_summary        = join(top_refine_dir, "contig_annotation", "out.BAT.bin2classification.summary.txt"),
-        R1                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq"),
-        R2                          = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq"),
+        R1                          = join(top_trim_dir, "{name}", "{name}_R1_dehost.fastq"),
+        R2                          = join(top_trim_dir, "{name}", "{name}_R2_dehost.fastq"),   
     output:
         index                       = directory(join(top_mags_dir, "{name}", "index")),
         statsfile                   = join(top_mags_dir, "{name}", "DNA", "{name}.statsfile"),

@@ -5,6 +5,7 @@
     }, 
     "containers": {
         "metawrap": "/data/OpenOmics/SIFs/metamorph_metawrap_0.0.11.sif",
-	"star": "/data/OpenOmics/SIFs/ccbr_arriba_2.0.0_v0.0.1.sif"
+	"star": "/data/OpenOmics/SIFs/ccbr_arriba_2.0.0_v0.0.1.sif",
+        "metaphlan_utils": "/data/OpenOmics/SIFs/metaphlan-utils_v0.1.0.sif"
     }
 }
