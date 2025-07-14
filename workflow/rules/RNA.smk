@@ -23,10 +23,12 @@ top_readqc_dir_rna                  = join(workpath, config['project']['id'], "m
 top_trim_dir_rna                    = join(workpath, config['project']['id'], "trimmed_reads_RNA")
 top_map_dir_rna                     = join(workpath, config['project']['id'], "mapping_RNA")
 humann3_dir_rna                     = join(workpath, config['project']['id'], "humann3_rna")
+top_centrifuger_dir_rna             = join(workpath, config['project']['id'], "centrifuger_rna")
 humann_deep_mode                    = True if "deep_profile" in config["options"] and \
                                       bool(int(config["options"]["deep_profile"])) else False
 # containers
-star_container = config["containers"]["star"]
+star_container              = config["containers"]["star"]
+centrifuger_sylph_container = config["containers"]["centrifuger_sylph"]
 
 rule rna_read_qc_skipBmtagger:
     input:
@@ -149,6 +151,56 @@ rule rna_dehost:
 
         """
 
+rule rna_centrifuger:
+    """
+    Data processing step to classify taxonomic composition of the host removed reads.
+    For more information about centrifuger, please visit: 
+       - https://github.com/mourisl/centrifuger
+    @Environment specifications
+        - Minimum 200 GB memory, centrifuger index is around 167 GB
+    @Input:
+        - Dehost fastq files (scatter-per-sample)
+    @Outputs:
+        - Centrifuge classification file
+    """
+    input:
+        R1_dehost                   = join(top_trim_dir_rna, "{name}", "{name}_R1_dehost.fastq.gz"),
+        R2_dehost                   = join(top_trim_dir_rna, "{name}", "{name}_R2_dehost.fastq.gz"),
+    output:
+        classification              = join(top_centrifuger_dir_rna, "{name}_centrifuger_classification.tsv"),
+        centrifuger_quant           = join(top_centrifuger_dir_rna, "{name}_centrifuger_quantification_report.tsv"),
+        metaphlan_quant             = join(top_centrifuger_dir_rna, "{name}_metaphlan_quantification_report.tsv"),
+    params:
+        rname                       = "rna_centrifuger",
+        sid                         = "{name}",
+        centrifuger_idx_prefix      = "/data2/centrifuger/gtdb_r226+refseq_hvfc/cfr_gtdb_r226+refseq_hvfc",
+    container: centrifuger_sylph_container,
+    threads: int(cluster["rna_centrifuger"].get('threads', default_threads)),
+    shell: 
+        """
+        # Runs centrifuger on RNA to classify taxonomic
+        # composition of host removed reads
+        centrifuger \\
+            -t {threads} \\
+            -x {params.centrifuger_idx_prefix} \\
+            -1 {input.R1_dehost} \\
+            -2 {input.R2_dehost}  \\
+        > {output.classification}
+        # Runs centrifuger quant on RNA to quantify
+        # taxonomic composition of host removed reads
+        # Centrifuger output file format
+        centrifuger-quant \\
+            -x {params.centrifuger_idx_prefix} \\
+            -c {output.classification} \\
+            --output-format 0 \\
+        > {output.centrifuger_quant}
+        # Metaphlan output file format
+        centrifuger-quant \\
+            -x {params.centrifuger_idx_prefix} \\
+            -c {output.classification} \\
+            --output-format 1 \\
+        > {output.metaphlan_quant}
+        """
 
 rule rna_humann_classify:
     input:

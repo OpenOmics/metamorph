@@ -26,12 +26,15 @@ top_tax_dir                = join(workpath, config['project']['id'], "metawrap_k
 top_binning_dir            = join(workpath, config['project']['id'], "metawrap_binning")
 top_mags_dir               = join(workpath, config['project']['id'], "mags")
 top_mapping_dir            = join(workpath, config['project']['id'], "humann3_dna")
+top_centrifuger_dir        = join(workpath, config['project']['id'], "centrifuger_dna")
 
 # RNA directories
 top_readqc_dir_rna         = join(workpath, config['project']['id'], "metawrap_read_qc_RNA")
 top_trim_dir_rna           = join(workpath, config['project']['id'], "trimmed_reads_RNA")
 top_map_dir_rna            = join(workpath, config['project']['id'], "mapping_RNA")
 humann3_dir_rna            = join(workpath, config['project']['id'], "humann3_rna")
+top_centrifuger_dir_rna    = join(workpath, config['project']['id'], "centrifuger_rna")
+
 
 # Read in resource information, containing information about threads, mem, walltimes, etc.
 # TODO: Add handler for when the mode is set to local.
@@ -68,7 +71,8 @@ rule all:
         expand(join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq.gz"), name=samples),
         expand(join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq.gz"), name=samples),
         expand(join(top_trim_dir, "{name}", "{name}_R1_dehost.fastq.gz"), name=samples),
-        expand(join(top_trim_dir, "{name}", "{name}_R2_dehost.fastq.gz"), name=samples),            
+        expand(join(top_trim_dir, "{name}", "{name}_R2_dehost.fastq.gz"), name=samples),
+        expand(join(top_centrifuger_dir, "{name}_centrifuger_classification.tsv"), name=samples),
         expand(join(top_mapping_dir, '{name}_genefamilies.tsv'), name=samples),
         expand(join(top_mapping_dir, '{name}_pathabundance.tsv'), name=samples),
         expand(join(top_mapping_dir, '{name}_pathcoverage.tsv'), name=samples),
@@ -102,6 +106,7 @@ rule all:
         expand(join(top_trim_dir_rna, "{name}", "{name}_R2_trimmed.fastq.gz"), name=rna_sample_stems),
         expand(join(top_trim_dir_rna, "{name}", "{name}_R1_dehost.fastq.gz"), name=rna_sample_stems),
         expand(join(top_trim_dir_rna, "{name}", "{name}_R2_dehost.fastq.gz"), name=rna_sample_stems),
+        expand(join(top_centrifuger_dir_rna, "{name}_centrifuger_classification.tsv"), name=rna_sample_stems),
         expand(join(humann3_dir_rna, '{name}_genefamilies.tsv'), name=rna_sample_stems),
         expand(join(humann3_dir_rna, '{name}_pathabundance.tsv'), name=rna_sample_stems),
         expand(join(humann3_dir_rna, '{name}_pathcoverage.tsv'), name=rna_sample_stems),

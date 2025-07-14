@@ -27,11 +27,13 @@ top_binning_dir            = join(workpath, config['project']['id'], "metawrap_b
 top_refine_dir             = join(workpath, config['project']['id'], "metawrap_bin_refine")
 top_mags_dir               = join(workpath, config['project']['id'], "mags")
 top_mapping_dir            = join(workpath, config['project']['id'], "humann3_dna")
+top_centrifuger_dir        = join(workpath, config['project']['id'], "centrifuger_dna")
 
 # workflow flags
-metawrap_container         = config["containers"]["metawrap"]
-bowtie2_samtools_container = config["images"]["bowtie2_samtools"]
-metaphlan_utils_container  = config["containers"]["metaphlan_utils"]
+metawrap_container          = config["containers"]["metawrap"]
+bowtie2_samtools_container  = config["images"]["bowtie2_samtools"]
+metaphlan_utils_container   = config["containers"]["metaphlan_utils"]
+centrifuger_sylph_container = config["containers"]["centrifuger_sylph"]
 pairedness                 = list(range(1, config['project']['nends']+1))
 mem2int                    = lambda x: int(str(x).lower().replace('gb', '').replace('g', ''))
 megahit_only               = bool(int(config["options"]["assembler_mode"]))
@@ -188,6 +190,57 @@ rule bowtie2_dehost:
             -1 {output.R1_dehost} \
             -2 {output.R2_dehost} \
             -0 /dev/null -s /dev/null -n
+        """
+
+rule dna_centrifuger:
+    """
+    Data processing step to classify taxonomic composition of the host removed reads.
+    For more information about centrifuger, please visit: 
+       - https://github.com/mourisl/centrifuger
+    @Environment specifications
+        - Minimum 200 GB memory, centrifuger index is around 167 GB
+    @Input:
+        - Dehost fastq files (scatter-per-sample)
+    @Outputs:
+        - Centrifuge classification file
+    """
+    input:
+        R1_dehost                   = join(top_trim_dir, "{name}", "{name}_R1_dehost.fastq.gz"),
+        R2_dehost                   = join(top_trim_dir, "{name}", "{name}_R2_dehost.fastq.gz"),
+    output:
+        classification              = join(top_centrifuger_dir, "{name}_centrifuger_classification.tsv"),
+        centrifuger_quant           = join(top_centrifuger_dir, "{name}_centrifuger_quantification_report.tsv"),
+        metaphlan_quant             = join(top_centrifuger_dir, "{name}_metaphlan_quantification_report.tsv"),
+    params:
+        rname                       = "dna_centrifuger",
+        sid                         = "{name}",
+        centrifuger_idx_prefix      = "/data2/centrifuger/gtdb_r226+refseq_hvfc/cfr_gtdb_r226+refseq_hvfc",
+    container: centrifuger_sylph_container,
+    threads: int(cluster["dna_centrifuger"].get('threads', default_threads)),
+    shell: 
+        """
+        # Runs centrifuger on gDNA to classify taxonomic
+        # composition of host removed reads
+        centrifuger \\
+            -t {threads} \\
+            -x {params.centrifuger_idx_prefix} \\
+            -1 {input.R1_dehost} \\
+            -2 {input.R2_dehost}  \\
+        > {output.classification}
+        # Runs centrifuger quant on gDNA to quantify
+        # taxonomic composition of host removed reads
+        # Centrifuger output file format
+        centrifuger-quant \\
+            -x {params.centrifuger_idx_prefix} \\
+            -c {output.classification} \\
+            --output-format 0 \\
+        > {output.centrifuger_quant}
+        # Metaphlan output file format
+        centrifuger-quant \\
+            -x {params.centrifuger_idx_prefix} \\
+            -c {output.classification} \\
+            --output-format 1 \\
+        > {output.metaphlan_quant}
         """
 
 rule dna_humann_classify:
