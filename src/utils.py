@@ -422,8 +422,10 @@ def valid_input(sheet):
 def valid_trigger(trigger_given):
     from argparse import ArgumentTypeError
     snk_triggers = ('mtime', 'code', 'input', 'params', 'software-env')
-    if not trigger_given in snk_triggers:
-        raise ArgumentTypeError('Invalid trigger selected please only use one of: ' + ', '.join(snk_triggers))
+    trigger_list =  trigger_given.split(',')
+    invalid = [t for t in trigger_list if t not in snk_triggers]
+    if invalid:
+            raise ArgumentTypeError('Invalid trigger selected please only use one of: ' + ', '.join(snk_triggers))
     return trigger_given
 
 
