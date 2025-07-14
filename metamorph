@@ -170,7 +170,7 @@ def run(sub_args):
     # Optional Step: Dry-run pipeline
     if sub_args.dry_run:
         # Dryrun pipeline
-        dryrun_output = dryrun(outdir = sub_args.output) # python3 returns byte-string representation
+        dryrun_output = dryrun(outdir = sub_args.output, rerun_triggers=sub_args.triggers) # python3 returns byte-string representation
         print("\nDry-running {} pipeline:\n{}".format(_name, dryrun_output.decode("utf-8")))
         sys.exit(0)
 
@@ -283,7 +283,8 @@ def parsed_arguments(name, description):
                 [--dry-run] [--job-name JOB_NAME] [--mode {{slurm,local}}] \\
                 [--sif-cache SIF_CACHE] [--singularity-cache SINGULARITY_CACHE] \\
                 [--silent] [--threads THREADS] [--megahit-only] [--deep-profile] \\
-                [--tmp-dir TMP_DIR] --input INPUT [INPUT ...] \\
+                [--tmp-dir TMP_DIR] [--triggers TRIGGER [TRIGGER ...]] \\
+                --input INPUT [INPUT ...] \\
                 --output OUTPUT
 
         Optional arguments are shown in square brackets above.
@@ -377,26 +378,23 @@ def parsed_arguments(name, description):
                                 Max number of threads for local processes. It is
                                 recommended setting this vaule to the maximum number 
                                 of CPUs available on the host machine, default: 2.
-                                  Example: --threads: 16
-                                           
+                                  Example: --threads: 16            
           --megahit-only
                                 Use only the megahit assembler for bin assembly.
                                 Turns off the metaspades assembler
-                                Example: --megahit-only
-                                           
-          -t(--triggers) TRIGGER [TRIGGER ...]
+                                  Example: --megahit-only
+          --triggers TRIGGER [TRIGGER ...]
                                 Manual control of the snakemake rerun triggers.
                                 Trigger values must be one or more of:
-                                    - mtime
-                                    - code
-                                    - software-env
-                                    - input
-                                    - params
-                                See https://snakemake.readthedocs.io/en/stable/executing/cli.html
-                                for more details about snakemake rerun triggers.
-                                Default (in prority order):
-                                    params, mtime, code, software-env, input
-                                           
+                                  • mtime
+                                  • code
+                                  • software-env
+                                  • input
+                                  • params
+                                See https://snakemake.readthedocs.io/en/v7.32.3/
+                                for more details about snakemake rerun triggers, 
+                                default: "params,mtime,code,software-env,input".
+                                  Example: --triggers mtime,params
           --shallow-profile
                                 Turn off the translated blast search of unaligned
                                 reads in humann3. This will decrease run time 
@@ -525,7 +523,7 @@ def parsed_arguments(name, description):
 
     # Snakemake rerun triggers
     subparser_run.add_argument(
-        '-t', '--triggers',
+        '--triggers',
         type = valid_trigger,
         required = False,
         default = None,
