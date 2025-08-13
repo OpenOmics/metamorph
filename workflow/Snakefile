@@ -16,6 +16,7 @@ megahit_only               = bool(int(config["options"]["assembler_mode"]))
 rna_included               = list_bool(config.get("rna", 'false'))
 rna_sample_stems           = config.get("rna", [])
 samples                    = config["samples"]
+analysis_mode              = config["options"]["analysis_mode"]
 
 # DNA directories
 top_assembly_dir           = join(workpath, config['project']['id'], "metawrap_assembly")
@@ -73,20 +74,7 @@ rule all:
         expand(join(top_trim_dir, "{name}", "{name}_R1_dehost.fastq.gz"), name=samples),
         expand(join(top_trim_dir, "{name}", "{name}_R2_dehost.fastq.gz"), name=samples),
         expand(join(top_centrifuger_dir, "{name}_centrifuger_classification.tsv"), name=samples),
-        expand(join(top_mapping_dir, '{name}_genefamilies.tsv'), name=samples),
-        expand(join(top_mapping_dir, '{name}_pathabundance.tsv'), name=samples),
-        expand(join(top_mapping_dir, '{name}_pathcoverage.tsv'), name=samples),
-        expand(join(top_mapping_dir, '{name}_bugs_list.tsv'),name=samples),
-        join(top_mapping_dir, 'merged_bugs_list.tsv'),
-        join(top_mapping_dir, 'merged_pathabundance.cpm.stratified.tsv'),
-        join(top_mapping_dir, 'merged_pathabundance.cpm.unstratified.tsv'),
-        join(top_mapping_dir, 'diversity_analysis','merged_bugs_list_shannon.tsv'),
-        join(top_mapping_dir, 'diversity_analysis','merged_bugs_list_richness.tsv'),
-        join(top_mapping_dir, 'diversity_analysis','merged_bugs_list_jaccard.tsv'),
-        join(top_mapping_dir, 'diversity_analysis','merged_bugs_list_weighted-unifrac.tsv'),
-        join(top_mapping_dir, 'diversity_analysis','merged_bugs_list_unweighted-unifrac.tsv'),
-        expand(join(top_trim_dir, "{name}", "{name}_R1_dehost.fastq"), name=samples),
-        expand(join(top_trim_dir, "{name}", "{name}_R2_dehost.fastq"), name=samples),
+        # Optional: read-based profiling (only if --option is read-based)
         #################
         #  RNA outputs  #
         #################
@@ -107,11 +95,7 @@ rule all:
         expand(join(top_trim_dir_rna, "{name}", "{name}_R1_dehost.fastq.gz"), name=rna_sample_stems),
         expand(join(top_trim_dir_rna, "{name}", "{name}_R2_dehost.fastq.gz"), name=rna_sample_stems),
         expand(join(top_centrifuger_dir_rna, "{name}_centrifuger_classification.tsv"), name=rna_sample_stems),
-        expand(join(humann3_dir_rna, '{name}_genefamilies.tsv'), name=rna_sample_stems),
-        expand(join(humann3_dir_rna, '{name}_pathabundance.tsv'), name=rna_sample_stems),
-        expand(join(humann3_dir_rna, '{name}_pathcoverage.tsv'), name=rna_sample_stems),
-        join(humann3_dir_rna, 'merged_pathabundance.cpm.stratified.rna.tsv'),
-        join(humann3_dir_rna, 'merged_pathabundance.cpm.unstratified.rna.tsv'),
+
 
 # Import rules
 include: join("rules", "DNA.smk")

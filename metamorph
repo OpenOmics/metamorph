@@ -155,7 +155,9 @@ def run(sub_args):
         config = config
     )
     config['bindpaths'] = bindpaths
-
+    
+    # Step 4a. Setup analysis option
+    config["options"]["analysis_mode"] = sub_args.option
     # Step 4b. Setup assembly mode
     #   modes: 0 - megahit + metaspades assembly
     config["options"]["assembler_mode"] = "1" if sub_args.megahit_only else "0"
@@ -379,6 +381,26 @@ def parsed_arguments(name, description):
                                 recommended setting this vaule to the maximum number 
                                 of CPUs available on the host machine, default: 2.
                                   Example: --threads: 16            
+          --option {{pre-screen,read-based,assembly-based, combined}}
+                                Specifies the analysis mode:
+                                  • pre-screen: perform quality control, host-read 
+                                    removal, and run Centrifuge and Kraken2 on 
+                                    dehosted reads.
+                                  • read-based: perform functional and taxonomic 
+                                    profiling on dehosted reads using HUMAnN3 and 
+                                    MetaPhlAn4. This stage follows pre-screen.
+                                  • assembly-based: perform full assembly and binning 
+                                    workflow on dehosted reads. This stage also 
+                                    follows pre-screen.
+                                  • combined: perform all steps included in the 
+                                    abovementioned modes.
+                                Default: pre-screen
+                                  Example: --option pre-screen
+          --shallow-profile
+                                Turn off the translated blast search of unaligned
+                                reads in humann3. This will decrease run time 
+                                significantly. Turns off the protein search for
+                                unaligned reads for humann3 taxanomic profiling.
           --megahit-only
                                 Use only the megahit assembler for bin assembly.
                                 Turns off the metaspades assembler
@@ -395,11 +417,6 @@ def parsed_arguments(name, description):
                                 for more details about snakemake rerun triggers, 
                                 default: "params,mtime,code,software-env,input".
                                   Example: --triggers mtime,params
-          --shallow-profile
-                                Turn off the translated blast search of unaligned
-                                reads in humann3. This will decrease run time 
-                                significantly. Turns off the protein search for
-                                unaligned reads for humann3 taxanomic profiling.
           
         
         {3}{4}Misc Options:{5}
@@ -612,6 +629,15 @@ def parsed_arguments(name, description):
         required = False,
         default = 2,
         help = argparse.SUPPRESS
+    )
+
+    # Select the analysis mode
+    subparser_run.add_argument(
+    '--option',
+    type = str,
+    choices = ['pre-screen', 'read-based', 'assembly-based', 'combined'],
+    default = 'pre-screen',
+    help = argparse.SUPPRESS
     )
     
     # Sub-parser for the "unlock" sub-command

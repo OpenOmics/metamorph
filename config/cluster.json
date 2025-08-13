@@ -21,7 +21,7 @@
         "gres": "lscratch:400"
     },
     "bowtie2_dehost": {
-        "threads": 1,
+        "threads": 16,
         "mem": "64G",
         "partition": "norm",
         "time": "2-00:00:00",
@@ -113,21 +113,21 @@
         "gres": "lscratch:600"
     },
     "rna_dehost": {
-        "threads": 1,
+        "threads": 16,
         "mem": "64G",
         "partition": "norm",
         "time": "1-00:00:00",
         "gres": "lscratch:600"
     },
     "rna_humann_classify": {
-        "threads": 1,
+        "threads": 16,
         "mem": "128G",
         "partition": "norm",
         "time": "10-00:00:00",
         "gres": "lscratch:800"
     },
     "dna_humann_classify": {
-        "threads": 1,
+        "threads": 16,
         "mem": "128G",
         "partition": "norm",
         "time": "10-00:00:00",
