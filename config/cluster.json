@@ -20,6 +20,27 @@
         "time": "1-00:00:00",
         "gres": "lscratch:400"
     },
+    "bowtie2_dehost": {
+        "threads": 16,
+        "mem": "64G",
+        "partition": "norm",
+        "time": "2-00:00:00",
+        "gres": "lscratch:600"
+    },
+    "dna_centrifuger": {
+        "threads": 4,
+        "mem": "200G",
+        "partition": "norm",
+        "time": "2-00:00:00",
+        "gres": "lscratch:100"
+    },
+    "rna_centrifuger": {
+        "threads": 4,
+        "mem": "200G",
+        "partition": "norm",
+        "time": "2-00:00:00",
+        "gres": "lscratch:100"
+    },
     "metawrap_genome_assembly": {
         "threads": 56,
         "mem": "240G",
@@ -98,13 +119,55 @@
         "time": "1-00:00:00",
         "gres": "lscratch:600"
     },
+    "rna_dehost": {
+        "threads": 16,
+        "mem": "64G",
+        "partition": "norm",
+        "time": "1-00:00:00",
+        "gres": "lscratch:600"
+    },
     "rna_humann_classify": {
-        "threads": 56,
+        "threads": 16,
         "mem": "128G",
         "partition": "norm",
         "time": "10-00:00:00",
         "gres": "lscratch:800"
     },
+    "dna_humann_classify": {
+        "threads": 16,
+        "mem": "128G",
+        "partition": "norm",
+        "time": "10-00:00:00",
+        "gres": "lscratch:800"
+    },
+    "dna_humann_summarize": {
+        "threads": 1,
+        "mem": "32G",
+        "partition": "norm",
+        "time": "0-04:00:00",
+        "gres": "lscratch:64"
+    },
+    "rna_humann_summarize": {
+        "threads": 1,
+        "mem": "32G",
+        "partition": "norm",
+        "time": "0-04:00:00",
+        "gres": "lscratch:64"
+    },
+    "dna_humann_diversity_calculation": {
+        "threads": 1,
+        "mem": "32G",
+        "partition": "norm",
+        "time": "0-04:00:00",
+        "gres": "lscratch:64"
+    },	
+    "dna_decompress_dehost_reads": {
+        "threads": 1,
+        "mem": "32G",
+        "partition": "norm",
+        "time": "0-04:00:00",
+        "gres": "lscratch:64"
+    },  
     "map_to_rna_to_mag": {
         "threads": 32,
         "mem": "64G",

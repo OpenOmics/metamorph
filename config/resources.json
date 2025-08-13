@@ -85,6 +85,36 @@
             "to": "/data2/metaphlan",
             "from": "/data/OpenOmics/references/metamorph/metaphlan",
             "mode": "rw"
+        }, {
+            "name": "hg38_bowtie_index",
+            "to": "/data2/bowtie",
+            "from": "/data/OpenOmics/references/chrom-seek/hg38_basic/indexes",
+            "mode": "rw"
+        }, {
+            "name": "hg38_bowtie2_index",
+            "to": "/data2/bowtie2",
+            "from": "/data/OpenOmics/references/chrom-seek/hg38_basic/indexes",
+            "mode": "rw"
+        },{
+            "name": "hg38_star_index",
+            "to": "/data2/star",
+            "from": "/data/CCBR_Pipeliner/db/PipeDB/Indices/GENOME_REFs/hg38_major_chrs/STAR/2.7.6a",
+            "mode": "rw"
+        },{
+            "name": "hg38_gtf",
+            "to": "/data2/gtf",
+            "from": "/data/CCBR_Pipeliner/db/PipeDB/Indices/GTFs/hg38",
+            "mode": "rw"
+        },{
+            "name": "mpa_nwk",
+            "to": "/data2/mpa_nwk_tree",
+            "from": "/data/OpenOmics/references/metamorph/metaphlan_diversity_calculation",
+            "mode": "rw"
+	    },{
+            "name": "centrifuger",
+            "to": "/data2/centrifuger/gtdb_r226+refseq_hvfc",
+            "from": "/data/OpenOmics/references/centrifuger/gtdb_r226+refseq_hvfc",
+            "mode": "ro"
         }
     ]
 }

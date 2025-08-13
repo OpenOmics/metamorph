@@ -627,20 +627,35 @@ def get_rawdata_bind_paths(input_files):
     return bindpaths
 
 
-def dryrun(outdir, config='config.json', snakefile=os.path.join('workflow', 'Snakefile')):
+def dryrun(outdir, config='config.json', snakefile=os.path.join('workflow', 'Snakefile'), rerun_triggers=None):
     """Dryruns the pipeline to ensure there are no errors prior to runnning.
     @param outdir <str>:
         Pipeline output PATH
+    @param rerun_triggers <list[str]>:
+        List of rerun triggers for snakemake
     @return dryrun_output <str>:
         Byte string representation of dryrun command
     """
     try:
+        if rerun_triggers is None or not rerun_triggers:
+            # Use default rerun triggers, i.e. 
+            # everything that snakemake uses by default
+            rerun_triggers = ["code", "params", "software-env", "input", "mtime"]
+        # Unpack rerun triggers for subprocess cmd,
+        # this allows for triggers to be specified
+        # as a space or comma seperated list, or
+        # a mix of the two.
+        # For example: --triggers input params,code
+        rerun_triggers = [unpacked_trigger for unsplit_trigger in rerun_triggers for unpacked_trigger in unsplit_trigger.split(',')]
+        trigger_args = ['--rerun-triggers', *rerun_triggers] if rerun_triggers is not None \
+            else ['--rerun-triggers', str(None)]
         # Setting cores to dummy high number so
         # displays the true number of cores a rule
         # will use, it uses the min(--cores CORES, N)
         dryrun_output = subprocess.check_output([
             'snakemake', '-np',
             '-s', str(snakefile),
+            *trigger_args,
             '--use-singularity',
             '--rerun-incomplete',
             '--cores', str(256),

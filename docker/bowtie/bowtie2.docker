@@ -1,0 +1,7 @@
+FROM ubuntu:latest
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update -y -qq
+RUN apt-get install -qq bowtie2=2.5.2-1 libz-dev build-essential libncurses-dev bzip2 libbz2-dev liblzma-dev -y
+RUN mkdir /work
+ADD samtools-1.17.tar.bz2 /work
+RUN cd /work/samtools-1.17; ./configure; make; make install

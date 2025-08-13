@@ -1,10 +1,14 @@
 {
     "images": {
         "metawrap": "docker://rroutsong/metamorph_metawrap:0.1.0",
-        "metaphlan-utils": "docker://skchronicles/metaphlan-utils:v0.1.0"
+        "metaphlan_utils": "docker://skchronicles/metaphlan-utils:v0.1.0",
+        "bowtie2_samtools": "docker://rroutsong/bowtie2-2.5:0.0.1",
+        "centrifuger_sylph": "docker://rroutsong/centrifudger_sylph:0.0.5"
     }, 
     "containers": {
         "metawrap": "/data/OpenOmics/SIFs/metamorph_metawrap_0.1.0.sif",
-        "metaphlan-utils": "/data/OpenOmics/SIFs/metaphlan-utils_v0.1.0.sif"
+        "metaphlan_utils": "/data/OpenOmics/SIFs/metaphlan-utils_v0.1.0.sif",   
+        "star": "/data/OpenOmics/SIFs/ccbr_arriba_2.0.0_v0.0.1.sif",
+        "centrifuger_sylph": "/data/OpenOmics/SIFs/centrifudger_sylph_0.0.5.sif"
     }
 }
