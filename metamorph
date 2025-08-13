@@ -286,7 +286,7 @@ def parsed_arguments(name, description):
                 [--sif-cache SIF_CACHE] [--singularity-cache SINGULARITY_CACHE] \\
                 [--silent] [--threads THREADS] [--megahit-only] [--deep-profile] \\
                 [--tmp-dir TMP_DIR] [--triggers TRIGGER [TRIGGER ...]] \\
-                --input INPUT [INPUT ...] \\
+                --samplesheet [SHEETPATH] \\
                 --output OUTPUT
 
         Optional arguments are shown in square brackets above.

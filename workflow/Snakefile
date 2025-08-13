@@ -91,45 +91,45 @@ rule all:
         *provided([
             expand(join(top_trim_dir, "{name}", "{name}_R1_dehost.fastq"), name=samples),
             expand(join(top_trim_dir, "{name}", "{name}_R2_dehost.fastq"), name=samples),
-            expand(join(top_assembly_dir, "{name}", "final_assembly.fasta"), name=samples)
-            expand(join(top_assembly_dir, "{name}", "assembly_report.html"), name=samples)
+            expand(join(top_assembly_dir, "{name}", "final_assembly.fasta"), name=samples),
+            expand(join(top_assembly_dir, "{name}", "assembly_report.html"), name=samples),
             # taxonomic classification
-            expand(join(top_tax_dir, "{name}", "final_assembly.krona"), name=samples)
-            expand(join(top_tax_dir, "{name}", "kronagram.html"), name=samples)
+            expand(join(top_tax_dir, "{name}", "final_assembly.krona"), name=samples),
+            expand(join(top_tax_dir, "{name}", "kronagram.html"), name=samples),
             # expand(join(top_tax_dir, "{name}", "final_assembly.krak2"), name=samples)
             # expand(join(top_tax_dir, "{name}", "final_assembly.kraken2"), name=samples)
-            expand(join(top_tax_dir, "GTDBTK_classify_wf"), name=samples)
-            expand(join(top_tax_dir, "GUNC_detect"), name=samples)
+            expand(join(top_tax_dir, "GTDBTK_classify_wf"), name=samples),
+            expand(join(top_tax_dir, "GUNC_detect"), name=samples),
             # assembly binning
-            expand(join(top_binning_dir, "{name}", "maxbin2_bins.contigs"), name=samples)
-            expand(join(top_binning_dir, "{name}", "maxbin2_bins.stats"), name=samples)
-            expand(join(top_binning_dir, "{name}", "metabat2_bins.contigs"), name=samples)
-            expand(join(top_binning_dir, "{name}", "metabat2_bins.stats"), name=samples)
-            expand(join(top_binning_dir, "{name}", "metawrap_50_5_bins.contigs"), name=samples)
-            expand(join(top_binning_dir, "{name}", "metawrap_50_5_bins.stats"), name=samples)
-            expand(join(top_binning_dir, "{name}", "figures", "binning_results.png"), name=samples)
+            expand(join(top_binning_dir, "{name}", "maxbin2_bins.contigs"), name=samples),
+            expand(join(top_binning_dir, "{name}", "maxbin2_bins.stats"), name=samples),
+            expand(join(top_binning_dir, "{name}", "metabat2_bins.contigs"), name=samples),
+            expand(join(top_binning_dir, "{name}", "metabat2_bins.stats"), name=samples),
+            expand(join(top_binning_dir, "{name}", "metawrap_50_5_bins.contigs"), name=samples),
+            expand(join(top_binning_dir, "{name}", "metawrap_50_5_bins.stats"), name=samples),
+            expand(join(top_binning_dir, "{name}", "figures", "binning_results.png"), name=samples),
             # bin refinement
-            expand(join(top_refine_dir, "dRep", "data_tables", "Widb.csv"), name=samples)
-            expand(join(top_refine_dir, "dRep", "figures", "Winning_genomes.pdf"), name=samples)
-            expand(join(top_refine_dir, "dRep", "log", "cluster_arguments.json"), name=samples)
+            expand(join(top_refine_dir, "dRep", "data_tables", "Widb.csv"), name=samples),
+            expand(join(top_refine_dir, "dRep", "figures", "Winning_genomes.pdf"), name=samples),
+            expand(join(top_refine_dir, "dRep", "log", "cluster_arguments.json"), name=samples),
             # bin statistics
-            expand(join(top_refine_dir, "{name}", "RefinedBins_summmary.txt"), name=samples)
-            expand(join(top_refine_dir, "{name}", "named_maxbin2_bins.stats"), name=samples)
-            expand(join(top_refine_dir, "{name}", "named_metabat2_bins.stats"), name=samples)
-            expand(join(top_refine_dir, "{name}", "named_metawrap_bins.stats"), name=samples)
-            join(top_refine_dir, "RefinedBins_summmary.txt")
-            join(top_refine_dir, "cumulative_stats_maxbin.txt")
-            join(top_refine_dir, "cumulative_stats_metabat2.txt")
-            join(top_refine_dir, "cumulative_stats_metawrap.txt")
+            expand(join(top_refine_dir, "{name}", "RefinedBins_summmary.txt"), name=samples),
+            expand(join(top_refine_dir, "{name}", "named_maxbin2_bins.stats"), name=samples),
+            expand(join(top_refine_dir, "{name}", "named_metabat2_bins.stats"), name=samples),
+            expand(join(top_refine_dir, "{name}", "named_metawrap_bins.stats"), name=samples),
+            join(top_refine_dir, "RefinedBins_summmary.txt"),
+            join(top_refine_dir, "cumulative_stats_maxbin.txt"),
+            join(top_refine_dir, "cumulative_stats_metabat2.txt"),
+            join(top_refine_dir, "cumulative_stats_metawrap.txt"),
             # contig annotation
-            expand(join(top_refine_dir, "contig_annotation", "out.BAT.bin2classification.summary.txt"), name=samples)
+            expand(join(top_refine_dir, "contig_annotation", "out.BAT.bin2classification.summary.txt"), name=samples),
             # BBMap mapping to MAGs
-            expand(join(top_mags_dir, "{name}", "index"), name=samples)
-            expand(join(top_mags_dir, "{name}", "DNA", "{name}.statsfile"), name=samples)
-            expand(join(top_mags_dir, "{name}", "DNA", "{name}.scafstats"), name=samples)
-            expand(join(top_mags_dir, "{name}", "DNA", "{name}.covstat"), name=samples)
-            expand(join(top_mags_dir, "{name}", "DNA", "{name}.rpkm"), name=samples)
-            expand(join(top_mags_dir, "{name}", "DNA", "{name}.refstats"), name=samples)
+            expand(join(top_mags_dir, "{name}", "index"), name=samples),
+            expand(join(top_mags_dir, "{name}", "DNA", "{name}.statsfile"), name=samples),
+            expand(join(top_mags_dir, "{name}", "DNA", "{name}.scafstats"), name=samples),
+            expand(join(top_mags_dir, "{name}", "DNA", "{name}.covstat"), name=samples),
+            expand(join(top_mags_dir, "{name}", "DNA", "{name}.rpkm"), name=samples),
+            expand(join(top_mags_dir, "{name}", "DNA", "{name}.refstats"), name=samples),
         ], condition = analysis_mode in ["assembly-based", "combined"]),
         # rna read decompress
         # ~~~~~~~~~~~~~~~~~~~
@@ -162,11 +162,11 @@ rule all:
         # read qc and filtering
         # ~~~~~~~~~~~~~~~
         *provided([
-            expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.aligned.sam"), rname=rna_sample_stems)
-            expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.statsfile"), rname=rna_sample_stems)
-            expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.scafstats"), rname=rna_sample_stems)
-            expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.covstat"), rname=rna_sample_stems)
-            expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.rpkm"), rname=rna_sample_stems)
+            expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.aligned.sam"), rname=rna_sample_stems),
+            expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.statsfile"), rname=rna_sample_stems),
+            expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.scafstats"), rname=rna_sample_stems),
+            expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.covstat"), rname=rna_sample_stems),
+            expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.rpkm"), rname=rna_sample_stems),
             expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.refstats"), rname=rna_sample_stems)
         ], condition = analysis_mode in ["assembly-based", "combined"])
 
