@@ -93,11 +93,6 @@ rule all:
             expand(join(top_trim_dir, "{name}", "{name}_R2_dehost.fastq"), name=samples),
             expand(join(top_assembly_dir, "{name}", "final_assembly.fasta"), name=samples),
             expand(join(top_assembly_dir, "{name}", "assembly_report.html"), name=samples),
-            # taxonomic classification
-            expand(join(top_tax_dir, "{name}", "final_assembly.krona"), name=samples),
-            expand(join(top_tax_dir, "{name}", "kronagram.html"), name=samples),
-            # expand(join(top_tax_dir, "{name}", "final_assembly.krak2"), name=samples)
-            # expand(join(top_tax_dir, "{name}", "final_assembly.kraken2"), name=samples)
             expand(join(top_tax_dir, "GTDBTK_classify_wf"), name=samples),
             expand(join(top_tax_dir, "GUNC_detect"), name=samples),
             # assembly binning
