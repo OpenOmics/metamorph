@@ -297,13 +297,41 @@ def parsed_arguments(name, description):
         and an output directory to store results.
 
         {3}{4}Required arguments:{5}
-          --input INPUT [INPUT ...]
-                                Input FastQ file(s) to process. The pipeline does NOT
-                                support single-end data. FastQ files for one or more  
-                                samples can be provided. Multiple input FastQ files
-                                should be seperated by a space. Globbing for multiple
-                                file is also supported.
-                                  Example: --input .tests/*.R?.fastq.gz
+          --samplesheet [SHEETPATH]
+                                Full absolute path to the delimited plain-text 
+                                sample sheet.
+                                           
+                                Example: --samplesheet /home/user/samplesheet.txt 
+                                Delimiters supported:
+                                    [.tsv/.txt]     = \\t
+                                    [.csv]          =   ,
+                                  
+                                Format supported:
+                                    Path            = full absolute plain text file path to fastq[.gz] files
+                                    R1 sample X     = orientation of files in sample sheet 
+                                    n               = total # samples
+
+                                    - DNA only - 1 column: "DNA"
+                                                                ________
+                                                                |  DNA  |
+                                                                | -------
+                                                R1 sample 1     |  path |
+                                                R2 sample 1     |  path |
+                                                ...             |  path |
+                                                R1 sample n     |  path |
+                                                R2 sample n     |  path |
+                                                                --------
+                                    - DNA & RNA - 2 columns: "DNA", "RNA"
+                                                                ________________
+                                                                |  DNA  |  RNA  |
+                                                                | --------------
+                                                R1 sample 1     |  path |  path |
+                                                R2 sample 1     |  path |  path |
+                                                ...             |  path |  path |
+                                                R1 sample n     |  path |  path |
+                                                R2 sample n     |  path |  path |
+                                                                ----------------
+                                    
           --output OUTPUT
                                 Path to an output directory. This location is where
                                 the pipeline will create all of its output files, also
@@ -493,7 +521,8 @@ def parsed_arguments(name, description):
     # Required Arguments
     # Input sample sheet
     subparser_run.add_argument(
-        '--input',
+        '--samplesheet',
+        dest='input',
         type = str,
         required = True,
         help = argparse.SUPPRESS

@@ -28,13 +28,52 @@ Use you can always use the `-h` option for information on a specific command.
 
 Each of the following arguments are required. Failure to provide a required argument will result in a non-zero exit-code.
 
-  `--input INPUT [INPUT ...]`  
-> **Input FastQ or BAM file(s).**  
-> *type: file(s)*  
-> 
-> One or more FastQ files can be provided. The pipeline does NOT support single-end data. From the command-line, each input file should seperated by a space. Globbing is supported! This makes selecting FastQ files easy. Input FastQ files should always be gzipp-ed.
-> 
-> ***Example:*** `--input .tests/*.R?.fastq.gz`
+  `--samplesheet [SHEETPATH]`
+                               
+> Full absolute path to the delimited plain-text sample sheet.
+                                           
+>> Example: --samplesheet /home/user/samplesheet.txt 
+
+> [!NOTE]
+> Delimiters supported:
+> | file extension | delimiter |
+> | -------------- | --------- |
+> | txt            | \\t       |
+> | tsv            | \\t       |
+> | csv            | ,         |
+                                
+__Supported sample sheet formats__:
+
+> [!NOTE]
+> Path            = full absolute plain text file path to fastq[.gz] files
+> R1 sample X     = orientation of files in sample sheet 
+> n               = total # samples
+
+__DNA only - 1 column: "DNA"__
+```                    
+                ________
+                |  DNA  |
+                | -------
+R1 sample 1     |  path |
+R2 sample 1     |  path |
+...             |  path |
+R1 sample n     |  path |
+R2 sample n     |  path |
+                --------
+```
+
+__DNA & RNA - 2 columns: "DNA", "RNA"__
+```
+                ________________
+                |  DNA  |  RNA  |
+                | --------------
+R1 sample 1     |  path |  path |
+R2 sample 1     |  path |  path |
+...             |  path |  path |
+R1 sample n     |  path |  path |
+R2 sample n     |  path |  path |
+                ----------------
+```
 
 ---  
   `--output OUTPUT`
@@ -62,6 +101,23 @@ Each of the following arguments are optional, and do not need to be provided.
 > Displays what steps in the pipeline remain or will be run. Does not execute anything!
 >
 > ***Example:*** `--dry-run`
+
+---  
+  `-t(--triggers)`            
+> **Manual control of the snakemake rerun triggers..**  
+>  Trigger values must be one or more of:
+>     - mtime
+>     - code
+>     - software-env
+>     - input
+>     - params
+> 
+> See https://snakemake.readthedocs.io/en/stable/executing/cli.html
+>   for more details about snakemake rerun triggers.
+> Default (in prority order):
+>   params, mtime, code, software-env, input
+>
+> ***Example:*** `--triggers mtime,code`
 
 ---  
   `--silent`            

@@ -18,7 +18,7 @@ jobs:
     - name: Dry Run 
       run: |
         docker run -v $PWD:/opt2 snakemake/snakemake:latest \
-        /opt2/metamorph run --input /opt2/.tests/test_cohort.txt \
+        /opt2/metamorph run --samplesheet /opt2/.tests/test_cohort.txt \
         --output /opt2/output --mode local --dry-run
     - name: View the pipeline config file [DNA & RNA modes]
       run: |
@@ -36,7 +36,7 @@ jobs:
     - name: Dry Run [DNA only mode]
       run: |
         docker run -v $PWD:/opt2 snakemake/snakemake:latest \
-        /opt2/metamorph run --input /opt2/.tests/test_cohort_DNAonly.txt \
+        /opt2/metamorph run --samplesheet /opt2/.tests/test_cohort_DNAonly.txt \
         --output /opt2/output --mode local --dry-run
     - name: View the pipeline config file [DNA only mode]
       run: |
@@ -54,5 +54,5 @@ jobs:
     - name: Dry Run [DNA only mode w RNA column]
       run: |
         docker run -v $PWD:/opt2 snakemake/snakemake:latest \
-        /opt2/metamorph run --input /opt2/.tests/test_cohort_DNAonly_RNAcolexists.txt \
+        /opt2/metamorph run --samplesheet /opt2/.tests/test_cohort_DNAonly_RNAcolexists.txt \
         --output /opt2/output --mode local --dry-run

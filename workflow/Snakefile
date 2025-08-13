@@ -36,9 +36,7 @@ top_map_dir_rna            = join(workpath, config['project']['id'], "mapping_RN
 humann3_dir_rna            = join(workpath, config['project']['id'], "humann3_rna")
 top_centrifuger_dir_rna    = join(workpath, config['project']['id'], "centrifuger_rna")
 
-
 # Read in resource information, containing information about threads, mem, walltimes, etc.
-# TODO: Add handler for when the mode is set to local.
 with open(join(workpath, "config", "cluster.json")) as fh:
     cluster = json.load(fh)
 
@@ -51,18 +49,14 @@ if rna_included:
 else:
     start_r1_rna, start_r2_rna = [], []
 
-# Final ouput files of the pipeline
 rule all:
     input:
-        #################
-        #  DNA outputs  #
-        #################
         # dna read decompress
-        # ~~~~~~~~~~~~~~~
+        # ~~~~~~~~~~~~~~~~~~~
         start_r1,
         start_r2,
         # read qc and filtering
-        # ~~~~~~~~~~~~~~~
+        # ~~~~~~~~~~~~~~~~~~~~~
         expand(join(top_readqc_dir, "{name}", "{name}_R1_pretrim_report.html"), name=samples),
         expand(join(top_readqc_dir, "{name}", "{name}_R2_pretrim_report.html"), name=samples),
         expand(join(top_readqc_dir, "{name}", "{name}_R1_postrim_report.html"), name=samples),
@@ -76,7 +70,8 @@ rule all:
         expand(join(top_centrifuger_dir, "{name}_centrifuger_classification.tsv"), name=samples),
         expand(join(top_centrifuger_dir, "{name}_centrifuger_quantification_report.tsv"), name=samples),
         expand(join(top_centrifuger_dir, "{name}_centrifuger_quantification_report_mpl.tsv"), name=samples),
-        # Optional: read-based profiling (only if --option is read-based or combined)
+        # read-based mode
+        # ~~~~~~~~~~~~~~~
         *provided([
             expand(join(top_mapping_dir, '{name}_genefamilies.tsv'), name=samples),
             expand(join(top_mapping_dir, '{name}_pathabundance.tsv'), name=samples),
@@ -90,24 +85,58 @@ rule all:
             join(top_mapping_dir, 'diversity_analysis','merged_bugs_list_jaccard.tsv'),
             join(top_mapping_dir, 'diversity_analysis','merged_bugs_list_weighted-unifrac.tsv'),
             join(top_mapping_dir, 'diversity_analysis','merged_bugs_list_unweighted-unifrac.tsv')
-            ], condition = analysis_mode in ["read-based", "combined"]),
-        # Optional: assembly-based profiling (only if --option is assembly-based or combined)
+        ], condition = analysis_mode in ["read-based", "combined"]),
+        # read-based mode
+        # ~~~~~~~~~~~~~~~
         *provided([
             expand(join(top_trim_dir, "{name}", "{name}_R1_dehost.fastq"), name=samples),
             expand(join(top_trim_dir, "{name}", "{name}_R2_dehost.fastq"), name=samples),
-
-            # add the other tasks back soon ...
-            ], condition = analysis_mode in ["assembly-based", "combined"]),
-            
-        #################
-        #  RNA outputs  #
-        #################
+            expand(join(top_assembly_dir, "{name}", "final_assembly.fasta"), name=samples)
+            expand(join(top_assembly_dir, "{name}", "assembly_report.html"), name=samples)
+            # taxonomic classification
+            expand(join(top_tax_dir, "{name}", "final_assembly.krona"), name=samples)
+            expand(join(top_tax_dir, "{name}", "kronagram.html"), name=samples)
+            # expand(join(top_tax_dir, "{name}", "final_assembly.krak2"), name=samples)
+            # expand(join(top_tax_dir, "{name}", "final_assembly.kraken2"), name=samples)
+            expand(join(top_tax_dir, "GTDBTK_classify_wf"), name=samples)
+            expand(join(top_tax_dir, "GUNC_detect"), name=samples)
+            # assembly binning
+            expand(join(top_binning_dir, "{name}", "maxbin2_bins.contigs"), name=samples)
+            expand(join(top_binning_dir, "{name}", "maxbin2_bins.stats"), name=samples)
+            expand(join(top_binning_dir, "{name}", "metabat2_bins.contigs"), name=samples)
+            expand(join(top_binning_dir, "{name}", "metabat2_bins.stats"), name=samples)
+            expand(join(top_binning_dir, "{name}", "metawrap_50_5_bins.contigs"), name=samples)
+            expand(join(top_binning_dir, "{name}", "metawrap_50_5_bins.stats"), name=samples)
+            expand(join(top_binning_dir, "{name}", "figures", "binning_results.png"), name=samples)
+            # bin refinement
+            expand(join(top_refine_dir, "dRep", "data_tables", "Widb.csv"), name=samples)
+            expand(join(top_refine_dir, "dRep", "figures", "Winning_genomes.pdf"), name=samples)
+            expand(join(top_refine_dir, "dRep", "log", "cluster_arguments.json"), name=samples)
+            # bin statistics
+            expand(join(top_refine_dir, "{name}", "RefinedBins_summmary.txt"), name=samples)
+            expand(join(top_refine_dir, "{name}", "named_maxbin2_bins.stats"), name=samples)
+            expand(join(top_refine_dir, "{name}", "named_metabat2_bins.stats"), name=samples)
+            expand(join(top_refine_dir, "{name}", "named_metawrap_bins.stats"), name=samples)
+            join(top_refine_dir, "RefinedBins_summmary.txt")
+            join(top_refine_dir, "cumulative_stats_maxbin.txt")
+            join(top_refine_dir, "cumulative_stats_metabat2.txt")
+            join(top_refine_dir, "cumulative_stats_metawrap.txt")
+            # contig annotation
+            expand(join(top_refine_dir, "contig_annotation", "out.BAT.bin2classification.summary.txt"), name=samples)
+            # BBMap mapping to MAGs
+            expand(join(top_mags_dir, "{name}", "index"), name=samples)
+            expand(join(top_mags_dir, "{name}", "DNA", "{name}.statsfile"), name=samples)
+            expand(join(top_mags_dir, "{name}", "DNA", "{name}.scafstats"), name=samples)
+            expand(join(top_mags_dir, "{name}", "DNA", "{name}.covstat"), name=samples)
+            expand(join(top_mags_dir, "{name}", "DNA", "{name}.rpkm"), name=samples)
+            expand(join(top_mags_dir, "{name}", "DNA", "{name}.refstats"), name=samples)
+        ], condition = analysis_mode in ["assembly-based", "combined"]),
         # rna read decompress
-        # ~~~~~~~~~~~~~~~
+        # ~~~~~~~~~~~~~~~~~~~
         start_r1_rna,
         start_r2_rna,
         # read qc and filtering
-        # ~~~~~~~~~~~~~~~
+        # ~~~~~~~~~~~~~~~~~~~~~
         expand(join(top_readqc_dir_rna, "{name}", "{name}_R1_pretrim_report.html"), name=rna_sample_stems),
         expand(join(top_readqc_dir_rna, "{name}", "{name}_R2_pretrim_report.html"), name=rna_sample_stems),
         expand(join(top_readqc_dir_rna, "{name}", "{name}_R1_postrim_report.html"), name=rna_sample_stems),
@@ -121,7 +150,8 @@ rule all:
         expand(join(top_centrifuger_dir_rna, "{name}_centrifuger_classification.tsv"), name=rna_sample_stems),
         expand(join(top_centrifuger_dir_rna, "{name}_centrifuger_quantification_report.tsv"), name=rna_sample_stems),
         expand(join(top_centrifuger_dir_rna, "{name}_centrifuger_quantification_report_mpl.tsv"), name=rna_sample_stems),
-        # Optional: read-based profiling (only if --option is read-based or combined)
+        # read-based mode
+        # ~~~~~~~~~~~~~~~
         *provided([
             expand(join(humann3_dir_rna, '{name}_genefamilies.tsv'), name=rna_sample_stems),
             expand(join(humann3_dir_rna, '{name}_pathabundance.tsv'), name=rna_sample_stems),
@@ -129,9 +159,16 @@ rule all:
             join(humann3_dir_rna, 'merged_pathabundance.cpm.stratified.rna.tsv'),
             join(humann3_dir_rna, 'merged_pathabundance.cpm.unstratified.rna.tsv')
         ], condition = analysis_mode in ["read-based", "combined"]),
-        # Optional: assembly-based profiling (only if --option is assembly-based or combined)
-        *provided([]
-             , condition = analysis_mode in ["assembly-based", "combined"])
+        # read qc and filtering
+        # ~~~~~~~~~~~~~~~
+        *provided([
+            expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.aligned.sam"), rname=rna_sample_stems)
+            expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.statsfile"), rname=rna_sample_stems)
+            expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.scafstats"), rname=rna_sample_stems)
+            expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.covstat"), rname=rna_sample_stems)
+            expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.rpkm"), rname=rna_sample_stems)
+            expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.refstats"), rname=rna_sample_stems)
+        ], condition = analysis_mode in ["assembly-based", "combined"])
 
 # Import rules
 include: join("rules", "DNA.smk")
