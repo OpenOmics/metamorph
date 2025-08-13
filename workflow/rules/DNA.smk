@@ -210,7 +210,7 @@ rule dna_centrifuger:
     output:
         classification              = join(top_centrifuger_dir, "{name}_centrifuger_classification.tsv"),
         centrifuger_quant           = join(top_centrifuger_dir, "{name}_centrifuger_quantification_report.tsv"),
-        metaphlan_quant             = join(top_centrifuger_dir, "{name}_metaphlan_quantification_report.tsv"),
+        metaphlan_quant             = join(top_centrifuger_dir, "{name}_centrifuger_quantification_report_mpl.tsv"),
     params:
         rname                       = "dna_centrifuger",
         sid                         = "{name}",

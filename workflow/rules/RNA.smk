@@ -169,7 +169,7 @@ rule rna_centrifuger:
     output:
         classification              = join(top_centrifuger_dir_rna, "{name}_centrifuger_classification.tsv"),
         centrifuger_quant           = join(top_centrifuger_dir_rna, "{name}_centrifuger_quantification_report.tsv"),
-        metaphlan_quant             = join(top_centrifuger_dir_rna, "{name}_metaphlan_quantification_report.tsv"),
+        metaphlan_quant             = join(top_centrifuger_dir_rna, "{name}_centrifuger_quantification_report_mpl.tsv"),
     params:
         rname                       = "rna_centrifuger",
         sid                         = "{name}",
