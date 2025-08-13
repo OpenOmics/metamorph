@@ -424,7 +424,7 @@ def parsed_arguments(name, description):
                                   • combined: perform all steps included in the 
                                     abovementioned modes.
                                 Default: pre-screen
-                                  Example: --option pre-screen
+                                  Example: --workflow pre-screen
           --shallow-profile
                                 Turn off the translated blast search of unaligned
                                 reads in humann3. This will decrease run time 
