@@ -708,7 +708,7 @@ rule prep_genome_info:
         combined_info = []
         for sample_info in input:
             with open(sample_info, 'r') as this_csv:
-                reader = csv.DictReader(this_csv, delimiter="\t")
+                reader = DictReader(this_csv, delimiter="\t")
                 for row in reader:
                     row['genome'] = row['genome'] + '.fa'
                     combined_info.append(dict(
