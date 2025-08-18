@@ -49,11 +49,6 @@ if rna_included:
 else:
     start_r1_rna, start_r2_rna = [], []
 
-# print('---- norm len ' + str(len(a_list)) + ' unique len ' + str(len(set(a_list))) + ' ----')
-# exit(a_list)
-# print('---- ' + ','.join(rna_sample_stems) + ' ----')
-# exit(rna_sample_stems)
-
 rule all:
     input:
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
