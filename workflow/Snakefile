@@ -51,18 +51,15 @@ else:
 
 rule all:
     input:
-        # dna read decompress
-        # ~~~~~~~~~~~~~~~~~~~
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+        # DNA preprocessing endpoints #
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
         start_r1,
         start_r2,
-        # read qc and filtering
-        # ~~~~~~~~~~~~~~~~~~~~~
         expand(join(top_readqc_dir, "{name}", "{name}_R1_pretrim_report.html"), name=samples),
         expand(join(top_readqc_dir, "{name}", "{name}_R2_pretrim_report.html"), name=samples),
         expand(join(top_readqc_dir, "{name}", "{name}_R1_postrim_report.html"), name=samples),
         expand(join(top_readqc_dir, "{name}", "{name}_R2_postrim_report.html"), name=samples),
-        expand(join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq.gz"), name=samples),
-        expand(join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq.gz"), name=samples),
         expand(join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq.gz"), name=samples),
         expand(join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq.gz"), name=samples),
         expand(join(top_trim_dir, "{name}", "{name}_R1_dehost.fastq.gz"), name=samples),
@@ -70,8 +67,9 @@ rule all:
         expand(join(top_centrifuger_dir, "{name}_centrifuger_classification.tsv"), name=samples),
         expand(join(top_centrifuger_dir, "{name}_centrifuger_quantification_report.tsv"), name=samples),
         expand(join(top_centrifuger_dir, "{name}_centrifuger_quantification_report_mpl.tsv"), name=samples),
-        # read-based mode
-        # ~~~~~~~~~~~~~~~
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+        # DNA read-based mode endpoints #
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
         *provided([
             expand(join(top_mapping_dir, '{name}_genefamilies.tsv'), name=samples),
             expand(join(top_mapping_dir, '{name}_pathabundance.tsv'), name=samples),
@@ -80,14 +78,15 @@ rule all:
             join(top_mapping_dir, 'merged_bugs_list.tsv'),
             join(top_mapping_dir, 'merged_pathabundance.cpm.stratified.tsv'),
             join(top_mapping_dir, 'merged_pathabundance.cpm.unstratified.tsv'),
-            join(top_mapping_dir, 'diversity_analysis','merged_bugs_list_shannon.tsv'),
-            join(top_mapping_dir, 'diversity_analysis','merged_bugs_list_richness.tsv'),
-            join(top_mapping_dir, 'diversity_analysis','merged_bugs_list_jaccard.tsv'),
-            join(top_mapping_dir, 'diversity_analysis','merged_bugs_list_weighted-unifrac.tsv'),
-            join(top_mapping_dir, 'diversity_analysis','merged_bugs_list_unweighted-unifrac.tsv')
+            join(top_mapping_dir, 'diversity_analysis', 'merged_bugs_list_shannon.tsv'),
+            join(top_mapping_dir, 'diversity_analysis', 'merged_bugs_list_richness.tsv'),
+            join(top_mapping_dir, 'diversity_analysis', 'merged_bugs_list_jaccard.tsv'),
+            join(top_mapping_dir, 'diversity_analysis', 'merged_bugs_list_weighted-unifrac.tsv'),
+            join(top_mapping_dir, 'diversity_analysis', 'merged_bugs_list_unweighted-unifrac.tsv')
         ], condition = analysis_mode in ["read-based", "combined"]),
-        # read-based mode
-        # ~~~~~~~~~~~~~~~
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+        # DNA read-based mode endpoints #
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
         *provided([
             expand(join(top_trim_dir, "{name}", "{name}_R1_dehost.fastq"), name=samples),
             expand(join(top_trim_dir, "{name}", "{name}_R2_dehost.fastq"), name=samples),
@@ -126,36 +125,39 @@ rule all:
             expand(join(top_mags_dir, "{name}", "DNA", "{name}.rpkm"), name=samples),
             expand(join(top_mags_dir, "{name}", "DNA", "{name}.refstats"), name=samples),
         ], condition = analysis_mode in ["assembly-based", "combined"]),
-        # rna read decompress
-        # ~~~~~~~~~~~~~~~~~~~
-        start_r1_rna,
-        start_r2_rna,
-        # read qc and filtering
-        # ~~~~~~~~~~~~~~~~~~~~~
-        expand(join(top_readqc_dir_rna, "{name}", "{name}_R1_pretrim_report.html"), name=rna_sample_stems),
-        expand(join(top_readqc_dir_rna, "{name}", "{name}_R2_pretrim_report.html"), name=rna_sample_stems),
-        expand(join(top_readqc_dir_rna, "{name}", "{name}_R1_postrim_report.html"), name=rna_sample_stems),
-        expand(join(top_readqc_dir_rna, "{name}", "{name}_R2_postrim_report.html"), name=rna_sample_stems),
-        expand(join(top_trim_dir_rna, "{name}", "{name}_R1_trimmed.fastq"), name=rna_sample_stems),
-        expand(join(top_trim_dir_rna, "{name}", "{name}_R2_trimmed.fastq"), name=rna_sample_stems),
-        expand(join(top_trim_dir_rna, "{name}", "{name}_R1_trimmed.fastq.gz"), name=rna_sample_stems),
-        expand(join(top_trim_dir_rna, "{name}", "{name}_R2_trimmed.fastq.gz"), name=rna_sample_stems),
-        expand(join(top_trim_dir_rna, "{name}", "{name}_R1_dehost.fastq.gz"), name=rna_sample_stems),
-        expand(join(top_trim_dir_rna, "{name}", "{name}_R2_dehost.fastq.gz"), name=rna_sample_stems),
-        expand(join(top_centrifuger_dir_rna, "{name}_centrifuger_classification.tsv"), name=rna_sample_stems),
-        expand(join(top_centrifuger_dir_rna, "{name}_centrifuger_quantification_report.tsv"), name=rna_sample_stems),
-        expand(join(top_centrifuger_dir_rna, "{name}_centrifuger_quantification_report_mpl.tsv"), name=rna_sample_stems),
-        # read-based mode
-        # ~~~~~~~~~~~~~~~
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+        # RNA preprocessing endpoints #
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+        *provided([
+            start_r1_rna,
+            start_r2_rna,
+            expand(join(top_readqc_dir_rna, "{name}", "{name}_R1_pretrim_report.html"), name=rna_sample_stems),
+            expand(join(top_readqc_dir_rna, "{name}", "{name}_R2_pretrim_report.html"), name=rna_sample_stems),
+            expand(join(top_readqc_dir_rna, "{name}", "{name}_R1_postrim_report.html"), name=rna_sample_stems),
+            expand(join(top_readqc_dir_rna, "{name}", "{name}_R2_postrim_report.html"), name=rna_sample_stems),
+            expand(join(top_trim_dir_rna, "{name}", "{name}_R1_trimmed.fastq"), name=rna_sample_stems),
+            expand(join(top_trim_dir_rna, "{name}", "{name}_R2_trimmed.fastq"), name=rna_sample_stems),
+            expand(join(top_trim_dir_rna, "{name}", "{name}_R1_trimmed.fastq.gz"), name=rna_sample_stems),
+            expand(join(top_trim_dir_rna, "{name}", "{name}_R2_trimmed.fastq.gz"), name=rna_sample_stems),
+            expand(join(top_trim_dir_rna, "{name}", "{name}_R1_dehost.fastq.gz"), name=rna_sample_stems),
+            expand(join(top_trim_dir_rna, "{name}", "{name}_R2_dehost.fastq.gz"), name=rna_sample_stems),
+            expand(join(top_centrifuger_dir_rna, "{name}_centrifuger_classification.tsv"), name=rna_sample_stems),
+            expand(join(top_centrifuger_dir_rna, "{name}_centrifuger_quantification_report.tsv"), name=rna_sample_stems),
+            expand(join(top_centrifuger_dir_rna, "{name}_centrifuger_quantification_report_mpl.tsv"), name=rna_sample_stems),
+        ], condition = rna_included),
+        # ~~~~~~~~~~~~~~~~~~~~~~~~ #
+        # RNA read-based endpoints #
+        # ~~~~~~~~~~~~~~~~~~~~~~~~ #
         *provided([
             expand(join(humann3_dir_rna, '{name}_genefamilies.tsv'), name=rna_sample_stems),
             expand(join(humann3_dir_rna, '{name}_pathabundance.tsv'), name=rna_sample_stems),
             expand(join(humann3_dir_rna, '{name}_pathcoverage.tsv'), name=rna_sample_stems),
             join(humann3_dir_rna, 'merged_pathabundance.cpm.stratified.rna.tsv'),
             join(humann3_dir_rna, 'merged_pathabundance.cpm.unstratified.rna.tsv')
-        ], condition = analysis_mode in ["read-based", "combined"]),
-        # read qc and filtering
-        # ~~~~~~~~~~~~~~~
+        ], condition = (analysis_mode in ("read-based", "combined")) and rna_included),
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+        # RNA assembly-based endpoints #
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
         *provided([
             expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.aligned.sam"), rname=rna_sample_stems),
             expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.statsfile"), rname=rna_sample_stems),
@@ -163,9 +165,8 @@ rule all:
             expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.covstat"), rname=rna_sample_stems),
             expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.rpkm"), rname=rna_sample_stems),
             expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.refstats"), rname=rna_sample_stems)
-        ], condition = analysis_mode in ["assembly-based", "combined"])
+        ], condition = (analysis_mode in ("read-based", "combined")) and rna_included)
 
-# Import rules
 include: join("rules", "DNA.smk")
 include: join("rules", "RNA.smk")
 include: join("rules", "hooks.smk")

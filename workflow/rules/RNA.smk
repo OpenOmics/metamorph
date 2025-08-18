@@ -97,12 +97,11 @@ rule rna_dehost:
         This module utilizes STAR to map trimmed reads to hg38 transcriptome, and select the untrimmed reads from the bam file as clean read.
     """
     input:
-        R1                          = join(top_trim_dir_rna, "{rname}", "{rname}_R1_trimmed.fastq.gz"),
-        R2                          = join(top_trim_dir_rna, "{rname}", "{rname}_R2_trimmed.fastq.gz"),
+        R1                          = join(top_trim_dir_rna, "{rname}", "{rname}_R1_trimmed.fastq.gz") if rna_included else [],
+        R2                          = join(top_trim_dir_rna, "{rname}", "{rname}_R2_trimmed.fastq.gz") if rna_included else [],
     output:
         R1_dehost                   = join(top_trim_dir_rna, "{rname}", "{rname}_R1_dehost.fastq.gz"),
         R2_dehost                   = join(top_trim_dir_rna, "{rname}", "{rname}_R2_dehost.fastq.gz"),
-
     params:
         rname                       = "rna_dehost",
         sid                         = "{rname}",
@@ -164,8 +163,8 @@ rule rna_centrifuger:
         - Centrifuge classification file
     """
     input:
-        R1_dehost                   = join(top_trim_dir_rna, "{name}", "{name}_R1_dehost.fastq.gz"),
-        R2_dehost                   = join(top_trim_dir_rna, "{name}", "{name}_R2_dehost.fastq.gz"),
+        R1_dehost                   = join(top_trim_dir_rna, "{name}", "{name}_R1_dehost.fastq.gz") if rna_included else [],
+        R2_dehost                   = join(top_trim_dir_rna, "{name}", "{name}_R2_dehost.fastq.gz") if rna_included else [],
     output:
         classification              = join(top_centrifuger_dir_rna, "{name}_centrifuger_classification.tsv"),
         centrifuger_quant           = join(top_centrifuger_dir_rna, "{name}_centrifuger_quantification_report.tsv"),
@@ -204,9 +203,9 @@ rule rna_centrifuger:
 
 rule rna_humann_classify:
     input:
-        R1                  = join(top_trim_dir_rna, "{rname}", "{rname}_R1_dehost.fastq.gz"),
-        R2                  = join(top_trim_dir_rna, "{rname}", "{rname}_R2_dehost.fastq.gz"),
-        DNA_bug_list        = lambda wildcards: join(top_mapping_dir, f"{get_dna_bugs(wildcards.rname)}_bugs_list.tsv")
+        R1                  = join(top_trim_dir_rna, "{rname}", "{rname}_R1_dehost.fastq.gz") if rna_included else [],
+        R2                  = join(top_trim_dir_rna, "{rname}", "{rname}_R2_dehost.fastq.gz") if rna_included else [],
+        DNA_bug_list        = lambda wildcards: join(top_mapping_dir, f"{get_dna_bugs(wildcards.rname)}_bugs_list.tsv") if rna_included else []
     output:
         hm3_gene_fam        = join(humann3_dir_rna, '{rname}_genefamilies.tsv'),
         hm3_path_abd        = join(humann3_dir_rna, '{rname}_pathabundance.tsv'),
@@ -264,8 +263,7 @@ rule rna_humann_summarize:
     """
 
     input:
-        path_abd            = expand(join(humann3_dir_rna, '{rname}_pathabundance.tsv'), rname=rna_sample_stems),
-  
+        path_abd            = expand(join(humann3_dir_rna, '{rname}_pathabundance.tsv'), rname=rna_sample_stems) if rna_included else [],
     output:
         mer_path_abd_str    = join(humann3_dir_rna, 'merged_pathabundance.cpm.stratified.rna.tsv'),
         mer_path_abd_unstr  = join(humann3_dir_rna, 'merged_pathabundance.cpm.unstratified.rna.tsv'),

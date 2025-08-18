@@ -151,7 +151,6 @@ rule bowtie2_dehost:
     output:
         R1_dehost                   = join(top_trim_dir, "{name}", "{name}_R1_dehost.fastq.gz"),
         R2_dehost                   = join(top_trim_dir, "{name}", "{name}_R2_dehost.fastq.gz"),
-
     params:
         rname                       = "bowtie2_dehost",
         sid                         = "{name}",
