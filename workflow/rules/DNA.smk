@@ -717,7 +717,7 @@ rule prep_genome_info:
                     ))
         
         with open(output[0], 'w') as genome_info_out:
-            wrt = DictWriter(genome_info_out, list(row.keys()), delimter="\t")
+            wrt = DictWriter(genome_info_out, list(row.keys()), delimiter="\t")
             wrt.writeheader()
             wrt.writerows(combined_info)
 
