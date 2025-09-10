@@ -155,13 +155,25 @@ def run(sub_args):
         config = config
     )
     config['bindpaths'] = bindpaths
-    
+
     # Step 4a. Setup analysis option
     config["options"]["analysis_mode"] = sub_args.workflow
-    # Step 4b. Setup assembly mode
-    #   modes: 0 - megahit + metaspades assembly
-    config["options"]["assembler_mode"] = "1" if sub_args.megahit_only else "0"
-
+    # Step 4b. Define assemblers used
+    assemblers = sub_args.assembler
+    if ',' in assemblers:
+        assemblers = sub_args.assembler.split(',')
+    if isinstance(assemblers, str):
+        assemblers = [assemblers]
+    bad_assembler = []
+    for asm in assemblers:
+        if asm.lower() not in ('megahit', 'metaspades'):
+            bad_assembler.append(asm)
+    if bad_assembler:
+        raise ValueError(
+            f'This pipeline only supports assemblers `megahit` and `metaspades`, ' +
+            f'please choose one of these values. Assemblers chosen: {", ".join(bad_assembler)}'
+            )
+    config["options"]["assemblers"] = [x.lower() for x in assemblers]
     # Step 4c. Setup humann3 execution mode
     config["options"]["shallow_profile"] = "1" if sub_args.shallow_profile else "0"
 
@@ -199,6 +211,7 @@ def run(sub_args):
         alt_cache = sub_args.singularity_cache,  
         threads = int(sub_args.threads),
         jobname = sub_args.job_name,
+        jobnode = sub_args.master_job_node,
         submission_script=os.path.join(__home__, 'src', 'run.sh'),
         logger = logfh,
         additional_bind_paths = ",".join(bindpaths),
@@ -410,7 +423,7 @@ def parsed_arguments(name, description):
                                 recommended setting this vaule to the maximum number 
                                 of CPUs available on the host machine, default: 2.
                                   Example: --threads: 16            
-          --workflow {{pre-screen,read-based,assembly-based, combined}}
+          --workflow {{pre-screen, read-based, assembly-based, combined}}
                                 Specifies the analysis mode:
                                   • pre-screen: perform quality control, host-read 
                                     removal, and run Centrifuge and Kraken2 on 
@@ -430,10 +443,18 @@ def parsed_arguments(name, description):
                                 reads in humann3. This will decrease run time 
                                 significantly. Turns off the protein search for
                                 unaligned reads for humann3 taxanomic profiling.
-          --megahit-only
-                                Use only the megahit assembler for bin assembly.
-                                Turns off the metaspades assembler
-                                  Example: --megahit-only
+          --assembler {{megahit, metaspades}}
+                                Comma-separated list of assemblers to use in the
+                                assembly-based workflow. 
+                                If this option is not provided, both
+                                assemblers (megahit & metaspades) will be used. 
+                                Example: 
+                                           --assembler megahit,metaspades
+                                           --assembler megahit
+                                           --assembler metaspades
+          --master-job-node {{norm, quick, unlimited}}
+                                TODO
+          
           --triggers TRIGGER [TRIGGER ...]
                                 Manual control of the snakemake rerun triggers.
                                 Trigger values must be one or more of:
@@ -568,6 +589,15 @@ def parsed_arguments(name, description):
         help = argparse.SUPPRESS
     )
 
+    # Node of master job
+    subparser_run.add_argument(
+        '--master-job-node',
+        required = False,
+        choices=['norm', 'unlimited', 'quick'],
+        default = 'unlimited',
+        help = argparse.SUPPRESS
+    )
+
     # Snakemake rerun triggers
     subparser_run.add_argument(
         '--triggers',
@@ -629,11 +659,9 @@ def parsed_arguments(name, description):
     # Selection of the assemblers used.
     # Either megahit only or metaspades & megahit
     subparser_run.add_argument(
-        '--megahit-only',
-        dest = 'megahit_only',
-        action = 'store_true',
+        '--assembler',
         required = False,
-        default = False,
+        default = 'megahit,metaspades',
         help = argparse.SUPPRESS
     )
 

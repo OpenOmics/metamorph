@@ -34,9 +34,16 @@ metawrap_container          = config["containers"]["metawrap"]
 bowtie2_samtools_container  = config["images"]["bowtie2_samtools"]
 metaphlan_utils_container   = config["containers"]["metaphlan_utils"]
 centrifuger_sylph_container = config["containers"]["centrifuger_sylph"]
-pairedness                 = list(range(1, config['project']['nends']+1))
-mem2int                    = lambda x: int(str(x).lower().replace('gb', '').replace('g', ''))
-megahit_only               = bool(int(config["options"]["assembler_mode"]))
+pairedness                  = list(range(1, config['project']['nends']+1))
+mem2int                     = lambda x: int(str(x).lower().replace('gb', '').replace('g', ''))
+assemblers                  = config["options"]["assemblers"]
+use_megahit                 = 'megahit' in assemblers
+use_metaspades              = 'metaspades' in assemblers
+assembler_flags             = {
+                                ('metaspades',): "--metaspades ",
+                                ('megahit', 'metaspades'):  "--megahit --metaspades ",
+                                ('megahit',): "--megahit "
+                              }
 """
     Step-wise pipeline outline:
         1. read qc
@@ -295,30 +302,27 @@ rule dna_humann_classify:
 
 rule dna_humann_diversity_calculation:
     """
-        This step calculates the following diversity metrics from the merged buglist:
-               1. observed species
-               2. Shannon index
-               3. Jaccard distance
-               4. Bray-curtis distance
-               5. Weighted and unweighted unifrac distance
-        """
+    This step calculates the following diversity metrics from the merged buglist:
+            1. observed species
+            2. Shannon index
+            3. Jaccard distance
+            4. Bray-curtis distance
+            5. Weighted and unweighted unifrac distance
+    """
     input:
         bugs_list           = join(top_mapping_dir, 'merged_bugs_list.tsv'),
-
     output:
-        shannon             = join(top_mapping_dir, 'diversity_analysis','merged_bugs_list_shannon.tsv'),
-        richness            = join(top_mapping_dir, 'diversity_analysis','merged_bugs_list_richness.tsv'),
-        jaccard             = join(top_mapping_dir, 'diversity_analysis','merged_bugs_list_jaccard.tsv'),
-        wunif               = join(top_mapping_dir, 'diversity_analysis','merged_bugs_list_weighted-unifrac.tsv'),
-        unwunif             = join(top_mapping_dir, 'diversity_analysis','merged_bugs_list_unweighted-unifrac.tsv'),
-
+        shannon             = join(top_mapping_dir, 'diversity_analysis', 'merged_bugs_list_shannon.tsv'),
+        richness            = join(top_mapping_dir, 'diversity_analysis', 'merged_bugs_list_richness.tsv'),
+        jaccard             = join(top_mapping_dir, 'diversity_analysis', 'merged_bugs_list_jaccard.tsv'),
+        wunif               = join(top_mapping_dir, 'diversity_analysis', 'merged_bugs_list_weighted-unifrac.tsv'),
+        unwunif             = join(top_mapping_dir, 'diversity_analysis', 'merged_bugs_list_unweighted-unifrac.tsv'),
     params:
         rname               = "dna_humann_diversity",
         div_dir             = join("metagenome_results/humann3_dna", "diversity_analysis"),
         wunif_log           = join("metagenome_results/humann3_dna", "diversity_analysis", "merged_bugs_list_weighted-unifrac.log"),
         unwunif_log         = join("metagenome_results/humann3_dna", "diversity_analysis", "merged_bugs_list_unweighted-unifrac.log"),
         tree                = "/data2/mpa_nwk_tree/mpa_vJan21_CHOCOPhlAnSGB_202103.nwk",
-
     containerized: metaphlan_utils_container,
     threads: int(cluster["dna_humann_diversity_calculation"].get('threads', default_threads)),
     shell:
@@ -328,7 +332,7 @@ rule dna_humann_diversity_calculation:
     	calculate_diversity.R -f {input.bugs_list} -o {params.div_dir} -d alpha -m shannon -s t__
     	calculate_diversity.R -f {input.bugs_list} -o {params.div_dir} -t {params.tree} -m weighted-unifrac -s t__ > {params.wunif_log}
     	calculate_diversity.R -f {input.bugs_list} -o {params.div_dir} -t {params.tree} -m unweighted-unifrac -s t__ > {params.unwunif_log}
-    """
+        """
 
 rule dna_humann_summarize:
     """
@@ -437,15 +441,15 @@ rule metawrap_genome_assembly:
         R2                  = join(top_trim_dir, "{name}", "{name}_R2_dehost.fastq"),    
     output:
         # megahit outputs
-        megahit_assembly            = join(top_assembly_dir, "{name}", "megahit", "final.contigs.fa"),
+        megahit_assembly            = join(top_assembly_dir, "{name}", "megahit", "final.contigs.fa") if use_megahit else [],
         # megahit_longcontigs         = join(top_assembly_dir, "{name}", "megahit", "long.contigs.fa"),
-        megahit_log                 = join(top_assembly_dir, "{name}", "megahit", "log"),
+        megahit_log                 = join(top_assembly_dir, "{name}", "megahit", "log") if use_megahit else [],
         # metaspades outputs
-        metaspades_assembly         = join(top_assembly_dir, "{name}", "metaspades", "contigs.fasta") if not megahit_only else [],
-        metaspades_graph            = join(top_assembly_dir, "{name}", "metaspades", "assembly_graph.fastg") if not megahit_only else [],
-        metaspades_longscaffolds    = join(top_assembly_dir, "{name}", "metaspades", "long_scaffolds.fasta") if not megahit_only else [],
-        metaspades_scaffolds        = join(top_assembly_dir, "{name}", "metaspades", "scaffolds.fasta") if not megahit_only else [],
-        metaspades_cor_reads        = directory(join(top_assembly_dir, "{name}", "metaspades", "corrected")) if not megahit_only else [],
+        metaspades_assembly         = join(top_assembly_dir, "{name}", "metaspades", "contigs.fasta") if use_metaspades else [],
+        metaspades_graph            = join(top_assembly_dir, "{name}", "metaspades", "assembly_graph.fastg") if use_metaspades else [],
+        metaspades_longscaffolds    = join(top_assembly_dir, "{name}", "metaspades", "long_scaffolds.fasta") if use_metaspades else [],
+        metaspades_scaffolds        = join(top_assembly_dir, "{name}", "metaspades", "scaffolds.fasta") if use_metaspades else [],
+        metaspades_cor_reads        = directory(join(top_assembly_dir, "{name}", "metaspades", "corrected")) if use_metaspades else [],
         # ensemble outputs
         final_assembly              = join(top_assembly_dir, "{name}", "final_assembly.fasta"),
         final_assembly_report       = join(top_assembly_dir, "{name}", "assembly_report.html"),
@@ -458,8 +462,7 @@ rule metawrap_genome_assembly:
         mh_dir                      = join(top_assembly_dir, "{name}", "megahit"),
         assembly_dir                = join(top_assembly_dir, "{name}"),
         contig_min_len              = "1000",
-        megahit_only                = megahit_only,
-        assemblers                  = "--megahit " if megahit_only else "--megahit --metaspades ",
+        assembler_flag              = assembler_flags[tuple(assemblers)]
     threads: int(cluster["metawrap_genome_assembly"].get('threads', default_threads)),
     shell:
         """
@@ -470,14 +473,13 @@ rule metawrap_genome_assembly:
             ln -s {input.R1} {output.assembly_R1}
             ln -s {input.R2} {output.assembly_R2}
             # run genome assembler
-            mw assembly \
-            {params.assemblers} \
-            -m {params.memlimit} \
-            -t {threads} \
-            -l {params.contig_min_len} \
-            -1 {output.assembly_R1} \
-            -2 {output.assembly_R2} \
-            -o {params.assembly_dir}
+            mw assembly {params.assembler_flag}\\
+                -m {params.memlimit} \\
+                -t {threads} \\
+                -l {params.contig_min_len} \\
+                -1 {output.assembly_R1} \\
+                -2 {output.assembly_R2} \\
+                -o {params.assembly_dir}
         """
 
 rule metawrap_binning:
@@ -576,27 +578,29 @@ rule metawrap_binning:
         if [ -d "{params.bin_dir}" ]; then rm -rf {params.bin_dir}; fi
 
         # setup links for metawrap input
-        [[ -f "{params.mw_trim_linker_R1}" ]] || ln -s {input.R1} {params.mw_trim_linker_R1}
-        [[ -f "{params.mw_trim_linker_R2}" ]] || ln -s {input.R2} {params.mw_trim_linker_R2}
+        rm -f "{params.mw_trim_linker_R1}"
+        ln -s {input.R1} {params.mw_trim_linker_R1}
+        rm -f "{params.mw_trim_linker_R2}"
+        ln -s {input.R2} {params.mw_trim_linker_R2}
 
         # metawrap binning
         mw binning \
-        --metabat2 --maxbin2 --concoct \
-        -m {params.bin_mem} \
-        -t {threads} \
-        -a {input.assembly} \
-        -o {params.bin_dir} \
-        {params.mw_trim_linker_R1} {params.mw_trim_linker_R2}
+            --metabat2 --maxbin2 --concoct \
+            -m {params.bin_mem} \
+            -t {threads} \
+            -a {input.assembly} \
+            -o {params.bin_dir} \
+            {params.mw_trim_linker_R1} {params.mw_trim_linker_R2}
 
         # metawrap bin refinement
         mw bin_refinement \
-        -o {params.tmp_binref_dir} \
-        -m {params.bin_mem} \
-        -t {threads} \
-        -A {params.bin_dir}/metabat2_bins \
-        -B {params.bin_dir}/maxbin2_bins \
-        -c {params.min_perc_complete} \
-        -x {params.max_perc_contam}
+            -o {params.tmp_binref_dir} \
+            -m {params.bin_mem} \
+            -t {threads} \
+            -A {params.bin_dir}/metabat2_bins \
+            -B {params.bin_dir}/maxbin2_bins \
+            -c {params.min_perc_complete} \
+            -x {params.max_perc_contam}
         
         cp -r {params.tmp_binref_dir}/* {params.bin_dir}
         bold=$(tput bold)
@@ -715,9 +719,8 @@ rule prep_genome_info:
                         completeness=row['completeness'], 
                         contamination=row['contamination']
                     ))
-        
         with open(output[0], 'w') as genome_info_out:
-            wrt = DictWriter(genome_info_out, list(row.keys()), delimiter="\t")
+            wrt = DictWriter(genome_info_out, ['genome', 'completeness', 'contamination'], delimiter=",")
             wrt.writeheader()
             wrt.writerows(combined_info)
 
@@ -760,7 +763,7 @@ rule derep_bins:
         # -sa[--S_ani] S_ANI: ANI threshold to form secondary clusters (default: 0.95)
         ani_secondary_threshold     = "0.95",
         # -nc[--cov_thresh] COV_THRESH: Minmum level of overlap between genomes when doing secondary comparisons (default: 0.1)
-        min_overlap                 = "0.3",
+        min_overlap                 = "0.5",
         # -cm[--coverage_method] {total,larger}  {total,larger}: Method to calculate coverage of an alignment
         coverage_method             = 'larger',
         # -comp COMPLETENESS, --completeness COMPLETENESS: Minimum genome completeness (default: 75)
@@ -784,24 +787,48 @@ rule derep_bins:
         # run drep
         DREP_BINS=$(ls {params.bindir}/*/{params.metawrap_dir_name}/*.fa | tr '\\n' ' ')
         NUM_BINS=$(ls 2>/dev/null -Ubad1 -- {params.bindir}/*/{params.metawrap_dir_name}/*.fa | wc -l)
-        NUM_CHUNK=$(( echo $NUM_BINS/3 ))
+        NUM_CHUNK=$(( $NUM_BINS/3 ))
         NUM_CHUNK=$(echo $NUM_CHUNK | awk '{{print int($1+0.5)}}')
         mkdir -p {params.outto}
-        dRep dereplicate -d \
-        -g ${{DREP_BINS}} \
-        -p {threads} \
-        -l {params.minimum_genome_length} \
-        -pa {params.ani_primary_threshold} \
-        -sa {params.ani_secondary_threshold} \
-        -nc {params.min_overlap} \
-        -cm {params.coverage_method} \
-        --genomeInfo {input.ginfo} \
-        --S_algorithm {params.second_cluster_algo} \
-        -comp {params.completeness} \
-        --multiround_primary_clustering \
-        --primary_chunksize $NUM_CHUNK \
-        --run_tertiary_clustering \
-        {params.outto}
+
+        echo "drep bins: ${{DREP_BINS}}"
+        echo "num bins: ${{NUM_BINS}}"
+
+        # threshold informed by NIDDK-5: /data/NIDDK_IDSS/projects/NIDDK-5_metamorph/genomeInfo.csv
+        if [[ ${{NUM_BINS}} -ge 2000 ]]; then
+            echo "\033[0;36mLARGE bin set detected, using flags '--multiround_primary_clustering' and '--genomeInfo'\033[0m"
+            dRep dereplicate -d \\
+                -g ${{DREP_BINS}} \\
+                -p {threads} \\
+                -l {params.minimum_genome_length} \\
+                -pa {params.ani_primary_threshold} \\
+                -sa {params.ani_secondary_threshold} \\
+                -nc {params.min_overlap} \\
+                -cm {params.coverage_method} \\
+                --genomeInfo {input.ginfo} \\
+                --S_algorithm {params.second_cluster_algo} \\
+                -comp {params.completeness} \\
+                --multiround_primary_clustering \\
+                --primary_chunksize $NUM_CHUNK \\
+                --run_tertiary_clustering \\
+                {params.outto}
+        else
+            echo "\033[0;36mSMALL bin set detected, **NOT** using flags '--multiround_primary_clustering' and '--genomeInfo'\033[0m"
+            dRep dereplicate -d \\
+                -g ${{DREP_BINS}} \\
+                -p {threads} \\
+                -l {params.minimum_genome_length} \\
+                -pa {params.ani_primary_threshold} \\
+                -sa {params.ani_secondary_threshold} \\
+                -nc {params.min_overlap} \\
+                -cm {params.coverage_method} \\
+                --S_algorithm {params.second_cluster_algo} \\
+                -comp {params.completeness} \\
+                --primary_chunksize $NUM_CHUNK \\
+                --run_tertiary_clustering \\
+                {params.outto}
+                touch {params.outto}/dRep.SMALL_BINSET_WARNING
+        fi
         """
 
 
@@ -892,59 +919,16 @@ rule bbtools_index_map:
             in2={input.R2}
         """
 
-# mapping DNA to MAGs with bowtie2
-# rule map_dna_to_mags:
-#     input:
-#         R1                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq"),
-#         R2                          = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq"),
-#         derep_genome_info           = join(top_refine_dir, "{name}", "dRep", "data_tables", "Widb.csv"),
-#         derep_winning_figure        = join(top_refine_dir, "{name}", "dRep", "figures", "Winning_genomes.pdf"),
-#         derep_args                  = join(top_refine_dir, "{name}", "dRep", "log", "cluster_arguments.json"),
-#     output:
-#         coverages                   = join(top_mapping_dir, "{name}", ".mags_mapped"),
-#     params:
-#         rname                       = "map_dna_to_mags",
-#         sid                         = "{name}",
-#         dRep_dir                    = join(top_refine_dir, "{name}", "dRep", "dereplicated_genomes"),
-#         this_map_dir                = join(top_mapping_dir, "{name}"),
-#         bowtie_indexes              = join(top_mapping_dir, "{name}", "bowtie2-Asm-indices"),
-#     threads: int(cluster["map_dna_to_mags"].get("threads", default_threads)),
-#     singularity: metawrap_container,
-#     shell:
-#         """
-#         # activate bowtie2 and samtools environment
-#         . /opt/conda/etc/profile.d/conda.sh && conda activate checkm
-#         # make mapping and index dirs
-#         if [ ! -d "{params.bowtie_indexes}" ]; then mkdir -p "{params.bowtie_indexes}"; fi
-#         for mag in {params.dRep_dir}/*.fa; do
-#             mag_base=$(basename $mag)
-#             mag_fn="${{mag_base%.*}}"
-#             idx_name="${{mag_fn}}_{params.sid}"
-#             cd {params.bowtie_indexes} && bowtie2-build --seed 42 --threads {threads} $mag $idx_name
-#             cd {params.this_map_dir}
-#             bowtie2 \
-#             -p {threads} \
-#             --very-sensitive-local \
-#             -x {params.bowtie_indexes}/$idx_name \
-#             -1 {input.R1} -2 {input.R2} > "${{idx_name}}.sam"
-#             samtools view -C -@ {threads} -q 30 -T $mag "${{idx_name}}.sam" > "${{idx_name}}_unsorted.cram"
-#             samtools sort -@ {threads} -O CRAM "${{idx_name}}_unsorted.cram" > "${{idx_name}}_sorted.cram"
-#             samtools coverage --reference $mag "${{idx_name}}_sorted.cram" > "{params.this_map_dir}/${{mag_fn}}_coverage.txt"
-#             rm "${{idx_name}}.sam" "${{idx_name}}_unsorted.cram"
-#         done
-#         touch {params.this_map_dir}/.mags_mapped
-#         """
-
 
 rule gtdbtk_classify:
     input:
         dRep_dir                    = join(top_refine_dir, "dRep", "dereplicated_genomes"),
     output:
-        gtdbk_dir                   = directory(join(top_tax_dir, "GTDBTK_classify_wf"))
+        gtdbtk_dir                   = directory(join(top_tax_dir, "GTDBTK_classify_wf"))
     threads: 
-        int(cluster["gtdbk_classify"].get("threads", default_threads)),
+        int(cluster["gtdbtk_classify"].get("threads", default_threads)),
     params:
-        rname                       = "gtdbk_classify",
+        rname                       = "gtdbtk_classify",
         tmp_safe_dir                = join(config['options']['tmp_dir'], 'gtdbtk_classify'),
         GTDBTK_DB                   = "/data2/GTDBTK_DB",
     singularity: metawrap_container,
@@ -962,7 +946,7 @@ rule gtdbtk_classify:
         export CHECKM_DATA_PATH="/data2/CHECKM_DB"
         gtdbtk classify_wf \
             --genome_dir {input.dRep_dir} \
-            --out_dir {output.gtdbk_dir} \
+            --out_dir {output.gtdbtk_dir} \
             --cpus {threads} \
             --tmpdir {params.tmp_safe_dir} \
             --skip_ani_screen \
@@ -1006,54 +990,3 @@ rule gunc_detection:
         """
 
 
-# rule dna_humann_classify:
-#     input:
-#         R1                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq"),
-#         R2                          = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq"),
-#     output:
-#         hm3_gene_fam                = join(top_mapping_dir, "{name}", 'humann3', '{name}_genefamilies.tsv'),
-#         hm3_path_abd                = join(top_mapping_dir, "{name}", 'humann3', '{name}_pathabundance.tsv'),
-#         hm3_path_cov                = join(top_mapping_dir, "{name}", 'humann3', '{name}_pathcoverage.tsv'),
-#         hm3_path_bugs               = join(top_mapping_dir, "{name}", 'humann3', '{name}_metaphlan_profile.tsv'),
-#         humann_log                  = join(top_mapping_dir, "{name}", 'humann3.log'),
-#         humann_config               = join(top_mapping_dir, "{name}", 'humann3.conf'),
-#     params:
-#         rname                       = "dna_humann_classify",
-#         sid                         = "{name}",
-#         tmpread                     = join(config['options']['tmp_dir'], 'dna_map', "{name}_concat.fastq.gz"),
-#         tmp_safe_dir                = join(config['options']['tmp_dir'], 'dna_map'),
-#         hm3_map_dir                 = join(top_mapping_dir, "{name}", 'humann3'),
-#         uniref_db                   = "/data2/uniref",      # from <root>/config/resources.json
-#         chocophlan_db               = "/data2/chocophlan",  # from <root>/config/resources.json
-#         util_map_db                 = "/data2/um",          # from <root>/config/resources.json
-#         metaphlan_db                = "/data2/metaphlan",   # from <root>/config/resources.json
-#     threads: int(cluster["dna_humann_classify"].get('threads', default_threads)),
-#     containerized: metawrap_container,
-#     shell:
-#         """
-#         . /opt/conda/etc/profile.d/conda.sh && conda activate bb3
-#         # safe temp directory
-#         if [ ! -d "{params.tmp_safe_dir}" ]; then mkdir -p "{params.tmp_safe_dir}"; fi
-#         tmp=$(mktemp -d -p "{params.tmp_safe_dir}")
-#         trap 'rm -rf "{params.tmp_safe_dir}"' EXIT
-
-#         # human configuration
-#         humann_config --print > {output.humann_config}
-
-#         # metaphlan configuration
-#         export DEFAULT_DB_FOLDER={params.metaphlan_db}
-
-#         cat {input.R1} {input.R2} > {params.tmpread}
-# 		humann \
-#         --threads {threads} \
-#         --input {params.tmpread} \
-#         --input-format fastq \
-#         --metaphlan-options "-t rel_ab --bowtie2db {params.metaphlan_db} --nproc {threads}" \
-#         --output-basename {params.sid} \
-#         --log-level DEBUG \
-#         --o-log {output.humann_log} \
-#         --bypass-prescreen \
-#         --memory-use maximum \
-#         --verbose \
-#         --output {params.hm3_map_dir} 
-#         """

@@ -693,6 +693,7 @@ def runner(
         additional_bind_paths = None, 
         threads=2,  
         jobname=__job_name__,
+        jobnode='unlimited',
         submission_script='run.sh',
         triggers=None,
         tmp_dir = '/lscratch/$SLURM_JOB_ID/'
@@ -804,12 +805,16 @@ def runner(
         #   --keep-remote --local-cores 30 2>&1 | tee -a "$3"/logfiles/master.log
         cmd = [
             str(submission_script), mode,
-            '-j', jobname, '-b', str(bindpaths),
-            '-o', str(outdir), '-c', str(cache),
+            '-j', jobname, 
+            '-b', str(bindpaths),
+            '-n', str(jobnode), 
+            '-o', str(outdir), 
+            '-c', str(cache),
             '-t', "'{}'".format(tmp_dir),
         ]
         if triggers:
             cmd.extend(['-r', ','.join(triggers)])
         masterjob = subprocess.Popen(cmd, cwd = outdir, stderr=subprocess.STDOUT, stdout=logger, env=my_env)
+        
 
     return masterjob

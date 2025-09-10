@@ -40,6 +40,10 @@ Required Arguments:
                                  This is the pipeline's working directory
                                  where all output files will be generated.
   -j, --job-name [Type: Str]    Name of pipeline's master job.
+  -n, --job-node [Type: Str]    Node to execute the master job on.
+                                 Valid options include: <norm, unlimited, quick>
+                                 See `freen` for more details.
+                                 Default: unlimited
   -b, --bind-paths [Type:Path]  Singularity bind paths. The pipeline uses
                                  singularity images for exection. Bind 
                                  paths are used to mount the host file 
@@ -99,6 +103,7 @@ function parser() {
     case $key in
       -h  | --help) usage && exit 0;;
       -j  | --job-name)   provided "$key" "${2:-}"; Arguments["j"]="$2"; shift; shift;;
+      -n  | --job-node)   provided "$key" "${2:-}"; Arguments["n"]="$2"; shift; shift;;
       -b  | --bind-paths) provided "$key" "${2:-}"; Arguments["b"]="$2"; shift; shift;;
       -t  | --tmp-dir) provided "$key" "${2:-}"; Arguments["t"]="$2"; shift; shift;;
       -o  | --outdir)  provided "$key" "${2:-}"; Arguments["o"]="$2"; shift; shift;;
@@ -162,11 +167,12 @@ function submit(){
   # Submit jobs to the defined job scheduler or executor (i.e. slurm)
   # INPUT $1 = Snakemake Mode of execution
   # INPUT $2 = Name of master/main job or process (pipeline controller)
-  # INPUT $3 = Pipeline output directory
-  # INPUT $4 = Singularity Bind paths
-  # INPUT $5 = Singularity cache directory
-  # INPUT $6 = Temporary directory for output files
-  # INPUT $7 = rerun trigger values
+  # INPUT $3 = Node to execute master job on
+  # INPUT $4 = Pipeline output directory
+  # INPUT $5 = Singularity Bind paths
+  # INPUT $6 = Singularity cache directory
+  # INPUT $7 = Temporary directory for output files
+  # INPUT $8 = rerun trigger values
 
   # Check if singularity and snakemake are in $PATH
   # If not, try to module load singularity as a last resort
@@ -179,7 +185,7 @@ function submit(){
   # Goto Pipeline Ouput directory
   # Create a local singularity cache in output directory
   # cache can be re-used instead of re-pulling from DockerHub everytime
-  cd "$3" && export SINGULARITY_CACHEDIR="${5}"
+  cd "$4" && export SINGULARITY_CACHEDIR="${6}"
 
   # unsetting XDG_RUNTIME_DIR to avoid some unsighly but harmless warnings
   unset XDG_RUNTIME_DIR
@@ -188,7 +194,7 @@ function submit(){
   case "$executor" in
     slurm)
           # Create directory for logfiles
-          mkdir -p "$3"/logfiles/slurmfiles/
+          mkdir -p "$4"/logfiles/slurmfiles/
           # Submit the master job to the cluster
           # sbatch --parsable -J {jobname} --time=5-00:00:00 --mail-type=BEGIN,END,FAIL 
           # --cpus-per-task=24 --mem=96g --gres=lscratch:500 
@@ -199,12 +205,12 @@ function submit(){
           # --printshellcmds --keep-going --rerun-incomplete 
           # --keep-remote --restart-times 3 -j 500 --use-singularity 
           # --singularity-args -B {}.format({bindpaths}) --local-cores 24
-          triggers="${7:-"code params software-env input mtime"}"
+          triggers="${8:-"code params software-env input mtime"}"
           # Convert comma seperated list with spaces
           triggers=$(echo "${triggers}" | sed 's/,/ /g') 
           rerun="--rerun-triggers $triggers"
           
-          SLURM_DIR="$3/logfiles/slurmfiles"
+          SLURM_DIR="$4/logfiles/slurmfiles"
           CLUSTER_OPTS="sbatch --gres {cluster.gres} --cpus-per-task {cluster.threads} -p {cluster.partition} -t {cluster.time} --mem {cluster.mem} --job-name={params.rname} -e $SLURM_DIR/slurm-%j_{params.rname}.out -o $SLURM_DIR/slurm-%j_{params.rname}.out"
           # Check if NOT running on Biowulf
           # Assumes other clusters do NOT 
@@ -219,7 +225,7 @@ function submit(){
           # it should be used and by default
           # SLURM is not configured to use 
           # GRES, remove prefix single quote
-          if [[ ${6#\'} != /lscratch* ]]; then
+          if [[ ${7#\'} != /lscratch* ]]; then
             CLUSTER_OPTS="sbatch --cpus-per-task {cluster.threads} -p {cluster.partition} -t {cluster.time} --mem {cluster.mem} --job-name={params.rname} -e $SLURM_DIR/slurm-%j_{params.rname}.out -o $SLURM_DIR/slurm-%j_{params.rname}.out"
           fi
     cat << EOF > kickoff.sh
@@ -228,40 +234,40 @@ function submit(){
 #SBATCH --mem=32g
 #SBATCH --time=10-00:00:00
 #SBATCH --parsable
-#SBATCH -p unlimited
+#SBATCH -p $3
 #SBATCH -J "$2"
 #SBATCH --mail-type=BEGIN,END,FAIL
-#SBATCH --output "$3/logfiles/snakemake.log"
-#SBATCH --error "$3/logfiles/snakemake.log"
+#SBATCH --output "$4/logfiles/snakemake.log"
+#SBATCH --error "$4/logfiles/snakemake.log"
 set -euo pipefail
 # Main process of pipeline
 snakemake \\
   -p \\
   --latency-wait 120 \\
-  -s "$3/workflow/Snakefile" \\
-  -d "$3" \\
+  -s "$4/workflow/Snakefile" \\
+  -d "$4" \\
   --use-singularity \\
   $rerun \\
-  --singularity-args "\\-c \\-B '$4'" \\
+  --singularity-args "\\-c \\-B '$5'" \\
   --use-envmodules \\
   --verbose \\
-  --configfile "$3/config.json" \\
+  --configfile "$4/config.json" \\
   --printshellcmds \\
-  --cluster-config $3/config/cluster.json \\
+  --cluster-config $4/config/cluster.json \\
   --cluster "${CLUSTER_OPTS}" \\
   --keep-going \\
   --rerun-incomplete \\
   --jobs 500 \\
   --keep-remote \\
-  --stats "$3/logfiles/runtime_statistics.json" \\
+  --stats "$4/logfiles/runtime_statistics.json" \\
   --restart-times 1 \\
   --keep-incomplete \\
   --local-cores "14" 2>&1
 # Create summary report
-snakemake -s "$3/workflow/Snakefile" -d "$3" --configfile="$3/config.json" --report "Snakemake_Report.html"
+snakemake -s "$4/workflow/Snakefile" -d "$4" --configfile="$4/config.json" --report "Snakemake_Report.html"
 EOF
     chmod +x kickoff.sh
-    job_id=$(sbatch kickoff.sh | tee -a "$3"/logfiles/master.log)
+    job_id=$(sbatch kickoff.sh | tee -a "$4"/logfiles/master.log)
         ;;
       *)  echo "${executor} is not available." && \
           fatal "Failed to provide valid execution backend: ${executor}. Please use slurm."
@@ -309,9 +315,9 @@ function main(){
   # Run pipeline and submit jobs to cluster using the defined executor
   mkdir -p "${Arguments[o]}/logfiles/"
   if [[ ! -v Arguments[r] ]] ; then
-    job_id=$(submit "${Arguments[e]}" "${Arguments[j]}" "${Arguments[o]}" "${Arguments[b]}" "${Arguments[c]}" "${Arguments[t]}")
+    job_id=$(submit "${Arguments[e]}" "${Arguments[j]}" "${Arguments[n]}" "${Arguments[o]}" "${Arguments[b]}" "${Arguments[c]}" "${Arguments[t]}")
   else
-    job_id=$(submit "${Arguments[e]}" "${Arguments[j]}" "${Arguments[o]}" "${Arguments[b]}" "${Arguments[c]}" "${Arguments[t]}" "${Arguments[r]}")
+    job_id=$(submit "${Arguments[e]}" "${Arguments[j]}" "${Arguments[n]}" "${Arguments[o]}" "${Arguments[b]}" "${Arguments[c]}" "${Arguments[t]}" "${Arguments[r]}")
   fi
   echo -e "[$(date)] Pipeline submitted to cluster.\nMaster Job ID: $job_id"
   echo "${job_id}" > "${Arguments[o]}/logfiles/mjobid.log"
