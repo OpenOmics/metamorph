@@ -85,7 +85,7 @@
         "partition": "norm",
         "time": "2-00:00:00"
     },
-    "gtdbk_classify": {
+    "gtdbtk_classify": {
         "threads": 48,
         "mem": "1024G",
         "partition": "largemem",
@@ -97,13 +97,6 @@
         "mem": "64G",
         "partition": "norm",
         "time": "2-00:00:00"
-    },
-    "dna_humann_classify": {
-        "threads": 56,
-        "mem": "247G",
-        "partition": "norm",
-        "time": "10-00:00:00",
-        "gres": "lscratch:800"
     },
     "concat_rna_reads": {
         "threads": 28,
