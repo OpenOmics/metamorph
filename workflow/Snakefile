@@ -12,7 +12,6 @@ datapath                   = config["project"]["datapath"]
 rna_datapath               = config["project"].get("rna_datapath", [])
 workpath                   = config["project"]["workpath"]
 tmpdir                     = config["options"]["tmp_dir"]
-megahit_only               = bool(int(config["options"]["assembler_mode"]))
 rna_included               = list_bool(config.get("rna", 'false'))
 rna_sample_stems           = config.get("rna", [])
 samples                    = config["samples"]
@@ -78,12 +77,14 @@ rule all:
             join(top_mapping_dir, 'merged_bugs_list.tsv'),
             join(top_mapping_dir, 'merged_pathabundance.cpm.stratified.tsv'),
             join(top_mapping_dir, 'merged_pathabundance.cpm.unstratified.tsv'),
+        ], condition = analysis_mode in ["read-based", "combined"]),
+        *provided([
             join(top_mapping_dir, 'diversity_analysis', 'merged_bugs_list_shannon.tsv'),
             join(top_mapping_dir, 'diversity_analysis', 'merged_bugs_list_richness.tsv'),
             join(top_mapping_dir, 'diversity_analysis', 'merged_bugs_list_jaccard.tsv'),
             join(top_mapping_dir, 'diversity_analysis', 'merged_bugs_list_weighted-unifrac.tsv'),
             join(top_mapping_dir, 'diversity_analysis', 'merged_bugs_list_unweighted-unifrac.tsv')
-        ], condition = analysis_mode in ["read-based", "combined"]),
+        ], condition = (analysis_mode in ["read-based", "combined"]) and (len(samples) > 1)),
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
         # DNA read-based mode endpoints #
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -166,6 +167,7 @@ rule all:
             expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.rpkm"), rname=rna_sample_stems),
             expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.refstats"), rname=rna_sample_stems)
         ], condition = (analysis_mode in ("read-based", "combined")) and rna_included)
+
 
 include: join("rules", "DNA.smk")
 include: join("rules", "RNA.smk")
