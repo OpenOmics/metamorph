@@ -39,20 +39,18 @@ rule rna_read_qc_skipBmtagger:
         R2_pretrim_report   = join(top_readqc_dir_rna, "{rname}", "{rname}_R2_pretrim_report.html"),
         R1_postrim_report   = join(top_readqc_dir_rna, "{rname}", "{rname}_R1_postrim_report.html"),
         R2_postrim_report   = join(top_readqc_dir_rna, "{rname}", "{rname}_R2_postrim_report.html"),
-        R1_trimmed          = join(top_trim_dir_rna, "{rname}", "{rname}_R1_trimmed.fastq"),
-        R2_trimmed          = join(top_trim_dir_rna, "{rname}", "{rname}_R2_trimmed.fastq"),
         R1_trimmed_gz       = join(top_trim_dir_rna, "{rname}", "{rname}_R1_trimmed.fastq.gz"),
         R2_trimmed_gz       = join(top_trim_dir_rna, "{rname}", "{rname}_R2_trimmed.fastq.gz"),
     params:
-        rname               = "rna_read_qc",
+        rname               = "rna_read_qc_skipBmtagger",
         sid                 = "{rname}",
         this_qc_dir         = join(top_readqc_dir_rna, "{rname}"),
         trim_out            = join(top_trim_dir_rna, "{rname}"),
-        tmp_safe_dir        = join(config['options']['tmp_dir'], 'read_qc'),
-        tmpr1               = lambda _, output, input: join(config['options']['tmp_dir'], 'read_qc', str(basename(str(input.R1))).replace('_R1.', '_1.').replace('.gz', '')),
-        tmpr2               = lambda _, output, input: join(config['options']['tmp_dir'], 'read_qc', str(basename(str(input.R2))).replace('_R2.', '_2.').replace('.gz', '')),
+        tmp_safe_dir        = join(config['options']['tmp_dir'], 'read_qc', "{rname}"),
+        tmpr1               = lambda _, output, input: join(config['options']['tmp_dir'], 'read_qc', _.rname, str(basename(str(input.R1))).replace('_R1.', '_1.').replace('.gz', '')),
+        tmpr2               = lambda _, output, input: join(config['options']['tmp_dir'], 'read_qc', _.rname, str(basename(str(input.R2))).replace('_R2.', '_2.').replace('.gz', '')),
     containerized: metawrap_container,
-    threads: int(cluster["rna_read_qc"].get('threads', default_threads)),
+    threads: int(cluster["rna_read_qc_skipBmtagger"].get('threads', default_threads)),
     shell:
         """
             # safe temp directory
@@ -80,11 +78,12 @@ rule rna_read_qc_skipBmtagger:
             mw read_qc -1 {params.tmpr1} -2 {params.tmpr2} -t {threads} -o {params.this_qc_dir} --skip-bmtagger
 
             # collate fastq outputs to facilitate workflow, compress
-            ln -s {params.this_qc_dir}/final_pure_reads_1.fastq {params.trim_out}/{params.sid}_R1_trimmed.fastq
-            ln -s {params.this_qc_dir}/final_pure_reads_2.fastq {params.trim_out}/{params.sid}_R2_trimmed.fastq
             pigz -9 -p {threads} -c {params.this_qc_dir}/final_pure_reads_1.fastq  > {params.trim_out}/{params.sid}_R1_trimmed.fastq.gz
             pigz -9 -p {threads} -c {params.this_qc_dir}/final_pure_reads_2.fastq > {params.trim_out}/{params.sid}_R2_trimmed.fastq.gz
-            
+
+            # remove uncompressed trimmed fastqs now that gzipped copies exist
+            rm -f {params.this_qc_dir}/final_pure_reads_1.fastq {params.this_qc_dir}/final_pure_reads_2.fastq
+
             # collate outputs to facilitate 
             ln -s {params.this_qc_dir}/post-QC_report/final_pure_reads_1_fastqc.html {params.this_qc_dir}/{params.sid}_R1_postrim_report.html
             ln -s {params.this_qc_dir}/post-QC_report/final_pure_reads_2_fastqc.html {params.this_qc_dir}/{params.sid}_R2_postrim_report.html
@@ -215,8 +214,8 @@ rule rna_humann_classify:
     params:
         rname               = "rna_humann_classify",
         sid                 = "{rname}",
-        tmpread             = join(config['options']['tmp_dir'], 'rna_map', "{rname}_concat.fastq.gz"),
-        tmp_safe_dir        = join(config['options']['tmp_dir'], 'rna_map'),
+        tmpread             = join(config['options']['tmp_dir'], 'rna_map', "{rname}", "{rname}_concat.fastq.gz"),
+        tmp_safe_dir        = join(config['options']['tmp_dir'], 'rna_map', "{rname}"),
         hm3_map_dir         = humann3_dir_rna,
         uniref_db           = "/data2/uniref",      # from <root>/config/resources.json
         chocophlan_db       = "/data2/chocophlan",  # from <root>/config/resources.json

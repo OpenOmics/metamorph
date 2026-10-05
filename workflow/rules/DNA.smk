@@ -19,7 +19,7 @@ workpath                   = config["project"]["workpath"]
 datapath                   = config["project"]["datapath"]
 samples                    = config["samples"]
 top_log_dir                = join(workpath, "logfiles")
-top_readqc_dir             = join(workpath, config['project']['id'], "metawrap_read_qc")
+top_readqc_dir             = join(workpath, config['project']['id'], "metawrap_read_qc_skipBmtagger")
 top_trim_dir               = join(workpath, config['project']['id'], "trimmed_reads")
 top_assembly_dir           = join(workpath, config['project']['id'], "metawrap_assembly")
 top_tax_dir                = join(workpath, config['project']['id'], "metawrap_kmer")
@@ -28,6 +28,26 @@ top_refine_dir             = join(workpath, config['project']['id'], "metawrap_b
 top_mags_dir               = join(workpath, config['project']['id'], "mags")
 top_mapping_dir            = join(workpath, config['project']['id'], "humann3_dna")
 top_centrifuger_dir        = join(workpath, config['project']['id'], "centrifuger_dna")
+top_resources_dir          = join(workpath, config['project']['id'], "resources")
+top_qc_summary_dir         = join(workpath, config['project']['id'], "qc_summary")
+
+# Generic, sample-agnostic reconciliation thresholds for dna_sample_qc_summary
+# (Section below) -- not tuned to any particular organism or dataset. A
+# sample below this fraction of its raw read pairs still present after
+# dehosting+trimming is flagged regardless of why; a sample above this host-
+# aligned fraction is flagged regardless of what the host reference was.
+qc_min_overall_retained_pct = 50.0
+qc_max_host_pct              = 20.0
+
+# user-injected additional host/contaminant genome(s) for dehosting (--host-genome);
+# empty list (the default) means dehosting behaves exactly as it always has
+host_genome_paths          = config['options'].get('host_genome', [])
+injected_host_idx_dir      = join(top_resources_dir, "injected_host_genome")
+injected_host_idx_prefix   = join(injected_host_idx_dir, "injected_host")
+# bowtie2_dehost's own output is the pipeline's final dehosted fastq only when
+# there's no second screening pass to chain after it; otherwise it's an
+# intermediate that screen_injected_host_dna consumes and finalizes
+dna_dehost_tag             = "_dehost" if not host_genome_paths else "_dehost_prehostscreen"
 
 # workflow flags
 metawrap_container          = config["containers"]["metawrap"]
@@ -94,20 +114,18 @@ rule metawrap_read_qc_skipBmtagger:
         R2_pretrim_report   = join(top_readqc_dir, "{name}", "{name}_R2_pretrim_report.html"),
         R1_postrim_report   = join(top_readqc_dir, "{name}", "{name}_R1_postrim_report.html"),
         R2_postrim_report   = join(top_readqc_dir, "{name}", "{name}_R2_postrim_report.html"),
-        R1_trimmed          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq"),
-        R2_trimmed          = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq"),
         R1_trimmed_gz       = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq.gz"),
         R2_trimmed_gz       = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq.gz"),
     params:
-        rname               = "metawrap_read_qc",
+        rname               = "metawrap_read_qc_skipBmtagger",
         sid                 = "{name}",
         this_qc_dir         = join(top_readqc_dir, "{name}"),
         trim_out            = join(top_trim_dir, "{name}"),
-        tmp_safe_dir        = join(config['options']['tmp_dir'], 'read_qc'),
-        tmpr1               = lambda _, output, input: join(config['options']['tmp_dir'], 'read_qc', str(basename(str(input.R1))).replace('_R1.', '_1.').replace('.gz', '')),
-        tmpr2               = lambda _, output, input: join(config['options']['tmp_dir'], 'read_qc', str(basename(str(input.R2))).replace('_R2.', '_2.').replace('.gz', '')),
+        tmp_safe_dir        = join(config['options']['tmp_dir'], 'read_qc', "{name}"),
+        tmpr1               = lambda _, output, input: join(config['options']['tmp_dir'], 'read_qc', _.name, str(basename(str(input.R1))).replace('_R1.', '_1.').replace('.gz', '')),
+        tmpr2               = lambda _, output, input: join(config['options']['tmp_dir'], 'read_qc', _.name, str(basename(str(input.R2))).replace('_R2.', '_2.').replace('.gz', '')),
     containerized: metawrap_container,
-    threads: int(cluster["metawrap_read_qc"].get('threads', default_threads)),
+    threads: int(cluster["metawrap_read_qc_skipBmtagger"].get('threads', default_threads)),
     shell: 
         """
             # safe temp directory
@@ -135,11 +153,12 @@ rule metawrap_read_qc_skipBmtagger:
             mw read_qc -1 {params.tmpr1} -2 {params.tmpr2} -t {threads} -o {params.this_qc_dir} --skip-bmtagger
 
             # collate fastq outputs to facilitate workflow, compress
-            ln -s {params.this_qc_dir}/final_pure_reads_1.fastq {params.trim_out}/{params.sid}_R1_trimmed.fastq
-            ln -s {params.this_qc_dir}/final_pure_reads_2.fastq {params.trim_out}/{params.sid}_R2_trimmed.fastq
             pigz -9 -p {threads} -c {params.this_qc_dir}/final_pure_reads_1.fastq  > {params.trim_out}/{params.sid}_R1_trimmed.fastq.gz
             pigz -9 -p {threads} -c {params.this_qc_dir}/final_pure_reads_2.fastq > {params.trim_out}/{params.sid}_R2_trimmed.fastq.gz
-            
+
+            # remove uncompressed trimmed fastqs now that gzipped copies exist
+            rm -f {params.this_qc_dir}/final_pure_reads_1.fastq {params.this_qc_dir}/final_pure_reads_2.fastq
+
             # collate outputs to facilitate
             mkdir -p {params.this_qc_dir}/dna
             ln -s {params.this_qc_dir}/post-QC_report/final_pure_reads_1_fastqc.html {params.this_qc_dir}/{params.sid}_R1_postrim_report.html
@@ -156,8 +175,9 @@ rule bowtie2_dehost:
         R1                          = join(top_trim_dir, "{name}", "{name}_R1_trimmed.fastq.gz"),
         R2                          = join(top_trim_dir, "{name}", "{name}_R2_trimmed.fastq.gz"),
     output:
-        R1_dehost                   = join(top_trim_dir, "{name}", "{name}_R1_dehost.fastq.gz"),
-        R2_dehost                   = join(top_trim_dir, "{name}", "{name}_R2_dehost.fastq.gz"),
+        R1_dehost                   = join(top_trim_dir, "{name}", "{name}_R1" + dna_dehost_tag + ".fastq.gz"),
+        R2_dehost                   = join(top_trim_dir, "{name}", "{name}_R2" + dna_dehost_tag + ".fastq.gz"),
+        dehost_summary              = join(top_trim_dir, "{name}", "{name}_hg38_dehost_summary.txt"),
     params:
         rname                       = "bowtie2_dehost",
         sid                         = "{name}",
@@ -169,7 +189,7 @@ rule bowtie2_dehost:
         hg38_bowtie2_idx_prefix     = "/data2/bowtie2/hg38",
     containerized: bowtie2_samtools_container,
     threads: int(cluster["bowtie2_dehost"].get('threads', default_threads)),
-    shell: 
+    shell:
         """
             # safe temp directory
             if [ ! -d "{params.tmp_safe_dir}" ]; then mkdir -p "{params.tmp_safe_dir}"; fi
@@ -180,7 +200,7 @@ rule bowtie2_dehost:
             bowtie2 -p {threads} -x {params.hg38_bowtie2_idx_prefix} \
             -1 {input.R1} \
             -2 {input.R2} \
-            -S {params.bowtie2sam}    
+            -S {params.bowtie2sam}
 
             # run samtools to convert sam to bam
             samtools view -@ {threads} -bS {params.bowtie2sam} > {params.bowtie2bam}
@@ -196,7 +216,151 @@ rule bowtie2_dehost:
             -1 {output.R1_dehost} \
             -2 {output.R2_dehost} \
             -0 /dev/null -s /dev/null -n
+
+            # summarize the filter: read-pair counts straight from the BAMs
+            # already produced above, rather than re-decompressing fastqs
+            total_pairs=$(( $(samtools view -c -@ {threads} {params.bowtie2bam}) / 2 ))
+            retained_pairs=$(( $(samtools view -c -@ {threads} {params.bowtie2bamUnmappedSorted}) / 2 ))
+            removed_pairs=$(( total_pairs - retained_pairs ))
+            pct_removed=$(awk -v r="$removed_pairs" -v t="$total_pairs" 'BEGIN{{ printf "%.4f", (t>0)? r/t*100 : 0 }}')
+            pct_retained=$(awk -v r="$retained_pairs" -v t="$total_pairs" 'BEGIN{{ printf "%.4f", (t>0)? r/t*100 : 0 }}')
+            {{
+                echo "metamorph dehosting summary"
+                echo "============================"
+                echo "Sample:                  {params.sid}"
+                echo "Filter stage:            default host reference (hg38)"
+                echo "Reference index:         {params.hg38_bowtie2_idx_prefix}"
+                echo "Program:                 bowtie2 + samtools"
+                echo "Retention criterion:     read pair kept only if BOTH mates are unmapped to this reference (samtools view -f 12 -F 256)"
+                echo ""
+                echo "Input read pairs:        ${{total_pairs}}"
+                echo "Removed (mapped):        ${{removed_pairs}} (${{pct_removed}}%)"
+                echo "Retained (unmapped):     ${{retained_pairs}} (${{pct_retained}}%)"
+            }} > {output.dehost_summary}
         """
+
+
+if host_genome_paths:
+
+    rule build_injected_host_index:
+        """
+            Builds one combined bowtie2 index from every FASTA passed via
+            --host-genome, so the dehosting steps can screen reads against it
+            in addition to the default host reference. Only exists in the DAG
+            when --host-genome was actually given.
+        """
+        input:
+            genomes                 = host_genome_paths,
+        output:
+            index_complete           = touch(join(injected_host_idx_dir, "INJECTED_HOST_INDEX_COMPLETE")),
+        params:
+            rname                    = "build_injected_host_index",
+            idx_dir                  = injected_host_idx_dir,
+            idx_prefix               = injected_host_idx_prefix,
+            combined_fa              = join(injected_host_idx_dir, "injected_host_combined.fa"),
+            genome_files              = host_genome_paths,
+        containerized: bowtie2_samtools_container,
+        threads: int(cluster["build_injected_host_index"].get('threads', default_threads)),
+        shell:
+            """
+                mkdir -p {params.idx_dir}
+
+                # Any one (or combination) of the injected FASTA(s) may reuse
+                # generic, assembler-default contig names (e.g. "ptg000001l")
+                # that collide with each other -- seen directly with a
+                # multi-genome FASTA built from two separate assemblies that
+                # both used the same naming convention. bowtie2-build itself
+                # doesn't care, but a SAM/BAM header requires globally unique
+                # reference names, so samtools fails downstream otherwise.
+                # Rewrite every sequence to a guaranteed-unique ID up front,
+                # keeping the original name as a suffix for traceability.
+                for g in {params.genome_files}; do
+                    case "$g" in
+                        *.gz) zcat "$g" ;;
+                        *)    cat  "$g" ;;
+                    esac
+                done | awk '/^>/ {{n++; print ">injected_seq" n "_" substr($0,2); next}} {{print}}' > {params.combined_fa}
+
+                bowtie2-build --threads {threads} {params.combined_fa} {params.idx_prefix}
+            """
+
+
+    rule screen_injected_host_dna:
+        """
+            Second dehosting pass: screens reads already cleared of the
+            default host reference (bowtie2_dehost) against every genome
+            supplied via --host-genome, using the same both-mates-unmapped
+            criterion. Only exists in the DAG when --host-genome was given;
+            this rule's output is the pipeline's real, final dehosted fastq
+            in that case.
+        """
+        input:
+            R1                      = join(top_trim_dir, "{name}", "{name}_R1_dehost_prehostscreen.fastq.gz"),
+            R2                      = join(top_trim_dir, "{name}", "{name}_R2_dehost_prehostscreen.fastq.gz"),
+            index_complete           = join(injected_host_idx_dir, "INJECTED_HOST_INDEX_COMPLETE"),
+        output:
+            R1_dehost                = join(top_trim_dir, "{name}", "{name}_R1_dehost.fastq.gz"),
+            R2_dehost                = join(top_trim_dir, "{name}", "{name}_R2_dehost.fastq.gz"),
+            dehost_summary           = join(top_trim_dir, "{name}", "{name}_injected_host_dehost_summary.txt"),
+        params:
+            rname                    = "screen_injected_host_dna",
+            sid                      = "{name}",
+            tmp_safe_dir             = join(config['options']['tmp_dir'], 'host_screen', "{name}"),
+            bowtie2sam               = join(config['options']['tmp_dir'], 'host_screen', "{name}", "{name}.injected_host.sam"),
+            bowtie2bam               = join(config['options']['tmp_dir'], 'host_screen', "{name}", "{name}.injected_host.bam"),
+            bowtie2bamUnmapped       = join(config['options']['tmp_dir'], 'host_screen', "{name}", "{name}.injected_host.unmapped.bam"),
+            bowtie2bamUnmappedSorted = join(config['options']['tmp_dir'], 'host_screen', "{name}", "{name}.injected_host.unmappedSorted.bam"),
+            injected_host_idx_prefix = injected_host_idx_prefix,
+            injected_genomes         = " ".join(host_genome_paths),
+        containerized: bowtie2_samtools_container,
+        threads: int(cluster["screen_injected_host_dna"].get('threads', default_threads)),
+        shell:
+            """
+                if [ ! -d "{params.tmp_safe_dir}" ]; then mkdir -p "{params.tmp_safe_dir}"; fi
+                tmp=$(mktemp -d -p "{params.tmp_safe_dir}")
+                trap 'rm -rf "{params.tmp_safe_dir}"' EXIT
+
+                # run bowtie against every user-injected host/contaminant genome
+                bowtie2 -p {threads} -x {params.injected_host_idx_prefix} \
+                -1 {input.R1} \
+                -2 {input.R2} \
+                -S {params.bowtie2sam}
+
+                samtools view -@ {threads} -bS {params.bowtie2sam} > {params.bowtie2bam}
+
+                # keep only pairs where neither mate mapped to any injected genome
+                samtools view -@ {threads} -b -f 12 -F 256 {params.bowtie2bam} > {params.bowtie2bamUnmapped}
+
+                samtools sort -@ {threads} -n {params.bowtie2bamUnmapped} -o {params.bowtie2bamUnmappedSorted}
+                samtools fastq -@ {threads} {params.bowtie2bamUnmappedSorted} \
+                -1 {output.R1_dehost} \
+                -2 {output.R2_dehost} \
+                -0 /dev/null -s /dev/null -n
+
+                # summarize the filter: read-pair counts straight from the BAMs
+                # already produced above, rather than re-decompressing fastqs
+                total_pairs=$(( $(samtools view -c -@ {threads} {params.bowtie2bam}) / 2 ))
+                retained_pairs=$(( $(samtools view -c -@ {threads} {params.bowtie2bamUnmappedSorted}) / 2 ))
+                removed_pairs=$(( total_pairs - retained_pairs ))
+                pct_removed=$(awk -v r="$removed_pairs" -v t="$total_pairs" 'BEGIN{{ printf "%.4f", (t>0)? r/t*100 : 0 }}')
+                pct_retained=$(awk -v r="$retained_pairs" -v t="$total_pairs" 'BEGIN{{ printf "%.4f", (t>0)? r/t*100 : 0 }}')
+                {{
+                    echo "metamorph dehosting summary"
+                    echo "============================"
+                    echo "Sample:                  {params.sid}"
+                    echo "Filter stage:            user-injected host/contaminant genome(s) (--host-genome)"
+                    echo "Injected genome FASTA(s): {params.injected_genomes}"
+                    echo "Combined index:          {params.injected_host_idx_prefix}"
+                    echo "Program:                 bowtie2 + samtools"
+                    echo "Retention criterion:     read pair kept only if BOTH mates are unmapped to this combined reference (samtools view -f 12 -F 256)"
+                    echo "Input to this stage:     output of the default hg38 screen (bowtie2_dehost); see {params.sid}_hg38_dehost_summary.txt"
+                    echo ""
+                    echo "Input read pairs:        ${{total_pairs}}"
+                    echo "Removed (mapped):        ${{removed_pairs}} (${{pct_removed}}%)"
+                    echo "Retained (unmapped):     ${{retained_pairs}} (${{pct_retained}}%)"
+                }} > {output.dehost_summary}
+            """
+
 
 rule dna_centrifuger:
     """
@@ -247,6 +411,98 @@ rule dna_centrifuger:
             -c {output.classification} \\
             --output-format 1 \\
         > {output.metaphlan_quant}
+        """
+
+rule dna_sample_qc_summary:
+    """
+    Joins measurements already produced by the read-qc, dehosting, and
+    classification rules above into one QC/provenance row per sample:
+    raw/trimmed read counts and FastQC module statuses, dehosting pair
+    counts and host-alignment rate, and Centrifuger's classified fraction
+    and domain-level breakdown -- plus reconciliation flags for the ways
+    this join could silently be wrong (R1/R2 desync, a count that rose
+    instead of fell between stages, the classifier's actual input not
+    matching what dehosting reported producing, a missing/empty file,
+    unusually high host content, or unusually low overall retention).
+    See workflow/scripts/sample_qc_summary.py for the actual logic; this
+    rule only locates the right files and counts the two numbers that
+    script deliberately doesn't trust from any single upstream file
+    (the dehosted FASTQs' own R1/R2 pair counts).
+    """
+    input:
+        fastqc_pretrim_r1              = join(top_readqc_dir, "{name}", "{name}_R1_pretrim_report.html"),
+        fastqc_pretrim_r2               = join(top_readqc_dir, "{name}", "{name}_R2_pretrim_report.html"),
+        fastqc_posttrim_r1              = join(top_readqc_dir, "{name}", "{name}_R1_postrim_report.html"),
+        fastqc_posttrim_r2               = join(top_readqc_dir, "{name}", "{name}_R2_postrim_report.html"),
+        hg38_dehost_summary             = join(top_trim_dir, "{name}", "{name}_hg38_dehost_summary.txt"),
+        injected_host_dehost_summary    = (join(top_trim_dir, "{name}", "{name}_injected_host_dehost_summary.txt") if host_genome_paths else []),
+        R1_dehost                       = join(top_trim_dir, "{name}", "{name}_R1_dehost.fastq.gz"),
+        R2_dehost                       = join(top_trim_dir, "{name}", "{name}_R2_dehost.fastq.gz"),
+        classification                  = join(top_centrifuger_dir, "{name}_centrifuger_classification.tsv"),
+        centrifuger_quant               = join(top_centrifuger_dir, "{name}_centrifuger_quantification_report.tsv"),
+    output:
+        qc_summary                      = join(top_qc_summary_dir, "{name}_qc_summary.tsv"),
+    params:
+        rname                           = "dna_sample_qc_summary",
+        sid                             = "{name}",
+        workflow_mode                   = config["options"]["workflow"],
+        pipeline_version                = config["project"]["version"],
+        pipeline_git_commit             = config["project"]["git_commit_hash"],
+        max_host_pct                    = qc_max_host_pct,
+        min_overall_retained_pct        = qc_min_overall_retained_pct,
+        injected_summary_arg            = lambda wc: (
+            "--injected-host-dehost-summary " + join(top_trim_dir, wc.name, wc.name + "_injected_host_dehost_summary.txt")
+            if host_genome_paths else ""
+        ),
+    containerized: metawrap_container,
+    threads: int(cluster["dna_sample_qc_summary"].get("threads", default_threads)),
+    shell:
+        """
+        r1_dehost_count=$(( $(zcat {input.R1_dehost} | wc -l) / 4 ))
+        r2_dehost_count=$(( $(zcat {input.R2_dehost} | wc -l) / 4 ))
+
+        python3 workflow/scripts/sample_qc_summary.py \\
+            --sample-id {params.sid} \\
+            --library-type DNA \\
+            --workflow {params.workflow_mode} \\
+            --pipeline-version {params.pipeline_version} \\
+            --pipeline-git-commit {params.pipeline_git_commit} \\
+            --fastqc-pretrim-r1 {input.fastqc_pretrim_r1} \\
+            --fastqc-pretrim-r2 {input.fastqc_pretrim_r2} \\
+            --fastqc-posttrim-r1 {input.fastqc_posttrim_r1} \\
+            --fastqc-posttrim-r2 {input.fastqc_posttrim_r2} \\
+            --hg38-dehost-summary {input.hg38_dehost_summary} \\
+            {params.injected_summary_arg} \\
+            --classification-tsv {input.classification} \\
+            --quant-report {input.centrifuger_quant} \\
+            --dehosted-r1-count ${{r1_dehost_count}} \\
+            --dehosted-r2-count ${{r2_dehost_count}} \\
+            --max-host-pct {params.max_host_pct} \\
+            --min-overall-retained-pct {params.min_overall_retained_pct} \\
+            --output {output.qc_summary}
+        """
+
+rule dna_qc_summary_merge:
+    """
+    Concatenates every sample's dna_sample_qc_summary row into one
+    cohort-level TSV with a single header -- the per-sample files stay
+    around too (same pattern as the per-sample vs. merged bugs-list
+    tables elsewhere in this workflow), this just adds the one-file view.
+    """
+    input:
+        expand(join(top_qc_summary_dir, "{name}_qc_summary.tsv"), name=samples),
+    output:
+        qc_summary_merged                = join(workpath, config['project']['id'], "qc_summary.tsv"),
+    params:
+        rname                            = "dna_qc_summary_merge",
+    containerized: metawrap_container,
+    threads: int(cluster["dna_qc_summary_merge"].get("threads", default_threads)),
+    shell:
+        """
+        head -n 1 {input[0]} > {output.qc_summary_merged}
+        for f in {input}; do
+            tail -n +2 "$f" >> {output.qc_summary_merged}
+        done
         """
 
 rule dna_humann_classify:
@@ -554,8 +810,8 @@ rule metawrap_binning:
         bin_mem                     = mem2int(cluster['metawrap_binning'].get("mem", default_memory)),
         mw_trim_linker_R1           = join(top_trim_dir, "{name}", "{name}_1.fastq"),
         mw_trim_linker_R2           = join(top_trim_dir, "{name}", "{name}_2.fastq"),
-        tmp_bin_dir                 = join(config['options']['tmp_dir'], 'bin'),
-        tmp_binref_dir              = join(config['options']['tmp_dir'], 'bin_rf'),
+        tmp_bin_dir                 = join(config['options']['tmp_dir'], 'bin', "{name}"),
+        tmp_binref_dir              = join(config['options']['tmp_dir'], 'bin_rf', "{name}"),
         min_perc_complete           = "50",
         max_perc_contam             = "5",
     singularity: metawrap_container,
@@ -772,11 +1028,30 @@ rule derep_bins:
         second_cluster_algo         = "fastANI"
     shell:
         """
-        # tmp directory creation and destruction
-        if [ ! -d "{params.tmpdir}" ]; then mkdir -p "{params.tmpdir}"; fi
-        tmp=$(mktemp -d -p "{params.tmpdir}")
-        export TMPDIR=${{tmp}}
-        trap 'rm -rf "${{tmp}}"' EXIT
+        # dRep's CheckM calls (prodigal + hmmfetch marker-gene extraction, run with
+        # {threads} parallel workers across every bin) do a lot of small-file I/O.
+        # Point dRep's actual working/output directory at node-local lscratch (this
+        # rule reserves it via cluster.json's gres) instead of the shared network
+        # --tmp-dir: it's faster, and it stops that many-small-files churn from
+        # contending with every other job on the shared filesystem. Falls back to
+        # the configured --tmp-dir when not running under Slurm (e.g. local testing).
+        if [ -n "${{SLURM_JOB_ID:-}}" ] && [ -d "/lscratch/${{SLURM_JOB_ID}}" ]; then
+            DREP_WORKROOT="/lscratch/${{SLURM_JOB_ID}}"
+        else
+            DREP_WORKROOT="{params.tmpdir}"
+        fi
+        if [ ! -d "$DREP_WORKROOT" ]; then mkdir -p "$DREP_WORKROOT"; fi
+        tmp=$(mktemp -d -p "$DREP_WORKROOT")
+        drep_work=$(mktemp -d -p "$DREP_WORKROOT")
+        # dRep's CheckM calls use Python's multiprocessing.Manager(), which binds a
+        # Unix domain socket under $TMPDIR; AF_UNIX socket paths have a hard ~108-byte
+        # kernel limit. $DREP_WORKROOT can be arbitrarily long, so point TMPDIR at a
+        # short-named symlink (under the system tmp directory, not $DREP_WORKROOT)
+        # that resolves to the real tmp dir instead of using the long path directly.
+        short_tmp=$(mktemp -u -t drep_ckm.XXXXXX)
+        ln -s "${{tmp}}" "${{short_tmp}}"
+        export TMPDIR=${{short_tmp}}
+        trap 'rm -rf "${{tmp}}" "${{drep_work}}"; rm -f "${{short_tmp}}"' EXIT
 
         # activate conda environment, initialize checkm, check deps
         . /opt/conda/etc/profile.d/conda.sh && conda activate checkm
@@ -787,12 +1062,16 @@ rule derep_bins:
         # run drep
         DREP_BINS=$(ls {params.bindir}/*/{params.metawrap_dir_name}/*.fa | tr '\\n' ' ')
         NUM_BINS=$(ls 2>/dev/null -Ubad1 -- {params.bindir}/*/{params.metawrap_dir_name}/*.fa | wc -l)
-        NUM_CHUNK=$(( $NUM_BINS/3 ))
+        # ceiling division so --primary_chunksize is never 0 (dRep raises
+        # "ValueError: range() arg 3 must not be zero" on a 0 chunksize,
+        # which floor division produces whenever there are fewer than 3 bins)
+        NUM_CHUNK=$(( (NUM_BINS + 2) / 3 ))
         NUM_CHUNK=$(echo $NUM_CHUNK | awk '{{print int($1+0.5)}}')
         mkdir -p {params.outto}
 
         echo "drep bins: ${{DREP_BINS}}"
         echo "num bins: ${{NUM_BINS}}"
+        echo "dRep scratch work dir: ${{drep_work}}"
 
         # threshold informed by NIDDK-5: /data/NIDDK_IDSS/projects/NIDDK-5_metamorph/genomeInfo.csv
         if [[ ${{NUM_BINS}} -ge 2000 ]]; then
@@ -811,9 +1090,16 @@ rule derep_bins:
                 --multiround_primary_clustering \\
                 --primary_chunksize $NUM_CHUNK \\
                 --run_tertiary_clustering \\
-                {params.outto}
+                ${{drep_work}}
         else
-            echo "\033[0;36mSMALL bin set detected, **NOT** using flags '--multiround_primary_clustering' and '--genomeInfo'\033[0m"
+            echo "\033[0;36mSMALL bin set detected, **NOT** using flags '--multiround_primary_clustering', '--genomeInfo', or '--run_tertiary_clustering'\033[0m"
+            # --run_tertiary_clustering re-clusters dRep's winning/representative
+            # genomes as an extra consistency check. With a small, closely-related
+            # bin set it's common for every genome to collapse into a single
+            # winning representative, which leaves tertiary clustering with an
+            # empty distance matrix and crashes dRep ("ValueError: The number of
+            # observations cannot be determined on an empty distance matrix").
+            # Skip it here; it's only meaningful with enough winners to compare.
             dRep dereplicate -d \\
                 -g ${{DREP_BINS}} \\
                 -p {threads} \\
@@ -825,9 +1111,20 @@ rule derep_bins:
                 --S_algorithm {params.second_cluster_algo} \\
                 -comp {params.completeness} \\
                 --primary_chunksize $NUM_CHUNK \\
-                --run_tertiary_clustering \\
-                {params.outto}
-                touch {params.outto}/dRep.SMALL_BINSET_WARNING
+                ${{drep_work}}
+                touch ${{drep_work}}/dRep.SMALL_BINSET_WARNING
+        fi
+
+        # Only the four items downstream rules actually read ever leave lscratch;
+        # dRep's heavy intermediate churn (data/checkM, data/prodigal, etc.) is left
+        # behind on node-local scratch and cleaned up by the trap above.
+        mkdir -p {params.outto}/data_tables {params.outto}/figures {params.outto}/log
+        cp -r ${{drep_work}}/data_tables/. {params.outto}/data_tables/
+        cp -r ${{drep_work}}/figures/. {params.outto}/figures/
+        cp -r ${{drep_work}}/log/. {params.outto}/log/
+        cp -r ${{drep_work}}/dereplicated_genomes {params.outto}/dereplicated_genomes
+        if [ -f ${{drep_work}}/dRep.SMALL_BINSET_WARNING ]; then
+            cp ${{drep_work}}/dRep.SMALL_BINSET_WARNING {params.outto}/dRep.SMALL_BINSET_WARNING
         fi
         """
 
@@ -937,7 +1234,16 @@ rule gtdbtk_classify:
         # tmp dir
         if [ ! -d "{params.tmp_safe_dir}" ]; then mkdir -p "{params.tmp_safe_dir}"; fi
         tmp=$(mktemp -d -p "{params.tmp_safe_dir}")
-        trap 'rm -rf "{params.tmp_safe_dir}"' EXIT
+        # GTDB-Tk parallelizes Prodigal with Python's multiprocessing.Manager(),
+        # which binds a Unix domain socket under --tmpdir; AF_UNIX socket paths
+        # have a hard ~108-byte kernel limit. {params.tmp_safe_dir} can be
+        # arbitrarily long (e.g. a site-configured --tmp-dir), so point
+        # --tmpdir at a short-named symlink (under the system tmp directory)
+        # that resolves to the real tmp dir instead of using the long path
+        # directly. Files still land under {params.tmp_safe_dir}.
+        short_tmp=$(mktemp -u -t gtdbtk.XXXXXX)
+        ln -s "${{tmp}}" "${{short_tmp}}"
+        trap 'rm -rf "{params.tmp_safe_dir}"; rm -f "${{short_tmp}}"' EXIT
 
         # activate conda env & db path
         . /opt/conda/etc/profile.d/conda.sh && conda activate checkm
@@ -948,7 +1254,7 @@ rule gtdbtk_classify:
             --genome_dir {input.dRep_dir} \
             --out_dir {output.gtdbtk_dir} \
             --cpus {threads} \
-            --tmpdir {params.tmp_safe_dir} \
+            --tmpdir ${{short_tmp}} \
             --skip_ani_screen \
             --full_tree \
             --force \
@@ -974,7 +1280,16 @@ rule gunc_detection:
         # tmp dir
         if [ ! -d "{params.tmp_safe_dir}" ]; then mkdir -p "{params.tmp_safe_dir}"; fi
         tmp=$(mktemp -d -p "{params.tmp_safe_dir}")
-        trap 'rm -rf "{params.tmp_safe_dir}"' EXIT
+        # gunc parallelizes with Python's multiprocessing.Manager(), which binds a
+        # Unix domain socket under --temp_dir; AF_UNIX socket paths have a hard
+        # ~108-byte kernel limit. {params.tmp_safe_dir} can be arbitrarily long
+        # (e.g. a site-configured --tmp-dir), so point --temp_dir at a
+        # short-named symlink (under the system tmp directory) that resolves to
+        # the real tmp dir instead of using the long path directly. Files still
+        # land under {params.tmp_safe_dir}.
+        short_tmp=$(mktemp -u -t gunc.XXXXXX)
+        ln -s "${{tmp}}" "${{short_tmp}}"
+        trap 'rm -rf "{params.tmp_safe_dir}"; rm -f "${{short_tmp}}"' EXIT
         # activate conda env
         . /opt/conda/etc/profile.d/conda.sh && conda activate checkm
         # run gunc
@@ -982,7 +1297,7 @@ rule gunc_detection:
         gunc run \
             --input_dir {input.drep_genomes} \
             --threads {threads} \
-            --temp_dir {params.tmp_safe_dir} \
+            --temp_dir ${{short_tmp}} \
             --out_dir {output.GUNC_detect_out} \
             --sensitive \
             --detailed_output \
