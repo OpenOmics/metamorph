@@ -1,0 +1,9 @@
+{
+    "delete": [
+        {"pattern": "metagenome_results/metawrap_bin_refine/contig_annotation/out.BAT.concatenated.alignment.diamond"}
+    ],
+    "compress": [
+    ],
+    "compress_indexed": [
+    ]
+}

@@ -97,7 +97,11 @@ markdown_extensions:
 # Page Tree
 nav:
   - About: index.md
-  - Commands: 
+  - Manual:
+    - Introduction: manual/introduction.md
+    - "Vignette: ZymoBIOMICS Standard": manual/zymo-vignette.md
+  - Walkthrough: walkthrough.md
+  - Commands:
     - metamorph run: usage/run.md
     - metamorph unlock: usage/unlock.md
     - metamorph install: usage/install.md

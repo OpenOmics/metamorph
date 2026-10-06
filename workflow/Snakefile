@@ -19,7 +19,7 @@ analysis_mode              = config["options"]["analysis_mode"]
 
 # DNA directories
 top_assembly_dir           = join(workpath, config['project']['id'], "metawrap_assembly")
-top_readqc_dir             = join(workpath, config['project']['id'], "metawrap_read_qc")
+top_readqc_dir             = join(workpath, config['project']['id'], "metawrap_read_qc_skipBmtagger")
 top_trim_dir               = join(workpath, config['project']['id'], "trimmed_reads")
 top_refine_dir             = join(workpath, config['project']['id'], "metawrap_bin_refine")
 top_tax_dir                = join(workpath, config['project']['id'], "metawrap_kmer")
@@ -27,6 +27,7 @@ top_binning_dir            = join(workpath, config['project']['id'], "metawrap_b
 top_mags_dir               = join(workpath, config['project']['id'], "mags")
 top_mapping_dir            = join(workpath, config['project']['id'], "humann3_dna")
 top_centrifuger_dir        = join(workpath, config['project']['id'], "centrifuger_dna")
+top_qc_summary_dir         = join(workpath, config['project']['id'], "qc_summary")
 
 # RNA directories
 top_readqc_dir_rna         = join(workpath, config['project']['id'], "metawrap_read_qc_RNA")
@@ -48,8 +49,16 @@ if rna_included:
 else:
     start_r1_rna, start_r2_rna = [], []
 
-rule all:
-    input:
+# Sentinel touched by the terminal cleanup_cruft rule (workflow/rules/cleanup.smk).
+# Depending on this (in addition to all_targets) is what lets `rule all`
+# wait for cleanup to finish without cleanup_cruft needing its own copy
+# of the full target list.
+cruft_sentinel = join(workpath, config['project']['id'], ".cruft_removed")
+
+# The complete list of files/directories the pipeline produces. Also used
+# as-is by cleanup_cruft's `input:` so that rule is guaranteed to run only
+# after every other rule has already produced its output.
+all_targets = [
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
         # DNA preprocessing endpoints #
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -66,6 +75,8 @@ rule all:
         expand(join(top_centrifuger_dir, "{name}_centrifuger_classification.tsv"), name=samples),
         expand(join(top_centrifuger_dir, "{name}_centrifuger_quantification_report.tsv"), name=samples),
         expand(join(top_centrifuger_dir, "{name}_centrifuger_quantification_report_mpl.tsv"), name=samples),
+        expand(join(top_qc_summary_dir, "{name}_qc_summary.tsv"), name=samples),
+        join(workpath, config['project']['id'], "qc_summary.tsv"),
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
         # DNA read-based mode endpoints #
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -136,8 +147,6 @@ rule all:
             expand(join(top_readqc_dir_rna, "{name}", "{name}_R2_pretrim_report.html"), name=rna_sample_stems),
             expand(join(top_readqc_dir_rna, "{name}", "{name}_R1_postrim_report.html"), name=rna_sample_stems),
             expand(join(top_readqc_dir_rna, "{name}", "{name}_R2_postrim_report.html"), name=rna_sample_stems),
-            expand(join(top_trim_dir_rna, "{name}", "{name}_R1_trimmed.fastq"), name=rna_sample_stems),
-            expand(join(top_trim_dir_rna, "{name}", "{name}_R2_trimmed.fastq"), name=rna_sample_stems),
             expand(join(top_trim_dir_rna, "{name}", "{name}_R1_trimmed.fastq.gz"), name=rna_sample_stems),
             expand(join(top_trim_dir_rna, "{name}", "{name}_R2_trimmed.fastq.gz"), name=rna_sample_stems),
             expand(join(top_trim_dir_rna, "{name}", "{name}_R1_dehost.fastq.gz"), name=rna_sample_stems),
@@ -167,8 +176,15 @@ rule all:
             expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.rpkm"), rname=rna_sample_stems),
             expand(join(top_map_dir_rna, "{rname}", "{rname}.RNA.refstats"), rname=rna_sample_stems)
         ], condition = (analysis_mode in ("read-based", "combined")) and rna_included)
+]
+
+rule all:
+    input:
+        all_targets,
+        cruft_sentinel
 
 
 include: join("rules", "DNA.smk")
 include: join("rules", "RNA.smk")
+include: join("rules", "cleanup.smk")
 include: join("rules", "hooks.smk")
