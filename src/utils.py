@@ -424,13 +424,14 @@ def valid_input(sheet):
             if col not in row or row[col] in ('', None, 'None'):
                 continue
             path = row[col]
-            if path in seen:
+            resolved_path = os.path.realpath(path)
+            if resolved_path in seen:
                 raise ArgumentTypeError(
-                    f"Sample sheet path `{path}` is used more than once: "
-                    f"as {seen[path]} and again as {col} in sheet row {i + 1}. "
+                    f"Sample sheet path `{path}` resolves to a file used more than once: "
+                    f"as {seen[resolved_path]} and again as {col} in sheet row {i + 1}. "
                     f"Each file in the sample sheet must be unique."
                 )
-            seen[path] = f"{col} in sheet row {i + 1}"
+            seen[resolved_path] = f"{col} in sheet row {i + 1}"
 
     # Structural pairing checks: every sample must resolve to exactly
     # one R1 and one R2 file, and no two different input files may
