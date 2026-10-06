@@ -111,7 +111,7 @@ Each of the following arguments is optional, and do not need to be provided.
 >
 > Available workflows:
 >
-> - `pre-screen`: perform quality control, host-read removal, and run Centrifuge on dehosted reads.
+> - `pre-screen`: perform quality control, host-read removal, and run Centrifuger on dehosted reads.
 > - `read-based`: perform functional and taxonomic profiling on dehosted reads using HUMAnN3 and MetaPhlAn4. This stage follows pre-screening.
 > - `assembly-based`: perform the assembly and binning workflow on dehosted reads. This stage also follows pre-screening.
 > - `combined`: perform all steps included in the preceding modes.
