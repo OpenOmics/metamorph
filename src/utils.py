@@ -532,7 +532,7 @@ def valid_host_genome(genome_given):
     path so downstream bind-path/Snakemake logic never has to re-resolve it.
     """
     from argparse import ArgumentTypeError
-    resolved = os.path.abspath(os.path.expanduser(genome_given))
+    resolved = os.path.realpath(os.path.abspath(os.path.expanduser(genome_given)))
     if not exists(resolved):
         raise ArgumentTypeError(f'--host-genome file does not exist: {genome_given}')
     if not os.path.isfile(resolved):
