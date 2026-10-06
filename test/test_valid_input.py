@@ -244,8 +244,14 @@ class TestPairingChecks(ValidInputTestCase):
 
     def test_r1_and_r2_resolving_to_same_file_raises(self):
         # Different path strings that point at the same file on disk
-        # (e.g. one path is a symlink to the other) must be rejected
-        # even though the plain string-uniqueness check would miss it.
+        # (e.g. one path is a symlink to the other) must be rejected.
+        # This is actually caught by the earlier, realpath-aware
+        # "every file in the sheet must be unique" check (src/utils.py,
+        # the `seen` dict), not the dedicated R1-vs-R2 realpath comparison
+        # further down -- that later check runs in a second pass and can
+        # never fire for this scenario, since the first pass already
+        # raises as soon as it sees the second row's resolved path repeat.
+        # Asserting on the message the code actually produces first.
         real_file = self.files['dna_s1_R1']
         alias_dir = os.path.join(self.tmpdir.name, 'alias')
         os.makedirs(alias_dir, exist_ok=True)
@@ -257,7 +263,7 @@ class TestPairingChecks(ValidInputTestCase):
         ])
         with self.assertRaises(ArgumentTypeError) as ctx:
             valid_input(sheet)
-        self.assertIn('resolve to the same file', str(ctx.exception))
+        self.assertIn('resolves to a file used more than once', str(ctx.exception))
 
 
 class TestStagedSymlinkNameCollisions(ValidInputTestCase):

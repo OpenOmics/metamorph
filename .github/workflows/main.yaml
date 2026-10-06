@@ -7,9 +7,27 @@ on:
       - master
       - main
   pull_request:
-    branches_ignore: []
+    branches-ignore: []
 
 jobs:
+  Unit_Tests:
+    # Pure-Python unit tests (test/, run via run_tests.sh) -- no snakemake
+    # or singularity involved, just the stdlib `unittest` runner over
+    # src/utils.py and friends. Runs on the bare runner rather than the
+    # snakemake Docker image the dry-run jobs below use, since none of
+    # that is needed here and it's faster without it. Wired up now so
+    # that as the suite grows (more test_*.py files under test/), those
+    # new tests are already being exercised on every push/PR with no
+    # further CI changes required.
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    - name: Run unit test suite
+      run: ./run_tests.sh
+
   # Covers every valid --workflow / sample-sheet / optional-flag combination
   # the CLI can actually reach, as one matrix instead of one job per
   # combination. Invalid or redundant combinations (e.g. --assembler with a
