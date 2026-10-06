@@ -1,0 +1,9 @@
+{
+  "ERR16012159": {"trimmed": 16447249, "post_hg38": 16424718, "post_fungal": 16131390},
+  "ERR16012160": {"trimmed": 19605331, "post_hg38": 19584649, "post_fungal": 19251912},
+  "ERR16012161": {"trimmed": 16345865, "post_hg38": 16320343, "post_fungal": 16010994},
+  "ERR16012162": {"trimmed": 18698209, "post_hg38": 18665922, "post_fungal": 18306379},
+  "ERR16012163": {"trimmed": 16490236, "post_hg38": 16468228, "post_fungal": 16151329},
+  "ERR16012164": {"trimmed": 17918574, "post_hg38": 17898402, "post_fungal": 17619052},
+  "ERR16012165": {"trimmed": 14218864, "post_hg38": 14200569, "post_fungal": 13951541}
+}
