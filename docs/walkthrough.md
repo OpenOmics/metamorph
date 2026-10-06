@@ -201,7 +201,7 @@ Each of the shared upstream steps (`metawrap_read_qc_skipBmtagger`, `bowtie2_deh
 Regardless of mode, `--output` is a self-contained Snakemake working directory. After a run you'll find:
 
 - `config.json` — the fully-resolved configuration generated from your sample sheet and CLI flags. Worth reading if a run behaves unexpectedly.
-- `metagenome_results/metawrap_read_qc/<sample>/` — pre/post-trim FastQC reports.
+- `metagenome_results/metawrap_read_qc_skipBmtagger/<sample>/` — pre/post-trim FastQC reports.
 - `metagenome_results/trimmed_reads/<sample>/` — trimmed and dehosted FASTQ.
 - `metagenome_results/centrifuger_dna/` — taxonomic classification/quantification tables.
 - `metagenome_results/humann3_dna/` (`read-based`/`combined` only) — gene family, pathway abundance/coverage, and diversity tables.
