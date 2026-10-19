@@ -364,8 +364,26 @@ def bind(sub_args, config):
         if os.path.exists(config['options']['output']) and os.path.isdir(config['options']['output']):
             bindpaths.append(os.path.abspath(config['options']['output']))
 
+    if 'options' in config and config['options'].get('host_genome'):
+        hostrents = list(set([os.path.abspath(os.path.dirname(p)) for p in config['options']['host_genome'] if os.path.exists(os.path.dirname(p)) and os.path.isdir(os.path.dirname(p))]))
+        common_parent = longest_common_parent_path(hostrents)
+        if common_parent:
+            bindpaths.extend([common_parent])
+        else:
+            bindpaths.extend(hostrents)
+
     if 'tmp_dir' in config:
         bindpaths.append(config['tmp_dir'])
+
+    if os.path.isdir('/lscratch'):
+        # Make Slurm's per-job node-local scratch (reserved via cluster.json's
+        # gres: lscratch:<N> for rules that need fast, non-shared scratch space)
+        # visible inside the container. Without this bind, a rule's shell code
+        # checking for /lscratch/$SLURM_JOB_ID runs inside the container's
+        # isolated filesystem view (singularity is invoked with --contain) and
+        # never finds it even though Slurm created it on the host, silently
+        # falling back to whatever shared --tmp-dir was configured instead.
+        bindpaths.append('/lscratch')
 
     # rawdata_bind_paths = [os.path.abspath(p) for p in config['project']['datapath'].split(',')]
     # working_directory =  os.path.realpath(config['project']['workpath'])

@@ -1,0 +1,52 @@
+{
+  "Theoretical": {
+    "Pseudomonas aeruginosa": 3.931,
+    "Escherichia coli": 10.063,
+    "Salmonella enterica": 10.22,
+    "Lactobacillus fermentum": 18.553,
+    "Enterococcus faecalis": 9.906,
+    "Staphylococcus aureus": 15.723,
+    "Listeria monocytogenes": 14.151,
+    "Bacillus subtilis": 17.453
+  },
+  "ZymoBIOMICS DNA Miniprep": {
+    "Pseudomonas aeruginosa": 4.245,
+    "Escherichia coli": 9.277,
+    "Salmonella enterica": 9.748,
+    "Lactobacillus fermentum": 16.195,
+    "Enterococcus faecalis": 9.591,
+    "Staphylococcus aureus": 16.352,
+    "Listeria monocytogenes": 15.566,
+    "Bacillus subtilis": 19.025
+  },
+  "HMP Protocol": {
+    "Pseudomonas aeruginosa": 16.195,
+    "Escherichia coli": 22.956,
+    "Salmonella enterica": 26.415,
+    "Lactobacillus fermentum": 22.17,
+    "Enterococcus faecalis": 2.83,
+    "Staphylococcus aureus": 1.258,
+    "Listeria monocytogenes": 2.358,
+    "Bacillus subtilis": 5.818
+  },
+  "Supplier M": {
+    "Pseudomonas aeruginosa": 14.151,
+    "Escherichia coli": 18.553,
+    "Salmonella enterica": 23.27,
+    "Lactobacillus fermentum": 19.811,
+    "Enterococcus faecalis": 4.403,
+    "Staphylococcus aureus": 2.201,
+    "Listeria monocytogenes": 4.403,
+    "Bacillus subtilis": 13.208
+  },
+  "Supplier Q": {
+    "Pseudomonas aeruginosa": 15.881,
+    "Escherichia coli": 25.943,
+    "Salmonella enterica": 30.818,
+    "Lactobacillus fermentum": 21.698,
+    "Enterococcus faecalis": 1.73,
+    "Staphylococcus aureus": 0.314,
+    "Listeria monocytogenes": 1.415,
+    "Bacillus subtilis": 2.201
+  }
+}

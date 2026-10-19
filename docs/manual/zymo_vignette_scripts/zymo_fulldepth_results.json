@@ -1,0 +1,80 @@
+{
+  "vendor_renorm": {
+    "Pseudomonas aeruginosa": 6.167846309403437,
+    "Escherichia coli": 8.594539939332659,
+    "Salmonella enterica": 8.796764408493427,
+    "Lactobacillus fermentum": 21.840242669362993,
+    "Enterococcus faecalis": 14.762386248736096,
+    "Staphylococcus aureus": 15.3690596562184,
+    "Listeria monocytogenes": 14.054600606673407,
+    "Bacillus subtilis": 10.414560161779574
+  },
+  "read_based": {
+    "Pseudomonas aeruginosa": {
+      "mean": 7.2949033488236195,
+      "sd": 0.44334060913507517
+    },
+    "Escherichia coli": {
+      "mean": 2.3884492644363875,
+      "sd": 0.09854843044431646
+    },
+    "Salmonella enterica": {
+      "mean": 7.366529872558509,
+      "sd": 0.21552349679711683
+    },
+    "Lactobacillus fermentum": {
+      "mean": 46.12252255642558,
+      "sd": 2.4652024633258236
+    },
+    "Enterococcus faecalis": {
+      "mean": 4.77183687524755,
+      "sd": 0.2930874915340278
+    },
+    "Staphylococcus aureus": {
+      "mean": 2.8464001202557436,
+      "sd": 0.5110356047744349
+    },
+    "Listeria monocytogenes": {
+      "mean": 15.607895699597458,
+      "sd": 1.6074474362072408
+    },
+    "Bacillus subtilis": {
+      "mean": 13.601462262655149,
+      "sd": 0.7392210556986422
+    }
+  },
+  "assembly_based": {
+    "Pseudomonas aeruginosa": {
+      "mean": 15.313702453438593,
+      "sd": 0.9731205969640637
+    },
+    "Escherichia coli": {
+      "mean": 13.502410813190169,
+      "sd": 0.269212209211547
+    },
+    "Salmonella enterica": {
+      "mean": 14.72542665295198,
+      "sd": 0.43337803933016933
+    },
+    "Lactobacillus fermentum": {
+      "mean": 19.31174896748157,
+      "sd": 1.0821668721769158
+    },
+    "Enterococcus faecalis": {
+      "mean": 7.182222208635912,
+      "sd": 0.40539444166516014
+    },
+    "Staphylococcus aureus": {
+      "mean": 2.835514271574494,
+      "sd": 0.5028128398122698
+    },
+    "Listeria monocytogenes": {
+      "mean": 13.871571929720956,
+      "sd": 1.3244294322005659
+    },
+    "Bacillus subtilis": {
+      "mean": 13.25740270300633,
+      "sd": 0.6026659898173728
+    }
+  }
+}
