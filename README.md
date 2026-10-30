@@ -29,6 +29,9 @@ Before getting started, we highly recommend reading through the [usage](https://
 
 For more information about issues or trouble-shooting a problem, please checkout our [FAQ](https://openomics.github.io/metamorph/faq/questions/) prior to [opening an issue on Github](https://github.com/OpenOmics/metamorph/issues).
 
+## Vignette
+Curious what metamorph's output looks like on real data? The [ZymoBIOMICS Standard vignette](https://openomics.github.io/metamorph/manual/zymo-vignette/) runs a full `--workflow combined` invocation against public sequencing data from a commercial mock community with a known, vendor-defined composition, then checks metamorph's read-based and assembly-based composition estimates — plus a third, independent cross-check against the standard's own reference genomes — against that ground truth. Real numbers, real figures, and the caveats that go with them, start to finish.
+
 ## Dependencies
 **Requires:** `singularity>=3.5`  `snakemake>=6.0`
 

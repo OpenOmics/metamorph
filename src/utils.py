@@ -406,7 +406,8 @@ def valid_input(sheet):
 
     data = [row for row in rdr]
     RNA_included = False
-    for row in data:
+    seen = {}
+    for i, row in enumerate(data):
         row['DNA'] = os.path.abspath(row['DNA'])
         if not os.path.exists(row['DNA']):
             raise ArgumentTypeError(f"Sample sheet path `{row['DNA']}` does not exist")
@@ -415,7 +416,103 @@ def valid_input(sheet):
             row['RNA'] = os.path.abspath(row['RNA'])
             if not os.path.exists(row['RNA']):
                 raise ArgumentTypeError(f"Sample sheet path `{row['RNA']}` does not exist")
-            
+
+        # every file in the sheet must be unique -- catches copy-paste
+        # mistakes like the same fastq reused as R1 for one sample and
+        # R2 for another (or DNA for one sample and RNA for another)
+        for col in ('DNA', 'RNA'):
+            if col not in row or row[col] in ('', None, 'None'):
+                continue
+            path = row[col]
+            resolved_path = os.path.realpath(path)
+            if resolved_path in seen:
+                raise ArgumentTypeError(
+                    f"Sample sheet path `{path}` resolves to a file used more than once: "
+                    f"as {seen[resolved_path]} and again as {col} in sheet row {i + 1}. "
+                    f"Each file in the sample sheet must be unique."
+                )
+            seen[resolved_path] = f"{col} in sheet row {i + 1}"
+
+    # Structural pairing checks: every sample must resolve to exactly
+    # one R1 and one R2 file, and no two different input files may
+    # collide on the same renamed symlink name once staged. metamorph
+    # stages inputs via src.run.sym_safe(), which calls src.run.rename()
+    # to rewrite each file's basename to <sample>_R[12].fastq.gz before
+    # symlinking it into <output>/dna or <output>/rna. Reuse that exact
+    # transform here (lazy import to avoid a circular import with
+    # src.run, which imports from this module) so sheet validation can
+    # never drift from actual staging behavior.
+    from .run import rename, FASTQ_R1_POSTFIX, FASTQ_R2_POSTFIX
+
+    for col in ('DNA', 'RNA'):
+        entries = [
+            (i, row[col]) for i, row in enumerate(data)
+            if col in row and row[col] not in ('', None, 'None')
+        ]
+        if not entries:
+            continue
+
+        staged = {}   # staged symlink name -> (row index, original path)
+        samples = {}  # sample id -> {'R1': [(row, path), ...], 'R2': [...]}
+        for i, path in entries:
+            try:
+                staged_name = rename(os.path.basename(path))
+            except NameError as e:
+                raise ArgumentTypeError(str(e))
+
+            if staged_name in staged:
+                other_row, other_path = staged[staged_name]
+                raise ArgumentTypeError(
+                    f"Sample sheet paths `{other_path}` ({col} row {other_row + 1}) "
+                    f"and `{path}` ({col} row {i + 1}) both stage to the same "
+                    f"renamed filename `{staged_name}` when symlinked into the "
+                    f"pipeline's {col.lower()} input directory. Each input file "
+                    f"must produce a unique staged filename."
+                )
+            staged[staged_name] = (i, path)
+
+            if staged_name.endswith(FASTQ_R1_POSTFIX):
+                mate, sample_id = 'R1', staged_name[:-len(FASTQ_R1_POSTFIX)]
+            elif staged_name.endswith(FASTQ_R2_POSTFIX):
+                mate, sample_id = 'R2', staged_name[:-len(FASTQ_R2_POSTFIX)]
+            else:
+                # Unreachable: rename() only ever returns names ending
+                # in FASTQ_R1_POSTFIX or FASTQ_R2_POSTFIX (or raises).
+                continue
+            samples.setdefault(sample_id, {'R1': [], 'R2': []})[mate].append((i, path))
+
+        # Skip pairing checks for columns that are entirely single-end
+        # (no R2 present at all), consistent with src.run.get_nends().
+        if not any(mates['R2'] for mates in samples.values()):
+            continue
+
+        for sample_id, mates in samples.items():
+            r1s, r2s = mates['R1'], mates['R2']
+
+            # Each mate list can only ever hold 0 or 1 entries here: two
+            # inputs sharing a sample id and mate would necessarily also
+            # share the exact same staged name, and that collision is
+            # already caught above before entries are ever grouped here.
+            if r1s and r2s:
+                r1_row, r1_path = r1s[0]
+                r2_row, r2_path = r2s[0]
+                if os.path.realpath(r1_path) == os.path.realpath(r2_path):
+                    raise ArgumentTypeError(
+                        f"Sample `{sample_id}` ({col}): R1 path `{r1_path}` "
+                        f"(row {r1_row + 1}) and R2 path `{r2_path}` "
+                        f"(row {r2_row + 1}) resolve to the same file on disk. "
+                        f"R1 and R2 must be different files."
+                    )
+                continue
+
+            missing_mate = 'R1' if not r1s else 'R2'
+            present_row, present_path = (r1s or r2s)[0]
+            raise ArgumentTypeError(
+                f"Sample `{sample_id}` ({col}) is missing its {missing_mate} file "
+                f"(only found `{present_path}`, row {present_row + 1}). Every "
+                f"paired-end sample must have exactly one R1 and one R2 file."
+            )
+
     return data, RNA_included
 
 
@@ -427,6 +524,21 @@ def valid_trigger(trigger_given):
     if invalid:
             raise ArgumentTypeError('Invalid trigger selected please only use one of: ' + ', '.join(snk_triggers))
     return trigger_given
+
+
+def valid_host_genome(genome_given):
+    """Validates a --host-genome value: must be an existing file (a FASTA,
+    optionally gzipped, of a genome to screen out during dehosting in
+    addition to the default host reference). Returns the resolved absolute
+    path so downstream bind-path/Snakemake logic never has to re-resolve it.
+    """
+    from argparse import ArgumentTypeError
+    resolved = os.path.realpath(os.path.abspath(os.path.expanduser(genome_given)))
+    if not exists(resolved):
+        raise ArgumentTypeError(f'--host-genome file does not exist: {genome_given}')
+    if not os.path.isfile(resolved):
+        raise ArgumentTypeError(f'--host-genome path is not a file: {genome_given}')
+    return resolved
 
 
 if __name__ == '__main__':

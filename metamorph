@@ -58,7 +58,7 @@ import argparse, sys, os, subprocess, json, textwrap
 from src import version 
 from src.run import init, setup, bind, dryrun, runner
 from src.utils import Colors, err, exists, fatal, check_cache, require, \
-                      permissions, valid_trigger, valid_input
+                      permissions, valid_trigger, valid_input, valid_host_genome
 
 
 # Pipeline Metadata
@@ -298,7 +298,8 @@ def parsed_arguments(name, description):
                 [--dry-run] [--job-name JOB_NAME] [--mode {{slurm,local}}] \\
                 [--sif-cache SIF_CACHE] [--singularity-cache SINGULARITY_CACHE] \\
                 [--silent] [--threads THREADS] [--megahit-only] [--deep-profile] \\
-                [--tmp-dir TMP_DIR] [--triggers TRIGGER [TRIGGER ...]] \\
+                [--tmp-dir TMP_DIR] [--host-genome HOST_GENOME [HOST_GENOME ...]] \\
+                [--triggers TRIGGER [TRIGGER ...]] \\
                 [--workflow {{pre-screen,read-based,assembly-based, combined}}] \\
                 --samplesheet [SHEETPATH] \\
                 --output OUTPUT
@@ -418,7 +419,19 @@ def parsed_arguments(name, description):
                                 variable into this string that should NOT be expanded, 
                                 please quote this options value in single quotes. 
                                   Example: --tmp-dir '/scratch/$USER/'
-          --threads THREADS     
+          --host-genome HOST_GENOME [HOST_GENOME ...]
+                                One or more additional host/contaminant genome
+                                FASTA files (optionally gzipped) to screen out
+                                during dehosting, on top of the default host
+                                reference. Each dehosting step keeps a read
+                                pair only if neither mate maps to the default
+                                host reference OR to any of these genomes.
+                                Useful for testing whether reads from a
+                                specific organism are being incorrectly
+                                removed as host, or for dehosting against a
+                                non-human host.
+                                  Example: --host-genome /data/$USER/fungal_contam.fa
+          --threads THREADS
                                 Max number of threads for local processes. It is
                                 recommended setting this vaule to the maximum number 
                                 of CPUs available on the host machine, default: 2.
@@ -650,9 +663,23 @@ def parsed_arguments(name, description):
     # temporary/intermediate files 
     subparser_run.add_argument(
         '--tmp-dir',
-        type = str,
+        type = lambda option: os.path.abspath(os.path.expanduser(option)),
         required = False,
         default = '/lscratch/$SLURM_JOB_ID/',
+        help = argparse.SUPPRESS
+    )
+
+    # One or more additional host/contaminant genomes (FASTA, optionally
+    # gzipped) to screen out during dehosting, on top of the default host
+    # reference. Lets a user test whether a specific organism's reads are
+    # being incorrectly removed as "host", or dehost against a non-human
+    # host entirely.
+    subparser_run.add_argument(
+        '--host-genome',
+        type = valid_host_genome,
+        nargs = '+',
+        required = False,
+        default = [],
         help = argparse.SUPPRESS
     )
 

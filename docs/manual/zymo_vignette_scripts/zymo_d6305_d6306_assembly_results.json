@@ -1,0 +1,97 @@
+{
+  "categories": [
+    "Bacillus subtilis",
+    "Enterococcus faecalis",
+    "Escherichia coli + Salmonella enterica (combined, not separable)",
+    "Lactobacillus fermentum",
+    "Listeria monocytogenes",
+    "Pseudomonas aeruginosa",
+    "Staphylococcus aureus"
+  ],
+  "combined_label": "Escherichia coli + Salmonella enterica (combined, not separable)",
+  "target_renorm": {
+    "Pseudomonas aeruginosa": 6.167846309403437,
+    "Lactobacillus fermentum": 21.840242669362993,
+    "Enterococcus faecalis": 14.762386248736096,
+    "Staphylococcus aureus": 15.3690596562184,
+    "Listeria monocytogenes": 14.054600606673407,
+    "Bacillus subtilis": 10.414560161779574,
+    "Escherichia coli + Salmonella enterica (combined, not separable)": 17.391304347826086
+  },
+  "assembly_based": {
+    "in3634_1": {
+      "Bacillus subtilis": {
+        "pct": 10.44035191026959,
+        "target": 10.414560161779574,
+        "fold": 1.0024765086656917
+      },
+      "Enterococcus faecalis": {
+        "pct": 20.288555808297886,
+        "target": 14.762386248736096,
+        "fold": 1.3743412119456582
+      },
+      "Escherichia coli + Salmonella enterica (combined, not separable)": {
+        "pct": 8.353417546280163,
+        "target": 17.391304347826086,
+        "fold": 0.48032150891110936
+      },
+      "Lactobacillus fermentum": {
+        "pct": 21.70767628013091,
+        "target": 21.840242669362993,
+        "fold": 0.9939301778263644
+      },
+      "Listeria monocytogenes": {
+        "pct": 16.717679698451192,
+        "target": 14.054600606673407,
+        "fold": 1.1894809512063476
+      },
+      "Pseudomonas aeruginosa": {
+        "pct": 4.691649562112501,
+        "target": 6.167846309403437,
+        "fold": 0.7606625273654531
+      },
+      "Staphylococcus aureus": {
+        "pct": 17.800669194457765,
+        "target": 15.3690596562184,
+        "fold": 1.158214594297285
+      }
+    },
+    "in3634_2": {
+      "Bacillus subtilis": {
+        "pct": 10.422241327450008,
+        "target": 10.414560161779574,
+        "fold": 1.0007375410532096
+      },
+      "Enterococcus faecalis": {
+        "pct": 20.05106999462107,
+        "target": 14.762386248736096,
+        "fold": 1.3582539879917972
+      },
+      "Escherichia coli + Salmonella enterica (combined, not separable)": {
+        "pct": 8.509184562910164,
+        "target": 17.391304347826086,
+        "fold": 0.4892781123673345
+      },
+      "Lactobacillus fermentum": {
+        "pct": 22.15694436227467,
+        "target": 21.840242669362993,
+        "fold": 1.014500832143039
+      },
+      "Listeria monocytogenes": {
+        "pct": 16.510059488371503,
+        "target": 14.054600606673407,
+        "fold": 1.1747085492085911
+      },
+      "Pseudomonas aeruginosa": {
+        "pct": 4.964879633336416,
+        "target": 6.167846309403437,
+        "fold": 0.8049616323556912
+      },
+      "Staphylococcus aureus": {
+        "pct": 17.38562063103617,
+        "target": 15.3690596562184,
+        "fold": 1.1312091318483404
+      }
+    }
+  }
+}

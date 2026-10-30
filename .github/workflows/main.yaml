@@ -7,20 +7,124 @@ on:
       - master
       - main
   pull_request:
-    branches_ignore: []
+    branches-ignore: []
 
 jobs:
-  Dry_Run_and_Lint_DNA_RNA:
+  Unit_Tests:
+    # Pure-Python unit tests (test/, run via run_tests.sh) -- no snakemake
+    # or singularity involved, just the stdlib `unittest` runner over
+    # src/utils.py and friends. Runs on the bare runner rather than the
+    # snakemake Docker image the dry-run jobs below use, since none of
+    # that is needed here and it's faster without it. Wired up now so
+    # that as the suite grows (more test_*.py files under test/), those
+    # new tests are already being exercised on every push/PR with no
+    # further CI changes required.
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    - name: Run unit test suite
+      run: ./run_tests.sh
+
+  # Covers every valid --workflow / sample-sheet / optional-flag combination
+  # the CLI can actually reach, as one matrix instead of one job per
+  # combination. Invalid or redundant combinations (e.g. --assembler with a
+  # workflow that never requests an assembly, or crossing the RNA-column-
+  # exists-but-empty sheet shape against every workflow when it parses
+  # identically to the DNA-only sheet once past valid_input()) are
+  # deliberately left out -- see the comment above each entry below.
+  Dry_Run_Matrix:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The three original, always-run configurations: default
+          # (--workflow pre-screen) across each of the three structurally
+          # distinct sample-sheet shapes (DNA+RNA paired, DNA-only, and
+          # DNA-only-with-an-empty-RNA-column -- the last one parses
+          # identically to DNA-only past valid_input(), it's here to catch
+          # a regression in that parsing path specifically, not DAG
+          # differences there aren't any).
+          - name: pre-screen_DNA-RNA
+            samplesheet: test_cohort.txt
+            workflow: pre-screen
+            extra_args: ""
+          - name: pre-screen_DNAonly
+            samplesheet: test_cohort_DNAonly.txt
+            workflow: pre-screen
+            extra_args: ""
+          - name: pre-screen_DNAonly_RNAcolexists
+            samplesheet: test_cohort_DNAonly_RNAcolexists.txt
+            workflow: pre-screen
+            extra_args: ""
+          # --workflow x sample-sheet, the two sheet shapes that actually
+          # produce different DAGs (pre-screen's own cross of these two is
+          # already covered by the two entries above)
+          - name: read-based_DNA-RNA
+            samplesheet: test_cohort.txt
+            workflow: read-based
+            extra_args: ""
+          - name: read-based_DNAonly
+            samplesheet: test_cohort_DNAonly.txt
+            workflow: read-based
+            extra_args: ""
+          - name: assembly-based_DNA-RNA
+            samplesheet: test_cohort.txt
+            workflow: assembly-based
+            extra_args: ""
+          - name: assembly-based_DNAonly
+            samplesheet: test_cohort_DNAonly.txt
+            workflow: assembly-based
+            extra_args: ""
+          - name: combined_DNA-RNA
+            samplesheet: test_cohort.txt
+            workflow: combined
+            extra_args: ""
+          - name: combined_DNAonly
+            samplesheet: test_cohort_DNAonly.txt
+            workflow: combined
+            extra_args: ""
+          # --host-genome: one lightweight workflow, one heavy workflow,
+          # one with RNA present alongside it to confirm it doesn't disturb
+          # the (host-genome-blind) RNA path
+          - name: pre-screen_DNAonly_host-genome
+            samplesheet: test_cohort_DNAonly.txt
+            workflow: pre-screen
+            extra_args: "--host-genome /opt2/.tests/dummy_host_genome.fasta"
+          - name: combined_DNA-RNA_host-genome
+            samplesheet: test_cohort.txt
+            workflow: combined
+            extra_args: "--host-genome /opt2/.tests/dummy_host_genome.fasta"
+          # --assembler: only meaningful where an assembly is actually
+          # requested; the default (both assemblers) is already exercised
+          # by the combined_DNAonly entry above
+          - name: combined_DNAonly_assembler-megahit
+            samplesheet: test_cohort_DNAonly.txt
+            workflow: combined
+            extra_args: "--assembler megahit"
+          - name: combined_DNAonly_assembler-metaspades
+            samplesheet: test_cohort_DNAonly.txt
+            workflow: combined
+            extra_args: "--assembler metaspades"
+          # --shallow-profile: only affects HUMAnN3's own options, exercised
+          # once alongside RNA since it's valid in both lanes
+          - name: combined_DNA-RNA_shallow-profile
+            samplesheet: test_cohort.txt
+            workflow: combined
+            extra_args: "--shallow-profile"
+    steps:
+    - uses: actions/checkout@v2
     - uses: docker://snakemake/snakemake:v7.32.4
-    - name: Dry Run 
+    - name: Dry Run [${{ matrix.name }}]
       run: |
         docker run -v $PWD:/opt2 snakemake/snakemake:v7.32.4 \
-        /opt2/metamorph run --samplesheet /opt2/.tests/test_cohort.txt \
-        --output /opt2/output --mode local --dry-run
-    - name: View the pipeline config file [DNA & RNA modes]
+        /opt2/metamorph run --samplesheet /opt2/.tests/${{ matrix.samplesheet }} \
+        --output /opt2/output --mode local --workflow ${{ matrix.workflow }} \
+        ${{ matrix.extra_args }} --dry-run
+    - name: View the pipeline config file [${{ matrix.name }}]
       run: |
         echo "Generated config file for pipeline...." && cat $PWD/output/config.json
     - name: Lint Workflow
@@ -28,31 +132,3 @@ jobs:
       run: |
         docker run -v $PWD:/opt2 snakemake/snakemake:v7.32.4 snakemake --lint -s /opt2/output/workflow/Snakefile -d /opt2/output || \
         echo 'There may have been a few warnings or errors. Please read through the log to determine if its harmless.'
-  Dry_Run_and_Lint_DNAonly1:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    - uses: docker://snakemake/snakemake:v7.32.4
-    - name: Dry Run [DNA only mode]
-      run: |
-        docker run -v $PWD:/opt2 snakemake/snakemake:v7.32.4 \
-        /opt2/metamorph run --samplesheet /opt2/.tests/test_cohort_DNAonly.txt \
-        --output /opt2/output --mode local --dry-run
-    - name: View the pipeline config file [DNA only mode]
-      run: |
-        echo "Generated config file for pipeline...." && cat $PWD/output/config.json
-    - name: Lint Workflow
-      continue-on-error: true
-      run: |
-        docker run -v $PWD:/opt2 snakemake/snakemake:v7.32.4 snakemake --lint -s /opt2/output/workflow/Snakefile -d /opt2/output || \
-        echo 'There may have been a few warnings or errors. Please read through the log to determine if its harmless.'
-  Dry_Run_DNA2:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    - uses: docker://snakemake/snakemake:v7.32.4
-    - name: Dry Run [DNA only mode w RNA column]
-      run: |
-        docker run -v $PWD:/opt2 snakemake/snakemake:v7.32.4 \
-        /opt2/metamorph run --samplesheet /opt2/.tests/test_cohort_DNAonly_RNAcolexists.txt \
-        --output /opt2/output --mode local --dry-run

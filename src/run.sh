@@ -212,20 +212,14 @@ function submit(){
           
           SLURM_DIR="$4/logfiles/slurmfiles"
           CLUSTER_OPTS="sbatch --gres {cluster.gres} --cpus-per-task {cluster.threads} -p {cluster.partition} -t {cluster.time} --mem {cluster.mem} --job-name={params.rname} -e $SLURM_DIR/slurm-%j_{params.rname}.out -o $SLURM_DIR/slurm-%j_{params.rname}.out"
-          # Check if NOT running on Biowulf
-          # Assumes other clusters do NOT 
-          # have GRES for local node disk,
-          # long term it might be worth 
-          # adding a new option to allow 
-          # a user to decide whether to 
-          # use GRES at job submission,
-          # trying to infer this because
-          # most users will not even know
-          # what GRES is and how or why
-          # it should be used and by default
-          # SLURM is not configured to use 
-          # GRES, remove prefix single quote
-          if [[ ${7#\'} != /lscratch* ]]; then
+          # Only request the lscratch GRES if this Slurm cluster actually
+          # advertises one (most non-Biowulf-style clusters do not configure
+          # it, and requesting an undefined GRES type makes every sbatch
+          # submission fail outright). Checked directly against the
+          # scheduler's own advertised resources, not inferred from any
+          # pipeline argument (e.g. --tmp-dir's path has no bearing on
+          # whether the cluster supports this GRES type).
+          if ! sinfo -o '%G' --noheader 2>/dev/null | tr ',' '\n' | grep -q '^lscratch'; then
             CLUSTER_OPTS="sbatch --cpus-per-task {cluster.threads} -p {cluster.partition} -t {cluster.time} --mem {cluster.mem} --job-name={params.rname} -e $SLURM_DIR/slurm-%j_{params.rname}.out -o $SLURM_DIR/slurm-%j_{params.rname}.out"
           fi
     cat << EOF > kickoff.sh
