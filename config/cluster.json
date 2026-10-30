@@ -55,6 +55,20 @@
         "time": "2-00:00:00",
         "gres": "lscratch:100"
     },
+    "dna_centrifuger_taxonomy": {
+        "threads": 1,
+        "mem": "16G",
+        "partition": "norm",
+        "time": "0-01:00:00",
+        "gres": "lscratch:16"
+    },
+    "dna_read_based_master_sheet": {
+        "threads": 1,
+        "mem": "16G",
+        "partition": "norm",
+        "time": "0-01:00:00",
+        "gres": "lscratch:16"
+    },
     "dna_sample_qc_summary": {
         "threads": 2,
         "mem": "8G",
@@ -132,6 +146,13 @@
         "mem": "64G",
         "partition": "norm",
         "time": "2-00:00:00"
+    },
+    "assembly_master_sheet": {
+        "threads": 1,
+        "mem": "4G",
+        "partition": "norm",
+        "time": "0-01:00:00",
+        "gres": "lscratch:16"
     },
     "concat_rna_reads": {
         "threads": 28,

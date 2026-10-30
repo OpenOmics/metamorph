@@ -83,7 +83,7 @@
         }, {
             "name": "metaphlan_db",
             "to": "/data2/metaphlan",
-            "from": "/data/OpenOmics/references/metamorph/metaphlan",
+            "from": "/data/OpenOmics/references/metamorph/metaphlan/mpa_vJan26_CHOCOPhlAnSGB_202605",
             "mode": "rw"
         }, {
             "name": "hg38_bowtie_index",

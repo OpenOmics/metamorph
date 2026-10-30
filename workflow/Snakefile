@@ -18,6 +18,7 @@ samples                    = config["samples"]
 analysis_mode              = config["options"]["analysis_mode"]
 
 # DNA directories
+top_results_dir            = join(workpath, config['project']['id'])
 top_assembly_dir           = join(workpath, config['project']['id'], "metawrap_assembly")
 top_readqc_dir             = join(workpath, config['project']['id'], "metawrap_read_qc_skipBmtagger")
 top_trim_dir               = join(workpath, config['project']['id'], "trimmed_reads")
@@ -85,6 +86,7 @@ all_targets = [
             expand(join(top_mapping_dir, '{name}_pathabundance.tsv'), name=samples),
             expand(join(top_mapping_dir, '{name}_pathcoverage.tsv'), name=samples),
             expand(join(top_mapping_dir, '{name}_bugs_list.tsv'),name=samples),
+            join(top_results_dir, "read_based_master_sheet.xlsx"),
             join(top_mapping_dir, 'merged_bugs_list.tsv'),
             join(top_mapping_dir, 'merged_pathabundance.cpm.stratified.tsv'),
             join(top_mapping_dir, 'merged_pathabundance.cpm.unstratified.tsv'),
@@ -106,6 +108,7 @@ all_targets = [
             expand(join(top_assembly_dir, "{name}", "assembly_report.html"), name=samples),
             expand(join(top_tax_dir, "GTDBTK_classify_wf"), name=samples),
             expand(join(top_tax_dir, "GUNC_detect"), name=samples),
+            join(top_results_dir, "assembly_master_sheet.tsv"),
             # assembly binning
             expand(join(top_binning_dir, "{name}", "maxbin2_bins.contigs"), name=samples),
             expand(join(top_binning_dir, "{name}", "maxbin2_bins.stats"), name=samples),

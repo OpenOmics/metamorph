@@ -18,6 +18,7 @@ default_memory             = cluster["__default__"]['mem']
 workpath                   = config["project"]["workpath"]
 datapath                   = config["project"]["datapath"]
 samples                    = config["samples"]
+top_results_dir            = join(workpath, config['project']['id'])
 top_log_dir                = join(workpath, "logfiles")
 top_readqc_dir             = join(workpath, config['project']['id'], "metawrap_read_qc_skipBmtagger")
 top_trim_dir               = join(workpath, config['project']['id'], "trimmed_reads")
@@ -387,7 +388,7 @@ rule dna_centrifuger:
         centrifuger_idx_prefix      = "/data2/centrifuger/gtdb_r226+refseq_hvfc/cfr_gtdb_r226+refseq_hvfc",
     container: centrifuger_sylph_container,
     threads: int(cluster["dna_centrifuger"].get('threads', default_threads)),
-    shell: 
+    shell:
         """
         # Runs centrifuger on gDNA to classify taxonomic
         # composition of host removed reads
@@ -397,6 +398,7 @@ rule dna_centrifuger:
             -1 {input.R1_dehost} \\
             -2 {input.R2_dehost}  \\
         > {output.classification}
+
         # Runs centrifuger quant on gDNA to quantify
         # taxonomic composition of host removed reads
         # Centrifuger output file format
@@ -405,12 +407,83 @@ rule dna_centrifuger:
             -c {output.classification} \\
             --output-format 0 \\
         > {output.centrifuger_quant}
+
         # Metaphlan output file format
         centrifuger-quant \\
             -x {params.centrifuger_idx_prefix} \\
             -c {output.classification} \\
             --output-format 1 \\
         > {output.metaphlan_quant}
+        """
+
+
+rule dna_centrifuger_taxonomy:
+    """
+    Extracts the taxonomy tree Centrifuger's taxIDs resolve against,
+    straight out of the index itself -- the prebuilt gtdb_r226+refseq_hvfc
+    index doesn't ship a standalone nodes.dmp/names.dmp, so this is the
+    only way to get one. Pulled once and shared by every sample rather
+    than re-extracted per sample.
+    """
+    output:
+        nodes                        = join(top_centrifuger_dir, "centrifuger_taxonomy_nodes.dmp"),
+        names                        = join(top_centrifuger_dir, "centrifuger_taxonomy_names.dmp"),
+    params:
+        rname                        = "dna_centrifuger_taxonomy",
+        centrifuger_idx_prefix       = "/data2/centrifuger/gtdb_r226+refseq_hvfc/cfr_gtdb_r226+refseq_hvfc",
+    container: centrifuger_sylph_container,
+    threads: int(cluster["dna_centrifuger_taxonomy"].get("threads", default_threads)),
+    shell:
+        """
+        centrifuger-inspect \\
+            -x {params.centrifuger_idx_prefix} \\
+            --taxonomy-tree \\
+        > {output.nodes}
+        centrifuger-inspect \\
+            -x {params.centrifuger_idx_prefix} \\
+            --name-table \\
+        > {output.names}
+        """
+
+
+rule dna_read_based_master_sheet:
+    """
+    Builds a two-sheet Excel workbook for the read-based workflow: one
+    sheet rolling every sample's Centrifuger quantification report into
+    a cohort-level table (one row per taxID, its GTDB-style lineage
+    split into per-rank columns, and that taxon's relative abundance in
+    each sample), and a second sheet holding humann3's own MetaPhlAn4
+    results (merged_bugs_list.tsv) unmodified. These are kept on
+    separate sheets rather than joined into one table -- Centrifuger and
+    MetaPhlAn4 are different databases with differently-versioned
+    taxonomies that disagree on naming above the species rank, so
+    merging them into one row-per-taxon table would silently imply a
+    correspondence that isn't really there. See
+    workflow/scripts/read_based_master_sheet.py for the details.
+    """
+    input:
+        nodes                         = join(top_centrifuger_dir, "centrifuger_taxonomy_nodes.dmp"),
+        names                         = join(top_centrifuger_dir, "centrifuger_taxonomy_names.dmp"),
+        quant_reports                 = expand(join(top_centrifuger_dir, "{name}_centrifuger_quantification_report.tsv"), name=samples),
+        metaphlan_bugs_list           = join(top_mapping_dir, 'merged_bugs_list.tsv'),
+    output:
+        read_based_master             = join(top_results_dir, "read_based_master_sheet.xlsx"),
+    params:
+        rname                        = "dna_read_based_master_sheet",
+        quant_report_args             = " ".join(
+            "--quant-report " + name + "=" + join(top_centrifuger_dir, name + "_centrifuger_quantification_report.tsv")
+            for name in samples
+        ),
+    containerized: metaphlan_utils_container,
+    threads: int(cluster["dna_read_based_master_sheet"].get("threads", default_threads)),
+    shell:
+        """
+        python3 workflow/scripts/read_based_master_sheet.py \\
+            --nodes {input.nodes} \\
+            --names {input.names} \\
+            {params.quant_report_args} \\
+            --metaphlan-bugs-list {input.metaphlan_bugs_list} \\
+            --output {output.read_based_master}
         """
 
 rule dna_sample_qc_summary:
@@ -1221,9 +1294,9 @@ rule gtdbtk_classify:
     input:
         dRep_dir                    = join(top_refine_dir, "dRep", "dereplicated_genomes"),
     output:
-        gtdbtk_dir                   = directory(join(top_tax_dir, "GTDBTK_classify_wf"))
-    threads: 
-        int(cluster["gtdbtk_classify"].get("threads", default_threads)),
+        gtdbtk_dir                  = directory(join(top_tax_dir, "GTDBTK_classify_wf")),
+        gtdbtk_summary              = join(top_tax_dir, "GTDBTK_classify_wf", "gtdbtk.bac120.summary.tsv")    
+    threads: int(cluster["gtdbtk_classify"].get("threads", default_threads)),
     params:
         rname                       = "gtdbtk_classify",
         tmp_safe_dir                = join(config['options']['tmp_dir'], 'gtdbtk_classify'),
@@ -1259,6 +1332,42 @@ rule gtdbtk_classify:
             --full_tree \
             --force \
             --extension fa
+        """
+
+
+rule assembly_master_sheet:
+    """
+    Rolls gtdbtk_classify's per-bin lineage calls, derep_bins' CheckM
+    completeness/contamination scores, each bin's own genome size and
+    contig count (counted directly from its dereplicated FASTA), and
+    bbtools_index_map's per-sample read-recruitment fractions into one
+    assembly-wide mastersheet: one row per dereplicated bin, its GTDB
+    lineage split out into per-rank columns, its QC metrics, and the
+    fraction of each sample's reads recruited to it.
+    """
+    input:
+        gtdbtk_summary               = join(top_tax_dir, "GTDBTK_classify_wf", "gtdbtk.bac120.summary.tsv"),
+        genome_info                  = join(top_refine_dir, "genomeInfo.csv"),
+        dereplicated_genomes_dir     = join(top_refine_dir, "dRep", "dereplicated_genomes"),
+        refstats                     = expand(join(top_mags_dir, "{name}", "DNA", "{name}.refstats"), name=samples),
+    output:
+        assembly_master               = join(top_results_dir, "assembly_master_sheet.tsv"),
+    params:
+        rname                        = "assembly_master_sheet",
+        refstats_args                = " ".join(
+            "--refstats " + name + "=" + join(top_mags_dir, name, "DNA", name + ".refstats")
+            for name in samples
+        ),
+    singularity: metawrap_container,
+    threads: int(cluster["assembly_master_sheet"].get("threads", default_threads)),
+    shell:
+        """
+        python3 workflow/scripts/gtdbtk_master_sheet.py \\
+            --gtdbtk-summary {input.gtdbtk_summary} \\
+            --genome-info {input.genome_info} \\
+            --dereplicated-genomes-dir {input.dereplicated_genomes_dir} \\
+            {params.refstats_args} \\
+            --output {output.assembly_master}
         """
 
 
