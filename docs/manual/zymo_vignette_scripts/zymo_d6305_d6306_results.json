@@ -1,0 +1,110 @@
+{
+  "vendor_renorm": {
+    "Pseudomonas aeruginosa": 6.167846309403437,
+    "Escherichia coli": 8.594539939332659,
+    "Salmonella enterica": 8.796764408493427,
+    "Lactobacillus fermentum": 21.840242669362993,
+    "Enterococcus faecalis": 14.762386248736096,
+    "Staphylococcus aureus": 15.3690596562184,
+    "Listeria monocytogenes": 14.054600606673407,
+    "Bacillus subtilis": 10.414560161779574
+  },
+  "read_based": {
+    "in3634_1": {
+      "Pseudomonas aeruginosa": {
+        "pct": 4.570097526030348,
+        "target": 6.167846309403437,
+        "fold": 0.7409551562695106
+      },
+      "Escherichia coli": {
+        "pct": 2.2272507046388124,
+        "target": 8.594539939332659,
+        "fold": 0.25914717022209244
+      },
+      "Salmonella enterica": {
+        "pct": 6.056503699924601,
+        "target": 8.796764408493427,
+        "fold": 0.6884922022098197
+      },
+      "Lactobacillus fermentum": {
+        "pct": 29.036104821329427,
+        "target": 21.840242669362993,
+        "fold": 1.3294772068655
+      },
+      "Enterococcus faecalis": {
+        "pct": 10.006166630545119,
+        "target": 14.762386248736096,
+        "fold": 0.6778149861376112
+      },
+      "Staphylococcus aureus": {
+        "pct": 15.228805202706353,
+        "target": 15.3690596562184,
+        "fold": 0.9908742332550384
+      },
+      "Listeria monocytogenes": {
+        "pct": 18.25449433898158,
+        "target": 14.054600606673407,
+        "fold": 1.29882697131315
+      },
+      "Bacillus subtilis": {
+        "pct": 14.620577075843752,
+        "target": 10.414560161779574,
+        "fold": 1.403859293981502
+      },
+      "Saccharomyces cerevisiae": {
+        "pct": 0.44079999999999997
+      },
+      "Cryptococcus neoformans": {
+        "pct": 0.0
+      }
+    },
+    "in3634_2": {
+      "Pseudomonas aeruginosa": {
+        "pct": 4.775730180806676,
+        "target": 6.167846309403437,
+        "fold": 0.7742946145602956
+      },
+      "Escherichia coli": {
+        "pct": 2.1687786534796265,
+        "target": 8.594539939332659,
+        "fold": 0.2523437750931001
+      },
+      "Salmonella enterica": {
+        "pct": 6.035453046927315,
+        "target": 8.796764408493427,
+        "fold": 0.6860992026909327
+      },
+      "Lactobacillus fermentum": {
+        "pct": 29.742719655213858,
+        "target": 21.840242669362993,
+        "fold": 1.3618310064354864
+      },
+      "Enterococcus faecalis": {
+        "pct": 9.72190027301293,
+        "target": 14.762386248736096,
+        "fold": 0.6585588609595745
+      },
+      "Staphylococcus aureus": {
+        "pct": 14.900227940040178,
+        "target": 15.3690596562184,
+        "fold": 0.9694950942565617
+      },
+      "Listeria monocytogenes": {
+        "pct": 18.011062174831295,
+        "target": 14.054600606673407,
+        "fold": 1.2815065101372771
+      },
+      "Bacillus subtilis": {
+        "pct": 14.644128075688112,
+        "target": 10.414560161779574,
+        "fold": 1.4061206472675285
+      },
+      "Saccharomyces cerevisiae": {
+        "pct": 0.43254000000000004
+      },
+      "Cryptococcus neoformans": {
+        "pct": 0.0
+      }
+    }
+  }
+}
