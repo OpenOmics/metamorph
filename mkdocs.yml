@@ -100,6 +100,7 @@ nav:
   - Manual:
     - Introduction: manual/introduction.md
     - "Vignette: ZymoBIOMICS Standard": manual/zymo-vignette.md
+    - "Vignette: ZymoBIOMICS DNA Standard (D6305/D6306)": manual/zymo-d6305-d6306-vignette.md
   - Walkthrough: walkthrough.md
   - Commands:
     - metamorph run: usage/run.md
